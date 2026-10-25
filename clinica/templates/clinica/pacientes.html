@@ -19,6 +19,8 @@
 <style>
 .patient-list-table{min-width:1120px}
 .patient-birthday-row{background:#fffaf0}
+.patient-restricted-row{background:#fff3f3}
+.patient-restriction-badge{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;background:#fee2e2;color:#a51b29;font-size:10px;font-weight:900;letter-spacing:.06em;white-space:nowrap}
 .patient-name-stack strong{display:block;color:#102338}
 .patient-name-stack span{display:block;margin-top:3px;color:var(--muted);font-size:12px}
 .patient-action-strip{display:flex;gap:8px;flex-wrap:wrap}
@@ -227,6 +229,10 @@
     opacity:.88;
 }
 .premium-patient-card-web:hover{transform:translateY(-5px);border-color:rgba(52,170,178,.55);box-shadow:0 22px 44px rgba(20,66,98,.14)}
+.premium-patient-card-web.is-restricted{border-color:#f0b9bf;background:linear-gradient(145deg,#fff4f4,#fffafa);box-shadow:0 12px 32px rgba(158,37,53,.08)}
+.premium-patient-card-web.is-restricted::before{background:#d54b5a}
+.premium-patient-card-web.is-restricted:hover{border-color:#da7c87;box-shadow:0 22px 44px rgba(158,37,53,.12)}
+.premium-patient-restriction-reason{margin:0 0 12px;padding:10px 11px;border:1px solid #f1cdd1;border-radius:12px;color:#8e2330;background:#fff;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .premium-patient-card-head{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:13px;align-items:center}
 .premium-patient-avatar{
     width:58px;
@@ -274,10 +280,12 @@
 .premium-patient-action:hover{transform:translateY(-1px);color:#087d79;border-color:#8fd8d3;background:#f1fffd}
 .premium-patient-action.is-primary{color:#fff;border-color:transparent;background:linear-gradient(120deg,var(--patient-teal),var(--patient-blue));box-shadow:0 8px 18px rgba(30,121,181,.18)}
 .premium-patient-action.is-disabled{cursor:not-allowed;opacity:.42}
-.premium-patient-admin{display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px;padding-top:11px;border-top:1px solid #e7eef5}
+.premium-patient-admin{display:flex;justify-content:flex-end;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:11px;border-top:1px solid #e7eef5}
 .premium-patient-admin a,.premium-patient-admin button{padding:0;border:0;color:#7890a5;background:transparent;font:inherit;font-size:11px;font-weight:800;cursor:pointer;text-decoration:none}
 .premium-patient-admin a:hover{color:#176aa4}
 .premium-patient-admin button:hover{color:#b42318}
+.premium-patient-admin a.is-restriction-action{color:#a32937}
+.premium-patient-admin a.is-enable-action{color:#087e72}
 .patients-premium-empty{grid-column:1/-1;padding:58px 24px;border:1px dashed #c8d9e7;border-radius:22px;color:#6d8296;background:rgba(255,255,255,.75);text-align:center}
 @keyframes patientWebCardEnter{from{opacity:0;transform:translateY(15px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media (max-width:1360px){.patients-premium-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -346,6 +354,7 @@
             <div class="patients-filter-group" aria-label="Filtros rápidos">
                 <button class="patients-filter-button is-active" type="button" data-patient-filter="all">Todos</button>
                 <button class="patients-filter-button" type="button" data-patient-filter="birthday">Cumpleaños</button>
+                <button class="patients-filter-button" type="button" data-patient-filter="restricted">No agendar</button>
                 {% if erp_access.ver_historia_clinica %}<button class="patients-filter-button" type="button" data-patient-filter="alert">Con alerta</button>{% endif %}
             </div>
             <div class="patients-view-group" aria-label="Vista del directorio">
@@ -356,7 +365,7 @@
 
         <div class="patients-premium-grid" data-patient-grid>
             {% for paciente in pacientes %}
-            <article class="premium-patient-card-web" style="--patient-index:{{ forloop.counter0 }}" data-patient-card data-birthday="{% if paciente.cumple_mes == 0 %}true{% else %}false{% endif %}" data-alert="{% if erp_access.ver_historia_clinica and paciente.es_alergico %}true{% else %}false{% endif %}">
+            <article class="premium-patient-card-web{% if paciente.no_agendar %} is-restricted{% endif %}" style="--patient-index:{{ forloop.counter0 }}" data-patient-card data-restricted="{% if paciente.no_agendar %}true{% else %}false{% endif %}" data-birthday="{% if paciente.cumple_mes == 0 %}true{% else %}false{% endif %}" data-alert="{% if erp_access.ver_historia_clinica and paciente.es_alergico %}true{% else %}false{% endif %}">
                 <div class="premium-patient-card-head">
                     <div class="premium-patient-avatar">
                         {% if paciente.foto_perfil %}
@@ -369,7 +378,7 @@
                         <h3 title="{{ paciente.nombre }}">{{ paciente.nombre }}</h3>
                         <p>{{ paciente.expediente_codigo }} · {% if paciente.edad is not None %}{{ paciente.edad }} años{% else %}Edad no indicada{% endif %}</p>
                     </div>
-                    <span class="premium-patient-status">Activo</span>
+                    {% if paciente.no_agendar %}<span class="patient-restriction-badge">NO AGENDAR</span>{% else %}<span class="premium-patient-status">Activo</span>{% endif %}
                 </div>
 
                 <div class="premium-patient-badges">
@@ -382,6 +391,9 @@
                     <span><strong>Teléfono:</strong> {{ paciente.whatsapp|default:paciente.telefono|default:"No registrado" }}</span>
                     <span><strong>Correo:</strong> {{ paciente.correo|default:"No registrado" }}</span>
                 </div>
+                {% if paciente.no_agendar and erp_access.ver_motivo_restriccion_paciente %}
+                <p class="premium-patient-restriction-reason"><strong>Motivo:</strong> {{ paciente.motivo_no_agendar }}</p>
+                {% endif %}
 
                 <div class="premium-patient-actions">
                     {% if paciente.telefono_accion %}
@@ -408,6 +420,11 @@
                 </div>
 
                 <div class="premium-patient-admin">
+                    {% if paciente.no_agendar %}
+                        {% if erp_access.habilitar_citas_paciente %}<a class="is-enable-action" href="{% url 'clinica_habilitar_citas_paciente' empresa.slug paciente.id %}">Habilitar nuevamente para citas</a>{% endif %}
+                    {% elif erp_access.restringir_citas_paciente %}
+                        <a class="is-restriction-action" href="{% url 'clinica_restringir_citas_paciente' empresa.slug paciente.id %}">Marcar como No Agendar</a>
+                    {% endif %}
                     {% if erp_access.editar_pacientes %}<a href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar datos</a>{% endif %}
                     {% if erp_access.eliminar_pacientes %}
                     <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
@@ -457,11 +474,12 @@
             <thead><tr><th>Nombres</th><th>Apellidos</th><th>Documento</th><th>Edad</th><th>Celular</th><th>E-mail</th><th>Sucursal</th><th>Riesgo</th><th>Cumple</th><th>Acciones</th></tr></thead>
             <tbody>
                 {% for paciente in pacientes %}
-                <tr class="{% if paciente.cumple_mes == 0 %}patient-birthday-row{% endif %}">
+                <tr class="{% if paciente.no_agendar %}patient-restricted-row{% elif paciente.cumple_mes == 0 %}patient-birthday-row{% endif %}">
                     <td>
                         <div class="patient-name-stack">
                             <strong><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">{{ paciente.primer_nombre|default:paciente.nombre }}{% if paciente.segundo_nombre %} {{ paciente.segundo_nombre }}{% endif %}</a></strong>
                             <span>{{ paciente.expediente_codigo }}</span>
+                            {% if paciente.no_agendar %}<span class="patient-restriction-badge">NO AGENDAR</span>{% endif %}
                         </div>
                     </td>
                     <td>{{ paciente.primer_apellido|default:"" }}{% if paciente.segundo_apellido %} {{ paciente.segundo_apellido }}{% endif %}</td>
@@ -487,6 +505,11 @@
                     <td>
                         <div class="patient-action-strip">
                             <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Ver</a>
+                            {% if paciente.no_agendar %}
+                                {% if erp_access.habilitar_citas_paciente %}<a class="erp-action-link" href="{% url 'clinica_habilitar_citas_paciente' empresa.slug paciente.id %}">Habilitar nuevamente para citas</a>{% endif %}
+                            {% elif erp_access.restringir_citas_paciente %}
+                                <a class="erp-action-link" href="{% url 'clinica_restringir_citas_paciente' empresa.slug paciente.id %}">Marcar como No Agendar</a>
+                            {% endif %}
                             {% if erp_access.editar_pacientes %}<a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a>{% endif %}
                             {% if erp_access.eliminar_pacientes %}
                             <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
@@ -598,6 +621,7 @@
             cards.forEach((card) => {
                 const visible = filter === "all"
                     || (filter === "birthday" && card.dataset.birthday === "true")
+                    || (filter === "restricted" && card.dataset.restricted === "true")
                     || (filter === "alert" && card.dataset.alert === "true");
                 card.hidden = !visible;
             });

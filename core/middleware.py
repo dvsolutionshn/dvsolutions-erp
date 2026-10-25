@@ -276,7 +276,7 @@ class EmpresaAccessMiddleware:
                     permiso = (
                         permiso_clinica_granular(suffix, request.method)
                         if rol_granular
-                        else permiso_clinica_desde_ruta(suffix)
+                        else permiso_clinica_desde_ruta(suffix, request.method)
                     )
                     if permiso == "__denegar__":
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta sección clínica.")
@@ -285,7 +285,8 @@ class EmpresaAccessMiddleware:
                         suffix.strip("/") == "configuracion"
                         and request.user.tiene_permiso_erp("puede_administrar_manuales_pdf", empresa)
                     )
-                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa) and not acceso_administracion_manuales:
+                    permisos_accion = permiso if isinstance(permiso, (tuple, list)) else (permiso,)
+                    if permiso and not any(request.user.tiene_permiso_erp(accion, empresa) for accion in permisos_accion) and not acceso_administracion_manuales:
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion clinica.")
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_clinica_empresa(empresa):

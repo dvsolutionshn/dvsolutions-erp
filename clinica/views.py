@@ -1452,6 +1452,12 @@ def eliminar_paciente(request, empresa_slug, paciente_id):
             f"Paciente {nombre} dado de baja en la base compartida. "
             f"Se ocultaron {pacientes_baja} expediente(s) y {clientes_baja} cliente(s) relacionado(s).",
         )
+    elif paciente.historial_restricciones_citas.exists():
+        with transaction.atomic():
+            Paciente.objects.filter(pk=paciente.pk, empresa=empresa).update(activo=False)
+            if paciente.cliente_id:
+                Cliente.objects.filter(pk=paciente.cliente_id, empresa=empresa).update(activo=False)
+        messages.success(request, f"Paciente {nombre} dado de baja. Se conserva su expediente y el historial de restricciones de citas.")
     else:
         paciente.delete()
         messages.success(request, f"Paciente {nombre} eliminado correctamente.")
@@ -1709,6 +1715,13 @@ def seguimientos_paciente(request, empresa_slug, paciente_id):
 def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    from .restricciones_citas import validar_paciente_para_cita
+    try:
+        validar_paciente_para_cita(paciente.pk, empresa.pk, usuario=request.user)
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
+        destino = "clinica_seguimientos_paciente" if request.POST.get("next") == "seguimientos" else "clinica_paciente_detalle"
+        return redirect(destino, empresa_slug=empresa.slug, paciente_id=paciente.pk)
     asegurar_profesionales_agenda_base(empresa)
 
     tratamientos = request.POST.getlist("tratamiento[]")
@@ -1757,7 +1770,7 @@ def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
             errores.append(f"Fila {fila}: fecha u hora invalida.")
             continue
 
-        cita = CitaClinica.objects.create(
+        cita = CitaClinica(
             empresa=empresa,
             paciente=paciente,
             profesional=profesional,
@@ -1769,6 +1782,12 @@ def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
             tratamiento_recordatorio=tratamiento,
             observaciones=nota or "Seguimiento programado desde expediente clinico.",
         )
+        cita._restriccion_usuario = request.user
+        try:
+            cita.save()
+        except ValidationError as exc:
+            errores.extend(exc.messages)
+            break
         try:
             _sincronizar_agenda_desde_cita_clinica(cita)
         except Exception:
@@ -4543,18 +4562,23 @@ def crear_cita(request, empresa_slug):
     form = CitaClinicaForm(
         request.POST or None,
         empresa=empresa,
+        usuario=request.user,
         initial={"paciente": paciente_inicial} if paciente_inicial else None,
     )
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
-        cita.save()
         try:
-            _sincronizar_agenda_desde_cita_clinica(cita)
-        except Exception:
-            messages.warning(request, "La cita se guardo, pero no se pudo sincronizar WhatsApp/agenda en este momento.")
-        messages.success(request, "Cita clinica guardada correctamente.")
-        return redirect("clinica_citas", empresa_slug=empresa.slug)
+            cita.save()
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            try:
+                _sincronizar_agenda_desde_cita_clinica(cita)
+            except Exception:
+                messages.warning(request, "La cita se guardo, pero no se pudo sincronizar WhatsApp/agenda en este momento.")
+            messages.success(request, "Cita clinica guardada correctamente.")
+            return redirect("clinica_citas", empresa_slug=empresa.slug)
     return render(request, "clinica/form.html", {
         "empresa": empresa,
         "form": form,

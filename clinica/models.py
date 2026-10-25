@@ -199,6 +199,9 @@ class Paciente(models.Model):
     notas_privadas = models.TextField(blank=True, null=True)
     acepta_promociones = models.BooleanField(default=False)
     activo = models.BooleanField(default=True)
+    no_agendar = models.BooleanField(default=False, editable=False, db_index=True)
+    motivo_no_agendar = models.TextField(blank=True, editable=False)
+    observacion_no_agendar = models.TextField(blank=True, editable=False)
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="pacientes_creados")
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
@@ -234,6 +237,17 @@ class Paciente(models.Model):
         nombre_compuesto = " ".join(parte.strip() for parte in partes_nombre if parte and parte.strip())
         if nombre_compuesto:
             self.nombre = nombre_compuesto
+        if self.pk and not getattr(self, "_actualizando_restriccion_citas", False):
+            # Un formulario abierto antes de restringir no debe restaurar el
+            # estado viejo al guardar otros datos generales del paciente.
+            with transaction.atomic():
+                actual = type(self).objects.select_for_update().filter(pk=self.pk).values(
+                    "no_agendar", "motivo_no_agendar", "observacion_no_agendar",
+                ).first()
+                if actual:
+                    for campo, valor in actual.items():
+                        setattr(self, campo, valor)
+                return super().save(*args, **kwargs)
         super().save(*args, **kwargs)
 
     @property
@@ -249,6 +263,27 @@ class Paciente(models.Model):
     def sexo_normalizado(self):
         """Valor estable para decisiones visuales sin modificar datos históricos."""
         return (self.sexo or "").strip().lower()
+
+
+class HistorialRestriccionCitasPaciente(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.PROTECT, related_name="restricciones_citas_pacientes")
+    paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, related_name="historial_restricciones_citas")
+    estado_anterior = models.BooleanField()
+    estado_nuevo = models.BooleanField()
+    motivo = models.TextField()
+    observacion = models.TextField(blank=True)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="restricciones_citas_aplicadas")
+    usuario_nombre = models.CharField(max_length=180, blank=True)
+    fecha = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        ordering = ["-fecha", "-pk"]
+        indexes = [models.Index(fields=["empresa", "paciente", "fecha"], name="clinica_restriccion_hist_idx")]
+        verbose_name = "Historial de restricción de citas"
+        verbose_name_plural = "Historial de restricciones de citas"
+
+    def __str__(self):
+        return f"{self.paciente} - {'NO AGENDAR' if self.estado_nuevo else 'Habilitado'}"
 
 
 class PacienteFotoEvolucion(models.Model):
@@ -359,6 +394,38 @@ class CitaClinica(models.Model):
 
     def __str__(self):
         return f"{self.paciente.nombre} - {self.fecha_hora:%d/%m/%Y %H:%M}"
+
+    def validar_restriccion_citas(self, *, bloquear=False):
+        if not self.empresa_id or not self.paciente_id:
+            return
+        if not self._state.adding and self.pk:
+            anterior = type(self).objects.filter(pk=self.pk).values("empresa_id", "paciente_id").first()
+            if anterior and anterior["empresa_id"] == self.empresa_id and anterior["paciente_id"] == self.paciente_id:
+                return
+        origen_id = getattr(self, "_cita_agenda_origen_id", None)
+        if self._state.adding and origen_id:
+            from crm.models import CitaCliente
+
+            if CitaCliente.objects.filter(
+                pk=origen_id, empresa_id=self.empresa_id, paciente_id=self.paciente_id,
+                fecha_hora=self.fecha_hora, cita_clinica__isnull=True,
+            ).exists():
+                return
+        from .restricciones_citas import validar_paciente_para_cita
+
+        validar_paciente_para_cita(
+            self.paciente_id, self.empresa_id,
+            usuario=getattr(self, "_restriccion_usuario", None), bloquear=bloquear,
+        )
+
+    def clean(self):
+        super().clean()
+        self.validar_restriccion_citas()
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            self.validar_restriccion_citas(bloquear=True)
+            return super().save(*args, **kwargs)
 
     @property
     def agenda_color(self):

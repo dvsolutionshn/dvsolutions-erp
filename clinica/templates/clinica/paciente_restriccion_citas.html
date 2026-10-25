@@ -1,0 +1,125 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{% if habilitar %}Habilitar citas{% else %}Restricción de citas{% endif %} - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Pacientes · {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}{% if habilitar %}Habilitar nuevamente para citas{% else %}Restricción de nuevas citas{% endif %}{% endblock %}
+{% block header_description %}{{ paciente.nombre }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}{% if modo_app %}?app=1{% endif %}">Volver a pacientes</a>
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}{% if modo_app %}?app=1{% endif %}">Abrir expediente</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.booking-restriction-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(250px,.85fr);gap:18px;align-items:start}
+.booking-restriction-card{min-width:0}
+.booking-restriction-status{display:inline-flex;align-items:center;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.06em;background:#e7f8f1;color:#08765c}
+.booking-restriction-status.is-restricted{background:#fee2e2;color:#a51b29}
+.booking-restriction-card h3{margin:12px 0 8px;color:#102338;font-size:21px}
+.booking-restriction-card p{color:#63798c;line-height:1.6}
+.booking-restriction-warning{margin:18px 0;padding:14px 15px;border:1px solid #f0d198;border-radius:14px;background:#fff9ed;color:#7b5109;line-height:1.55}
+.booking-restriction-warning strong{display:block;margin-bottom:3px}
+.booking-restriction-field{display:grid;gap:7px;margin:18px 0}
+.booking-restriction-field>label{font-size:13px;color:#24445f;font-weight:800}
+.booking-restriction-field input[type=text],.booking-restriction-field textarea{box-sizing:border-box;width:100%;padding:12px 13px;border:1px solid #c9dbe9;border-radius:12px;background:#fff;color:#102338;font:inherit;line-height:1.5}
+.booking-restriction-field textarea{min-height:105px;resize:vertical}
+.booking-restriction-field input:focus,.booking-restriction-field textarea:focus{outline:3px solid rgba(19,169,164,.14);border-color:#0aa7a0}
+.booking-restriction-help{margin:0!important;font-size:12px}
+.booking-restriction-error{display:block;color:#b42318;font-size:12px;line-height:1.5}
+.booking-restriction-errors{padding:12px 14px;margin:16px 0;border-radius:12px;color:#a51b29;background:#fff0f1;line-height:1.5}
+.booking-restriction-confirm{display:flex;gap:10px;align-items:flex-start;margin:20px 0;padding:13px;border:1px solid #d7e3ed;border-radius:12px;background:#f8fbfd;color:#24445f;line-height:1.55;font-size:13px;cursor:pointer}
+.booking-restriction-confirm input{margin-top:4px;flex:0 0 auto;width:17px;height:17px;accent-color:#be3548}
+.booking-restriction-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:20px}
+.booking-restriction-submit{border-color:#bc3043!important;background:#bc3043!important;color:#fff!important}
+.booking-restriction-note{padding:14px;border:1px solid #d6e4ef;border-radius:14px;background:#f8fcff;overflow-wrap:anywhere}
+.booking-restriction-note p{margin:0}.booking-restriction-note p+p{margin-top:9px}
+.booking-restriction-history{margin-top:18px;scroll-margin-top:90px}
+.booking-restriction-history h3{margin-top:0}.booking-restriction-history table{min-width:650px}
+.booking-restriction-history td{vertical-align:top;white-space:normal;overflow-wrap:anywhere}
+.booking-restriction-history small{display:block;margin-top:5px;color:#6d8192;line-height:1.55}
+@media(max-width:850px){.booking-restriction-layout{grid-template-columns:1fr}}
+@media(max-width:480px){.booking-restriction-actions .erp-btn,.booking-restriction-actions .erp-btn-secondary{width:100%;text-align:center;justify-content:center}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="booking-restriction-layout">
+    <section class="erp-card booking-restriction-card">
+        <span class="booking-restriction-status{% if paciente.no_agendar %} is-restricted{% endif %}">{% if paciente.no_agendar %}NO AGENDAR{% else %}Habilitado para citas{% endif %}</span>
+        <h3>{{ paciente.nombre }}</h3>
+        <p>{% if habilitar %}Al confirmar, el paciente podrá recibir nuevas citas.{% else %}Al confirmar, se bloquearán las nuevas citas de este paciente en todos los accesos a la agenda.{% endif %} El expediente y las citas anteriores se conservan.</p>
+
+        {% if citas_futuras %}
+        <div class="booking-restriction-warning" role="status">
+            <strong>{{ citas_futuras }} cita{{ citas_futuras|pluralize }} futura{{ citas_futuras|pluralize }} para revisión manual</strong>
+            Las citas existentes se mantendrán. Esta acción no las cancela automáticamente.
+        </div>
+        {% endif %}
+
+        {% if puede_cambiar_restriccion %}
+        <form method="post">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="booking-restriction-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="booking-restriction-field">
+                <label for="{{ form.motivo.id_for_label }}">Motivo <span aria-hidden="true">*</span></label>
+                {{ form.motivo }}
+                <p class="booking-restriction-help">Indique el motivo de {% if habilitar %}habilitar nuevamente las citas{% else %}la restricción{% endif %}.</p>
+                {% for error in form.motivo.errors %}<span class="booking-restriction-error" role="alert">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="booking-restriction-field">
+                <label for="{{ form.observacion.id_for_label }}">Observación opcional</label>
+                {{ form.observacion }}
+                {% for error in form.observacion.errors %}<span class="booking-restriction-error" role="alert">{{ error }}</span>{% endfor %}
+            </div>
+            <label class="booking-restriction-confirm" for="{{ form.confirmar.id_for_label }}">
+                {{ form.confirmar }}
+                <span>Confirmo que deseo {% if habilitar %}habilitar nuevamente a este paciente para recibir citas{% else %}marcar a este paciente como NO AGENDAR{% endif %}.</span>
+            </label>
+            {% for error in form.confirmar.errors %}<span class="booking-restriction-error" role="alert">{{ error }}</span>{% endfor %}
+            <div class="booking-restriction-actions">
+                <button type="submit" class="erp-btn{% if not habilitar %} booking-restriction-submit{% endif %}">{% if habilitar %}Habilitar nuevamente para citas{% else %}Confirmar No Agendar{% endif %}</button>
+                <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}{% if modo_app %}?app=1{% endif %}">Cancelar</a>
+            </div>
+        </form>
+        {% else %}
+        <p>Consulte el estado y el historial de restricciones de este paciente.</p>
+        {% if paciente.no_agendar and erp_access.habilitar_citas_paciente %}<a class="erp-btn-secondary" href="{% url 'clinica_habilitar_citas_paciente' empresa.slug paciente.id %}{% if modo_app %}?app=1{% endif %}">Habilitar nuevamente para citas</a>{% endif %}
+        {% endif %}
+    </section>
+    <aside class="erp-card booking-restriction-card">
+        <div class="erp-kpi-label">Estado del paciente</div>
+        <h3>{{ paciente.expediente_codigo }}</h3>
+        <p>Puede consultar el expediente y continuar trabajando con el historial clínico, recetas, facturas y anexos.</p>
+        {% if paciente.no_agendar and erp_access.ver_motivo_restriccion_paciente %}
+        <div class="booking-restriction-note">
+            <p><strong>Motivo actual:</strong><br>{{ paciente.motivo_no_agendar|linebreaksbr }}</p>
+            {% if paciente.observacion_no_agendar %}<p><strong>Observación:</strong><br>{{ paciente.observacion_no_agendar|linebreaksbr }}</p>{% endif %}
+        </div>
+        {% endif %}
+    </aside>
+</div>
+
+<section class="erp-card booking-restriction-history" id="historial-restricciones">
+    <h3>Historial de restricciones</h3>
+    <p class="erp-card-muted">Registro de las restricciones y habilitaciones de citas del paciente.</p>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Estado anterior</th><th>Estado nuevo</th>{% if erp_access.ver_motivo_restriccion_paciente %}<th>Motivo y observación</th>{% endif %}</tr></thead>
+            <tbody>
+            {% for cambio in historial_restricciones %}
+                <tr>
+                    <td>{{ cambio.fecha|date:"d/m/Y H:i" }}</td>
+                    <td>{{ cambio.usuario_nombre|default:"Usuario no disponible" }}</td>
+                    <td>{% if cambio.estado_anterior %}<span class="booking-restriction-status is-restricted">NO AGENDAR</span>{% else %}Habilitado{% endif %}</td>
+                    <td>{% if cambio.estado_nuevo %}<span class="booking-restriction-status is-restricted">NO AGENDAR</span>{% else %}Habilitado{% endif %}</td>
+                    {% if erp_access.ver_motivo_restriccion_paciente %}<td>{{ cambio.motivo|linebreaksbr }}{% if cambio.observacion %}<small>{{ cambio.observacion|linebreaksbr }}</small>{% endif %}</td>{% endif %}
+                </tr>
+            {% empty %}
+                <tr><td colspan="{% if erp_access.ver_motivo_restriccion_paciente %}5{% else %}4{% endif %}" class="erp-empty">Este paciente aún no tiene cambios de restricción registrados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -2,7 +2,7 @@ import unicodedata
 from urllib.parse import quote
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from core.models import Empresa
@@ -290,6 +290,50 @@ class CitaCliente(models.Model):
 
     def __str__(self):
         return f"{self.titulo} - {self.display_cliente}"
+
+    def _requiere_validacion_paciente(self):
+        if self._state.adding:
+            return True
+        anterior = type(self).objects.filter(pk=self.pk).values("paciente_id", "cliente_id", "empresa_id").first()
+        campos = ("paciente_id", "empresa_id") if self.paciente_id else ("paciente_id", "cliente_id", "empresa_id")
+        return not anterior or any(anterior[campo] != getattr(self, campo) for campo in campos)
+
+    def _es_espejo_clinico_existente(self):
+        if not self._state.adding or not self.cita_clinica_id:
+            return False
+        from clinica.models import CitaClinica
+
+        return CitaClinica.objects.filter(
+            pk=self.cita_clinica_id,
+            empresa_id=self.empresa_id,
+            paciente_id=self.paciente_id,
+            fecha_hora=self.fecha_hora,
+        ).exists()
+
+    def clean(self):
+        super().clean()
+        if self.empresa_id and self._requiere_validacion_paciente() and not self._es_espejo_clinico_existente():
+            from clinica.restricciones_citas import validar_paciente_para_cita
+
+            validar_paciente_para_cita(
+                self.paciente_id, self.empresa_id,
+                cliente_id=self.cliente_id,
+                usuario=getattr(self, "_restriccion_usuario", None),
+            )
+
+    def save(self, *args, **kwargs):
+        if self._requiere_validacion_paciente() and not self._es_espejo_clinico_existente():
+            from clinica.restricciones_citas import validar_paciente_para_cita
+
+            with transaction.atomic():
+                validar_paciente_para_cita(
+                    self.paciente_id, self.empresa_id,
+                    cliente_id=self.cliente_id,
+                    usuario=getattr(self, "_restriccion_usuario", None),
+                    bloquear=True,
+                )
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     @property
     def display_cliente(self):

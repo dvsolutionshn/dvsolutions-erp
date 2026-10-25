@@ -26,6 +26,9 @@ PERMISOS_CLINICOS = (
         ("puede_editar_pacientes", "Editar datos generales"),
         ("puede_eliminar_pacientes", "Eliminar pacientes"),
         ("puede_crear_recordatorios_paciente", "Agendar recordatorios"),
+        ("puede_restringir_citas_paciente", "Puede marcar paciente como No Agendar"),
+        ("puede_habilitar_citas_paciente", "Puede quitar restricción"),
+        ("puede_ver_motivo_restriccion_paciente", "Puede ver motivo de restricción"),
     )),
     ("Historia clínica", (
         ("puede_ver_historia_clinica", "Ver historia clínica y diagnósticos"),
@@ -94,6 +97,12 @@ PERMISOS_CLINICOS = (
 
 TODOS_LOS_PERMISOS_CLINICOS = tuple(
     campo for _, permisos in PERMISOS_CLINICOS for campo, _ in permisos
+)
+
+PERMISOS_CONSULTA_RESTRICCION_CITAS = (
+    "puede_restringir_citas_paciente",
+    "puede_habilitar_citas_paciente",
+    "puede_ver_motivo_restriccion_paciente",
 )
 
 
@@ -172,6 +181,10 @@ def permiso_clinica_granular(path_suffix, method="GET"):
     action = parts[2:]
     if not action:
         return "puede_ver_datos_generales_paciente"
+    if action == ["restriccion"]:
+        return PERMISOS_CONSULTA_RESTRICCION_CITAS if method in {"GET", "HEAD"} else "puede_restringir_citas_paciente"
+    if action == ["restriccion", "habilitar"]:
+        return PERMISOS_CONSULTA_RESTRICCION_CITAS if method in {"GET", "HEAD"} else "puede_habilitar_citas_paciente"
     if action[0] == "anexos":
         # Sólo el nuevo lector de archivos; no cambia permisos de las demás rutas.
         return "puede_ver_anexos_clinicos" if method in {"GET", "HEAD"} and len(action) == 5 and action[3] == "archivo" else "__denegar__"

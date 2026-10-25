@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
+from clinica.widgets_citas import PacienteCitaSelect
 
 from .availability import bloqueos_en_conflicto, rango_bloqueo
 from .constants import EMPRESAS_WHATSAPP_CITAS
@@ -647,8 +648,13 @@ class CitaClienteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop("empresa", None)
+        self.usuario = kwargs.pop("usuario", None)
         self.empresa = empresa
         super().__init__(*args, **kwargs)
+        if empresa:
+            self.instance.empresa = empresa
+        self.instance._restriccion_usuario = self.usuario
+        self._paciente_original_id = self.instance.paciente_id
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
         self.notificaciones_cita_activas = bool(empresa and empresa.slug in self.EMPRESAS_WHATSAPP_CITAS)
         self.cirugia_extendida_activa = bool(empresa and empresa.slug in self.EMPRESAS_CIRUGIA_EXTENDIDA)
@@ -818,6 +824,11 @@ class CitaClienteForm(forms.ModelForm):
             for nombre in ["cliente", "producto", "titulo", "responsable", "duracion_minutos"]:
                 self.fields.pop(nombre)
             self.fields["paciente"].label = "Paciente"
+            self.fields["paciente"].widget = PacienteCitaSelect(
+                usuario=self.usuario, empresa=self.empresa,
+                original_id=self._paciente_original_id,
+            )
+            self.fields["paciente"].widget.choices = self.fields["paciente"].choices
             self.fields["paciente"].required = True
             self.fields["paciente"].error_messages["required"] = "Selecciona el paciente de la lista antes de guardar la cita."
             self.fields["servicio_clinico"].label = "Tipo de consulta"

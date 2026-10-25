@@ -19,6 +19,11 @@
 {% endif %}
 {% endif %}
 <a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>
+{% if paciente.no_agendar %}
+    {% if erp_access.habilitar_citas_paciente %}<a class="erp-btn-secondary" href="{% url 'clinica_habilitar_citas_paciente' empresa.slug paciente.id %}">Habilitar nuevamente para citas</a>{% endif %}
+{% elif erp_access.restringir_citas_paciente %}
+    <a class="erp-btn-secondary" href="{% url 'clinica_restringir_citas_paciente' empresa.slug paciente.id %}">Marcar como No Agendar</a>
+{% endif %}
 {% if puede_eliminar_pacientes %}
 <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" class="erp-inline-form" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
     {% csrf_token %}
@@ -50,6 +55,9 @@
 .patient-evolution-carousel::-webkit-scrollbar{height:9px}.patient-evolution-carousel::-webkit-scrollbar-thumb{background:#c8d8e6;border-radius:999px}.patient-evolution-photo{position:relative;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 16px 38px rgba(16,40,62,.08);scroll-snap-align:start;text-align:left;cursor:zoom-in;transition:transform .18s ease,box-shadow .18s ease}.patient-evolution-photo:hover{transform:translateY(-4px);box-shadow:0 24px 52px rgba(16,40,62,.13)}.patient-evolution-photo img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}.patient-evolution-photo div{padding:14px}.patient-evolution-photo strong{display:block;font-size:14px;color:#102338}.patient-evolution-photo span{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.45}.patient-evolution-chip{position:absolute;top:12px;left:12px;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.92);color:#0f766e;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.patient-photo-modal{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(10,24,38,.78);backdrop-filter:blur(8px)}.patient-photo-modal.is-open{display:flex}.patient-photo-modal-card{width:min(980px,96vw);max-height:92vh;overflow:auto;border-radius:24px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.35)}.patient-photo-modal-card img{width:100%;max-height:72vh;object-fit:contain;background:#071422;display:block}.patient-photo-modal-info{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:18px 20px}.patient-photo-modal-info h3{margin:0;color:#102338}.patient-photo-modal-info p{margin:6px 0 0;color:var(--muted);line-height:1.55}.patient-photo-close{width:40px;height:40px;border:1px solid var(--line);border-radius:14px;background:#fff;color:#102338;font-size:22px;font-weight:900;cursor:pointer}
 .patient-consent-list{display:grid;gap:12px;margin-top:14px}.patient-consent-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#fff,#f8fbff)}.patient-consent-card strong{display:block;color:#102338}.patient-consent-card span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.patient-consent-actions{display:flex;gap:8px;flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:14px;padding:12px 14px;font-weight:800}
+.patient-booking-restriction{margin-bottom:16px;padding:17px 18px;border:1px solid #edb8c0;border-left:5px solid #ca3f53;border-radius:16px;background:#fff2f4;color:#922337;line-height:1.55}
+.patient-booking-restriction strong{display:block;font-size:15px;letter-spacing:.04em}
+.patient-booking-restriction p{margin:7px 0 0;overflow-wrap:anywhere}.patient-booking-restriction a{display:inline-block;margin-top:10px;color:#922337;font-weight:800}
 .patient-data-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;border:1px solid #f0c36a;background:#fff9e8;color:#7a4b00;border-radius:14px;padding:12px 14px;font-weight:800}
 .patient-data-alert a{color:#155eef;text-decoration:none;white-space:nowrap}
 .patient-sex-dialog{width:min(520px,calc(100vw - 32px));border:0;border-radius:20px;padding:0;box-shadow:0 24px 80px rgba(15,35,55,.28)}
@@ -133,6 +141,17 @@
 {% endblock %}
 
 {% block content %}
+{% if paciente.no_agendar %}
+<section class="patient-booking-restriction" role="alert" aria-label="Restricción de nuevas citas">
+    <strong>NO AGENDAR</strong>
+    <p>No se puede agendar una nueva cita para este paciente. Está marcado como NO AGENDAR.</p>
+    {% if erp_access.ver_motivo_restriccion_paciente %}
+    <p><b>Motivo:</b> {{ paciente.motivo_no_agendar }}</p>
+    {% if paciente.observacion_no_agendar %}<p>{{ paciente.observacion_no_agendar|linebreaksbr }}</p>{% endif %}
+    {% endif %}
+    {% if erp_access.restringir_citas_paciente or erp_access.habilitar_citas_paciente or erp_access.ver_motivo_restriccion_paciente %}<a href="{% url 'clinica_restringir_citas_paciente' empresa.slug paciente.id %}#historial-restricciones">Ver historial de restricciones</a>{% endif %}
+</section>
+{% endif %}
 <section class="erp-card patient-anchor-offset" id="datos-generales">
     <div class="patient-hero">
         <div class="patient-profile-photo">
@@ -145,6 +164,11 @@
         <div>
             <div class="erp-kpi-label">Datos generales</div>
             <h3 class="erp-panel-title" style="margin:6px 0 0;">{{ paciente.expediente_codigo }}</h3>
+            {% if not paciente.no_agendar %}
+            {% if erp_access.restringir_citas_paciente or erp_access.habilitar_citas_paciente or erp_access.ver_motivo_restriccion_paciente %}
+            <a class="erp-inline-link" href="{% url 'clinica_restringir_citas_paciente' empresa.slug paciente.id %}#historial-restricciones">Historial de restricciones de citas</a>
+            {% endif %}
+            {% endif %}
             {% if erp_access.ver_historia_clinica and paciente.es_alergico %}
             <div class="patient-alert" style="margin-top:12px;">Paciente alergico{% if paciente.alergias %}: {{ paciente.alergias }}{% endif %}</div>
             {% endif %}

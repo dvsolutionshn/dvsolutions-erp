@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core import signing
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
@@ -35,6 +36,7 @@ from facturacion.models import (
     TipoImpuesto,
 )
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
+from clinica.restricciones_citas import mensaje_restriccion
 
 from .forms import (
     BloqueoDisponibilidadMedicaForm,
@@ -653,6 +655,8 @@ def _contexto_calendario(
                 "expediente": paciente.expediente_codigo,
                 "telefono": paciente.whatsapp or paciente.telefono or "",
                 "correo": paciente.correo or "",
+                "no_agendar": paciente.no_agendar,
+                "restriccion_mensaje": mensaje_restriccion(paciente, request.user) if paciente.no_agendar else "",
             }
             for paciente in form.fields["paciente"].queryset
         ]
@@ -832,6 +836,7 @@ def _guardar_cita_formulario(request, empresa, form, objeto=None):
                 cita.fase_servicio = detalle["fase"]
                 cita.sesion_servicio = detalle["sesion"]
                 cita.titulo = cita.display_servicio
+            cita._restriccion_usuario = request.user
             cita.save()
             _sincronizar_cita_clinica(cita)
             creadas.append(cita)
@@ -884,7 +889,10 @@ def _sincronizar_cita_clinica(cita):
             setattr(cita.cita_clinica, campo, valor)
         cita.cita_clinica.save()
     else:
-        cita.cita_clinica = CitaClinica.objects.create(**valores)
+        espejo_clinico = CitaClinica(**valores)
+        espejo_clinico._cita_agenda_origen_id = cita.pk
+        espejo_clinico.save()
+        cita.cita_clinica = espejo_clinico
         cita.save(update_fields=["cita_clinica"])
 
 
@@ -1473,11 +1481,15 @@ def citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto, usuario=request.user)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
-        messages.success(request, f"{len(creadas)} cita(s) guardada(s) correctamente.")
-        return redirect("crm_citas", empresa_slug=empresa.slug)
+        try:
+            cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            messages.success(request, f"{len(creadas)} cita(s) guardada(s) correctamente.")
+            return redirect("crm_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form))
 
 
@@ -1487,11 +1499,15 @@ def agenda_citas(request, empresa_slug):
     _asegurar_pacientes_empresas_clinicas(empresa)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto, usuario=request.user)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
-        messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
-        return redirect("agenda_citas", empresa_slug=empresa.slug)
+        try:
+            cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
+            return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
 
 
@@ -2057,15 +2073,19 @@ def agenda_mobile(request, empresa_slug):
         _asegurar_pacientes_empresas_clinicas(empresa_agenda)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto)
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto, usuario=request.user)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)
-        messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) creada(s) correctamente.")
-        fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
-        vista_regreso = request.GET.get("vista") or request.POST.get("vista") or "dia"
-        if vista_regreso not in {"dia", "semana", "mes", "anio", "agenda", "proximas"}:
-            vista_regreso = "dia"
-        return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?vista={vista_regreso}&fecha={fecha}")
+        try:
+            cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) creada(s) correctamente.")
+            fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
+            vista_regreso = request.GET.get("vista") or request.POST.get("vista") or "dia"
+            if vista_regreso not in {"dia", "semana", "mes", "anio", "agenda", "proximas"}:
+                vista_regreso = "dia"
+            return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?vista={vista_regreso}&fecha={fecha}")
 
     contexto = _contexto_calendario(
         empresa,
@@ -2695,6 +2715,8 @@ def buscar_pacientes_cita(request, empresa_slug):
                 "expediente": paciente.expediente_codigo,
                 "telefono": paciente.whatsapp or paciente.telefono or "",
                 "correo": paciente.correo or "",
+                "no_agendar": paciente.no_agendar,
+                "restriccion_mensaje": mensaje_restriccion(paciente, request.user) if paciente.no_agendar else "",
             }
             for paciente in pacientes
         ]

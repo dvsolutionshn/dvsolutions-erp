@@ -11,6 +11,8 @@ PERMISOS_CLINICOS_GRANULARES = {
     "puede_ver_calendario", "puede_crear_citas", "puede_editar_citas", "puede_eliminar_citas",
     "puede_ver_pacientes", "puede_ver_datos_generales_paciente", "puede_crear_pacientes",
     "puede_editar_pacientes", "puede_eliminar_pacientes", "puede_crear_recordatorios_paciente",
+    "puede_restringir_citas_paciente", "puede_habilitar_citas_paciente",
+    "puede_ver_motivo_restriccion_paciente",
     "puede_ver_historia_clinica", "puede_crear_historia_clinica", "puede_editar_historia_clinica",
     "puede_ver_anexos_clinicos", "puede_subir_anexos_clinicos", "puede_eliminar_anexos_clinicos",
     "puede_ver_recetas", "puede_crear_recetas", "puede_enviar_recetas",
@@ -116,6 +118,9 @@ class RolSistema(models.Model):
     puede_editar_pacientes = models.BooleanField(default=False)
     puede_eliminar_pacientes = models.BooleanField(default=False)
     puede_crear_recordatorios_paciente = models.BooleanField(default=False)
+    puede_restringir_citas_paciente = models.BooleanField("Puede marcar paciente como No Agendar", default=False)
+    puede_habilitar_citas_paciente = models.BooleanField("Puede quitar restricción de citas", default=False)
+    puede_ver_motivo_restriccion_paciente = models.BooleanField("Puede ver motivo de restricción", default=False)
     puede_ver_historia_clinica = models.BooleanField(default=False)
     puede_crear_historia_clinica = models.BooleanField(default=False)
     puede_editar_historia_clinica = models.BooleanField(default=False)

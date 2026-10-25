@@ -290,12 +290,19 @@ def permiso_crm_desde_ruta(path_suffix):
     return None
 
 
-def permiso_clinica_desde_ruta(path_suffix):
+def permiso_clinica_desde_ruta(path_suffix, method="GET"):
     if not path_suffix:
         return None
     normalized = path_suffix if path_suffix.endswith("/") else f"{path_suffix}/"
     parts = [part for part in normalized.split("/") if part]
     if parts and parts[0] == "pacientes":
+        if len(parts) > 2 and parts[1].isdigit():
+            if parts[2:] in (["restriccion"], ["restriccion", "habilitar"]):
+                from .clinical_permissions import PERMISOS_CONSULTA_RESTRICCION_CITAS
+
+                if method in {"GET", "HEAD"}:
+                    return PERMISOS_CONSULTA_RESTRICCION_CITAS
+                return "puede_habilitar_citas_paciente" if parts[-1] == "habilitar" else "puede_restringir_citas_paciente"
         if any(part in {"historias", "preconsulta"} for part in parts):
             return "puede_expediente_clinico"
     if normalized.startswith(tuple(str(i) for i in range(10))):

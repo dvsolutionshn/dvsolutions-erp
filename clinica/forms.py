@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from core.access import manuales_pdf_habilitados
+from .widgets_citas import PacienteCitaSelect
 
 from .models import (
     AntecedenteAdicionalPaciente,
@@ -276,8 +277,16 @@ class CitaClinicaForm(BaseClinicaForm):
         model = CitaClinica
         fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "pagada", "cortesia", "sala", "observaciones"]
 
-    def __init__(self, *args, empresa=None, **kwargs):
+    def __init__(self, *args, empresa=None, usuario=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
+        self.usuario = usuario
+        self._paciente_original_id = self.instance.paciente_id
+        self.instance._restriccion_usuario = usuario
+        if empresa:
+            self.instance.empresa = empresa
+        self.fields["paciente"].widget = PacienteCitaSelect(
+            usuario=usuario, empresa=empresa, original_id=self._paciente_original_id,
+        )
         if empresa:
             asegurar_profesionales_agenda_base(empresa)
             self.fields["paciente"].queryset = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
