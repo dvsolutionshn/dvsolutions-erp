@@ -31,7 +31,7 @@ from django.views.decorators.http import require_GET, require_POST, require_safe
 from weasyprint import HTML
 
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados
-from core.clinical_permissions import permiso_historia_por_tipo, rol_clinico_granular, rol_clinico_v2
+from core.clinical_permissions import permiso_historia_por_tipo, rol_clinico_granular, rol_clinico_v2, rol_clinico_v3
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
@@ -187,7 +187,7 @@ MANUAL_PDF_LINK_SALT = "clinica.manual-pdf.descarga"
 MANUAL_PDF_LINK_MAX_AGE_DEFAULT = 7 * 24 * 60 * 60
 
 
-def _puede_historia_tipo(usuario, empresa, tipo, *, editar=False):
+def _puede_historia_tipo(usuario, empresa, tipo, *, crear=False, editar=False):
     rol_v2 = rol_clinico_v2(usuario, empresa)
     if not rol_v2:
         if not rol_clinico_granular(usuario, empresa):
@@ -203,7 +203,11 @@ def _puede_historia_tipo(usuario, empresa, tipo, *, editar=False):
             "puede_editar_historia_clinica" if editar else "puede_ver_historia_clinica"
         )
         return usuario.tiene_permiso_erp(permiso, empresa)
-    permiso = permiso_historia_por_tipo(tipo, editar=editar)
+    permiso = permiso_historia_por_tipo(
+        tipo,
+        crear=crear if rol_clinico_v3(usuario, empresa) else False,
+        editar=editar or (crear and not rol_clinico_v3(usuario, empresa)),
+    )
     return bool(permiso and usuario.tiene_permiso_erp(permiso, empresa))
 
 def _texto_busqueda_profesional(valor):
@@ -1396,6 +1400,8 @@ def confirmar_sexo_paciente(request, empresa_slug, paciente_id):
 
 
 def _puede_eliminar_pacientes(user, empresa):
+    if rol_clinico_v3(user, empresa):
+        return bool(user.puede_acceder_empresa(empresa) and user.tiene_permiso_erp("puede_eliminar_pacientes", empresa))
     return bool(
         getattr(user, "is_authenticated", False)
         and (user.is_superuser or getattr(user, "es_administrador_empresa", False))
@@ -1404,6 +1410,14 @@ def _puede_eliminar_pacientes(user, empresa):
 
 
 def _puede_administrar_catalogo_clinico(user, empresa):
+    if rol_clinico_v3(user, empresa):
+        return bool(
+            user.puede_acceder_empresa(empresa)
+            and (
+                user.tiene_permiso_erp("puede_crear_profesionales_clinicos", empresa)
+                or user.tiene_permiso_erp("puede_editar_profesionales_clinicos", empresa)
+            )
+        )
     return bool(
         getattr(user, "is_authenticated", False)
         and (user.is_superuser or getattr(user, "es_administrador_empresa", False))
@@ -1412,6 +1426,14 @@ def _puede_administrar_catalogo_clinico(user, empresa):
 
 
 def _puede_administrar_servicios_clinicos(user, empresa):
+    if rol_clinico_v3(user, empresa):
+        return bool(
+            user.puede_acceder_empresa(empresa)
+            and any(user.tiene_permiso_erp(permiso, empresa) for permiso in (
+                "puede_crear_servicios_clinicos", "puede_editar_servicios_clinicos",
+                "puede_eliminar_servicios_clinicos",
+            ))
+        )
     return bool(
         empresa.slug == "hospital_mia"
         and _es_dueno_erp(user)
@@ -2856,6 +2878,7 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
     _requiere_interfaz_clinica(empresa)
     paciente = paciente_plan_app(empresa, paciente_id) if modo_app else get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     puede_crear_plan = request.user.tiene_permiso_erp(
+        "puede_crear_planes_tratamiento" if rol_clinico_v3(request.user, empresa) else
         "puede_editar_planes_tratamiento" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico",
         empresa,
     )
@@ -3868,7 +3891,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
-    if not _puede_historia_tipo(request.user, empresa, tipo, editar=True):
+    if not _puede_historia_tipo(request.user, empresa, tipo, crear=True):
         raise PermissionDenied("No tiene permiso para crear esta clase de historia clínica.")
     if tipo in {"evaluacion_integral", "tricopigmentacion"}:
         ancla = "evaluacion-integral" if tipo == "evaluacion_integral" else "tricopigmentacion"

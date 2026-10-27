@@ -7,8 +7,8 @@
 {% block header_description %}Planilla hondureña, expedientes, vacaciones, vouchers y comunicación al colaborador desde una sola capa operativa.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'crear_empleado_rrhh' empresa.slug %}" class="erp-action-link">Nuevo empleado</a>
-<a href="{% url 'crear_periodo_planilla' empresa.slug %}" class="erp-action-link">Nueva planilla</a>
+{% if erp_access.crear_empleados %}<a href="{% url 'crear_empleado_rrhh' empresa.slug %}" class="erp-action-link">Nuevo empleado</a>{% endif %}
+{% if erp_access.crear_planillas %}<a href="{% url 'crear_periodo_planilla' empresa.slug %}" class="erp-action-link">Nueva planilla</a>{% endif %}
 {% endblock %}
 
 {% block content %}

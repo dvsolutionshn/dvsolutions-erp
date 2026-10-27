@@ -5,7 +5,7 @@
 {% block header_description %}Operaciones, tiempos y vehiculos en una sola cabina digital.{% endblock %}
 {% block content %}
 <section class="garage-shell">
-  <div class="garage-head"><div><div class="garage-eyebrow">Garage Operations System</div><h2 class="garage-title">Taller en tiempo real</h2><p class="garage-sub">Visibilidad total desde la recepcion hasta la entrega.</p></div><div class="garage-actions"><span class="garage-live">OPERACION EN LINEA</span>{% if erp_access.recepcion_taller %}<a class="garage-btn" href="{% url 'tecnicentro_recepcion' empresa.slug %}">+ Recibir vehiculo</a>{% endif %}<a class="garage-btn secondary" href="{% url 'tecnicentro_ordenes' empresa.slug %}">Historial</a></div></div>
+  <div class="garage-head"><div><div class="garage-eyebrow">Garage Operations System</div><h2 class="garage-title">Taller en tiempo real</h2><p class="garage-sub">Visibilidad total desde la recepcion hasta la entrega.</p></div><div class="garage-actions"><span class="garage-live">OPERACION EN LINEA</span>{% if erp_access.crear_recepciones_taller %}<a class="garage-btn" href="{% url 'tecnicentro_recepcion' empresa.slug %}">+ Recibir vehiculo</a>{% endif %}<a class="garage-btn secondary" href="{% url 'tecnicentro_ordenes' empresa.slug %}">Historial</a></div></div>
   <div class="garage-kpis">
     <article class="garage-kpi"><span>Vehiculos en cola</span><strong>{{ metricas.cola }}</strong><small>espera activa</small></article>
     <article class="garage-kpi"><span>En proceso</span><strong>{{ metricas.taller }}</strong><small>dentro del taller</small></article>

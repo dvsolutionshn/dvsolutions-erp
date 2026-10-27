@@ -18,7 +18,7 @@
       <h1>Asientos contables</h1>
       <p>Encuentra una partida y despliega sus líneas para revisarla aquí mismo.</p>
     </div>
-    {% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="al-btn al-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Nuevo asiento</a>{% endif %}
+    {% if erp_access.crear_asientos %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="al-btn al-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Nuevo asiento</a>{% endif %}
   </header>
 
   <section aria-label="Resumen de asientos de la empresa">
@@ -76,7 +76,7 @@
                 <tfoot><tr><th scope="row" colspan="2">Totales de la partida</th><td>{{ asiento.importe_debe|floatformat:"2g" }}</td><td>{{ asiento.importe_haber|floatformat:"2g" }}</td></tr></tfoot>
               </table>
             </div>
-            <div class="al-entry__footer"><a href="{% url 'ver_asiento_contable' empresa.slug asiento.pk %}" class="al-btn al-btn--secondary al-btn--small">Ver asiento completo {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>{% if asiento.estado == "borrador" and erp_access.asientos_contables %}<a href="{% url 'editar_asiento_contable' empresa.slug asiento.pk %}" class="al-btn al-btn--quiet al-btn--small">Editar borrador</a>{% endif %}</div>
+            <div class="al-entry__footer"><a href="{% url 'ver_asiento_contable' empresa.slug asiento.pk %}" class="al-btn al-btn--secondary al-btn--small">Ver asiento completo {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>{% if asiento.estado == "borrador" and erp_access.editar_asientos %}<a href="{% url 'editar_asiento_contable' empresa.slug asiento.pk %}" class="al-btn al-btn--quiet al-btn--small">Editar borrador</a>{% endif %}</div>
           </div>
         </details>
       </li>
@@ -84,7 +84,7 @@
     </ol>
     <nav class="al-pagination" aria-label="Páginas de asientos"><p>Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ total_resultados }} asiento{{ total_resultados|pluralize }}</p><div class="al-pagination__pages">{% if paginacion.anterior_url %}<a class="al-page" href="{{ paginacion.anterior_url }}" aria-label="Página anterior">Anterior</a>{% endif %}{% for pagina in paginacion.paginas %}{% if pagina.url %}<a class="al-page" href="{{ pagina.url }}" {% if pagina.actual %}aria-current="page"{% endif %} aria-label="Página {{ pagina.numero }}">{{ pagina.numero }}</a>{% else %}<span class="al-page-gap">{{ pagina.numero }}</span>{% endif %}{% endfor %}{% if paginacion.siguiente_url %}<a class="al-page" href="{{ paginacion.siguiente_url }}" aria-label="Página siguiente">Siguiente</a>{% endif %}</div></nav>
     {% else %}
-    <div class="al-empty">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}{% if hay_filtros or errores_filtros %}<h3>No encontramos partidas con estos filtros</h3><p>Prueba otra palabra, cuenta o rango de fechas dentro de {{ empresa.nombre }}.</p><a href="{% url 'asientos_contables' empresa.slug %}" class="al-btn al-btn--secondary">Ver todos los asientos</a>{% else %}<h3>Tu diario está listo para empezar</h3><p>Aquí aparecerán los asientos de {{ empresa.nombre }}, con sus cuentas e importes para revisión.</p>{% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="al-btn al-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear primer asiento</a>{% endif %}{% endif %}</div>
+    <div class="al-empty">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}{% if hay_filtros or errores_filtros %}<h3>No encontramos partidas con estos filtros</h3><p>Prueba otra palabra, cuenta o rango de fechas dentro de {{ empresa.nombre }}.</p><a href="{% url 'asientos_contables' empresa.slug %}" class="al-btn al-btn--secondary">Ver todos los asientos</a>{% else %}<h3>Tu diario está listo para empezar</h3><p>Aquí aparecerán los asientos de {{ empresa.nombre }}, con sus cuentas e importes para revisión.</p>{% if erp_access.crear_asientos %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="al-btn al-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear primer asiento</a>{% endif %}{% endif %}</div>
     {% endif %}
   </section>
 </div>

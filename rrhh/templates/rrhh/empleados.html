@@ -5,7 +5,7 @@
 {% block header_kicker %}RRHH{% endblock %}
 {% block header_title %}Empleados{% endblock %}
 {% block header_description %}Expedientes del personal con fotografia, salario, banco, vacaciones y datos listos para planilla.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_empleado_rrhh' empresa.slug %}">Nuevo Empleado</a>{% endblock %}
+{% block topbar_actions %}{% if erp_access.crear_empleados %}<a class="erp-action-link" href="{% url 'crear_empleado_rrhh' empresa.slug %}">Nuevo Empleado</a>{% endif %}{% endblock %}
 
 {% block content %}
 <section class="erp-list-shell">
@@ -59,9 +59,9 @@
                         <td>
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'ver_empleado' empresa.slug empleado.id %}">Ver</a>
-                                <a class="erp-pill-link" href="{% url 'editar_empleado_rrhh' empresa.slug empleado.id %}">Editar</a>
+                                {% if erp_access.editar_empleados %}<a class="erp-pill-link" href="{% url 'editar_empleado_rrhh' empresa.slug empleado.id %}">Editar</a>{% endif %}
                                 {% if puede_borrar_rrhh %}
-                                <a class="erp-pill-link" style="color:#b42318;border-color:#fecdd3;background:#fff5f5;" href="{% url 'eliminar_empleado_rrhh' empresa.slug empleado.id %}">Eliminar</a>
+                                {% if erp_access.eliminar_empleados %}<a class="erp-pill-link" style="color:#b42318;border-color:#fecdd3;background:#fff5f5;" href="{% url 'eliminar_empleado_rrhh' empresa.slug empleado.id %}">Eliminar</a>{% endif %}
                                 {% endif %}
                             </div>
                         </td>

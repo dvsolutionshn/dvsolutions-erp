@@ -169,7 +169,14 @@ def detalle_rol_clinico(rol):
     grupos = []
     for nombre, permisos in catalogo:
         detalles = [
-            {"campo": campo, "etiqueta": etiqueta, "descripcion": DESCRIPCIONES_PERMISOS[campo]}
+            {
+                "campo": campo,
+                "etiqueta": etiqueta,
+                "descripcion": DESCRIPCIONES_PERMISOS.get(
+                    campo,
+                    f"Autoriza exclusivamente la acción: {etiqueta.lower()}. No concede otras acciones del módulo.",
+                ),
+            }
             for campo, etiqueta in permisos if etiqueta in visibles.get(nombre, set())
         ]
         if detalles:

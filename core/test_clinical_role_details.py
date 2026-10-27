@@ -163,12 +163,14 @@ class ClinicalRoleDetailsTests(TestCase):
         user = Usuario(username="Unsaved role-reader QA", rol_sistema=self.inactive_role)
         self.assertFalse(user.tiene_permiso_erp("puede_ver_pacientes"))
 
-    def test_non_catalog_flags_are_not_invented_as_configured_permissions(self):
+    def test_operational_module_flags_now_appear_in_the_catalog(self):
         role = RolSistema(pk=900005, nombre="Flags ocultos QA", es_rol_clinico=True, usa_permisos_clinicos_granulares=True, puede_contabilidad=True, puede_rrhh=True, puede_campanias=True)
         detail = self.detail(role)
-        self.assertEqual(detail["total_permisos"], 0)
-        self.assertEqual(detail["grupos"], [])
-        self.assertTrue(detail["advertencias"])
+        self.assertEqual(detail["total_permisos"], 3)
+        self.assertEqual(
+            {entry["campo"] for entry in self.entries(detail)},
+            {"puede_contabilidad", "puede_rrhh", "puede_campanias"},
+        )
 
     def test_pure_detail_has_stable_metadata_keys_and_does_not_mutate_the_role(self):
         before = vars(self.role_a).copy()

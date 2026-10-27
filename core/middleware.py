@@ -11,8 +11,11 @@ from core.access import (
     permiso_facturacion_accion,
     permiso_facturacion_desde_ruta,
     permiso_crm_desde_ruta,
+    permiso_crm_accion,
     permiso_rrhh_desde_ruta,
+    permiso_rrhh_accion,
     permiso_tecnicentro_desde_ruta,
+    permiso_tecnicentro_accion,
 )
 from core.models import Empresa
 from core.read_only_permissions import evaluar_ruta_solo_lectura, modulo_facturacion_desde_ruta
@@ -24,6 +27,7 @@ from core.clinical_permissions import (
     permiso_clinica_granular,
     rol_clinico_granular,
     rol_clinico_v2,
+    rol_clinico_v3,
 )
 from core.audit_context import reset_audit_request, set_audit_request
 
@@ -91,16 +95,20 @@ class EmpresaAccessMiddleware:
                     permiso = permiso_facturacion_desde_ruta(suffix)
                     rol_granular = rol_clinico_granular(request.user, empresa)
                     permiso_accion = (
-                        permiso_facturacion_clinico_granular(suffix, request.method)
+                        permiso_facturacion_clinico_granular(
+                            suffix, request.method, v3=bool(rol_clinico_v3(request.user, empresa))
+                        )
                         if rol_granular and rol_granular.usa_permisos_clinicos_v2
                         else permiso_facturacion_accion(suffix)
                     )
+                    if rol_clinico_v3(request.user, empresa) and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
+                        permiso_accion = "__denegar__"
                     if permiso_accion == "puede_transferir_inventario" and not rol_clinico_granular(request.user, empresa):
                         permiso_accion = "puede_inventario"
                     if permiso and not permiso_accion and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa):
+                    if permiso_accion == "__denegar__" or (permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa)):
                         messages.error(request, "Tu rol no tiene permiso para ejecutar esta accion.")
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_facturacion_empresa(empresa):
@@ -138,11 +146,14 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_contabilidad_desde_ruta(suffix)
-                    permiso_accion = permiso_contabilidad_accion(suffix)
+                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    permiso_accion = permiso_contabilidad_accion(suffix, request.method, v3=True) if usa_v3 else None
+                    if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
+                        permiso_accion = "__denegar__"
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa):
+                    if permiso_accion == "__denegar__" or (permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa)):
                         messages.error(request, "Tu rol no tiene permiso para ejecutar esta accion.")
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_contabilidad_empresa(empresa):
@@ -179,8 +190,15 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_rrhh_desde_ruta(suffix)
+                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    permiso_accion = permiso_rrhh_accion(suffix, request.method) if usa_v3 else None
+                    if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
+                        permiso_accion = "__denegar__"
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
+                        return redirect("dashboard", slug=empresa.slug)
+                    if permiso_accion == "__denegar__" or (permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa)):
+                        messages.error(request, "Tu rol no tiene permiso para ejecutar esta acción de Recursos Humanos.")
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_rrhh_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de recursos humanos.")
@@ -211,8 +229,15 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_crm_desde_ruta(suffix)
+                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    permiso_accion = permiso_crm_accion(suffix, request.method, request.POST) if usa_v3 else None
+                    if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
+                        permiso_accion = "__denegar__"
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
+                        return redirect("dashboard", slug=empresa.slug)
+                    if permiso_accion == "__denegar__" or (permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa)):
+                        messages.error(request, "Tu rol no tiene permiso para ejecutar esta acción de CRM.")
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_crm_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo CRM.")
@@ -272,11 +297,17 @@ class EmpresaAccessMiddleware:
                     rol_granular = rol_clinico_granular(request.user, empresa)
                     if rol_granular:
                         if rol_clinico_v2(request.user, empresa):
-                            permiso = permiso_agenda_granular(suffix, request.method, request.POST)
+                            permiso = permiso_agenda_granular(
+                                suffix, request.method, request.POST,
+                                v3=bool(rol_clinico_v3(request.user, empresa)),
+                            )
                         elif suffix.startswith("disponibilidad/"):
                             permiso = "puede_editar_citas"
                         else:
-                            permiso = permiso_agenda_granular(suffix, request.method, request.POST)
+                            permiso = permiso_agenda_granular(
+                                suffix, request.method, request.POST,
+                                v3=bool(rol_clinico_v3(request.user, empresa)),
+                            )
                         if permiso == "__denegar__" or (
                             permiso and not request.user.tiene_permiso_erp(permiso, empresa)
                         ):
@@ -349,6 +380,7 @@ class EmpresaAccessMiddleware:
                         permiso_clinica_granular(
                             suffix, request.method,
                             v2=bool(rol_clinico_v2(request.user, empresa)),
+                            v3=bool(rol_clinico_v3(request.user, empresa)),
                         )
                         if rol_granular
                         else permiso_clinica_desde_ruta(suffix, request.method)
@@ -397,8 +429,15 @@ class EmpresaAccessMiddleware:
                     return self.get_response(request)
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_tecnicentro_desde_ruta(suffix)
+                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    permiso_accion = permiso_tecnicentro_accion(suffix, request.method, request.POST) if usa_v3 else None
+                    if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
+                        permiso_accion = "__denegar__"
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para esta operacion del taller.")
+                        return redirect("dashboard", slug=empresa.slug)
+                    if permiso_accion == "__denegar__" or (permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa)):
+                        messages.error(request, "Tu rol no tiene permiso para ejecutar esta acción del taller.")
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_tecnicentro_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso al modulo Tecnicentro.")

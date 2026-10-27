@@ -64,6 +64,7 @@ class RolSistema(models.Model):
     es_rol_clinico = models.BooleanField(default=False)
     usa_permisos_clinicos_granulares = models.BooleanField(default=False)
     usa_permisos_clinicos_v2 = models.BooleanField(default=False)
+    usa_permisos_acciones_v3 = models.BooleanField(default=False)
     solo_lectura_facturacion = models.BooleanField(default=False)
     solo_lectura_inventario = models.BooleanField(default=False)
     solo_lectura_contabilidad = models.BooleanField(default=False)
@@ -75,7 +76,12 @@ class RolSistema(models.Model):
     puede_punto_venta = models.BooleanField(default=False)
     puede_configuracion_facturacion = models.BooleanField(default=False)
     puede_cierres_caja = models.BooleanField(default=False)
+    puede_operar_cierres_caja = models.BooleanField(default=False)
     puede_facturas = models.BooleanField(default=False)
+    puede_crear_cotizaciones = models.BooleanField(default=False)
+    puede_editar_cotizaciones = models.BooleanField(default=False)
+    puede_aprobar_cotizaciones = models.BooleanField(default=False)
+    puede_convertir_cotizaciones = models.BooleanField(default=False)
     puede_ver_facturas = models.BooleanField(default=False)
     puede_clientes = models.BooleanField(default=False)
     puede_productos = models.BooleanField(default=False)
@@ -106,6 +112,7 @@ class RolSistema(models.Model):
     puede_ver_reporte_ventas_producto = models.BooleanField(default=False)
     puede_crear_clientes = models.BooleanField(default=False)
     puede_editar_clientes = models.BooleanField(default=False)
+    puede_eliminar_clientes = models.BooleanField(default=False)
     puede_crear_productos = models.BooleanField(default=False)
     puede_editar_productos = models.BooleanField(default=False)
     puede_eliminar_productos = models.BooleanField(default=False)
@@ -121,32 +128,90 @@ class RolSistema(models.Model):
     puede_aplicar_compras = models.BooleanField(default=False)
     puede_anular_compras = models.BooleanField(default=False)
     puede_registrar_pagos_proveedores = models.BooleanField(default=False)
+    puede_revertir_pagos_proveedores = models.BooleanField(default=False)
+    puede_eliminar_compras_anuladas = models.BooleanField(default=False)
+    puede_importar_libro_compras = models.BooleanField(default=False)
+    puede_crear_registros_libro_compras = models.BooleanField(default=False)
+    puede_anular_registros_libro_compras = models.BooleanField(default=False)
+    puede_crear_entradas_inventario = models.BooleanField(default=False)
     puede_crear_notas_credito = models.BooleanField(default=False)
     puede_editar_notas_credito = models.BooleanField(default=False)
     puede_anular_notas_credito = models.BooleanField(default=False)
     puede_exportar_reportes = models.BooleanField(default=False)
+    puede_editar_recibos = models.BooleanField(default=False)
     puede_catalogo_cuentas = models.BooleanField(default=False)
     puede_crear_asientos = models.BooleanField(default=False)
     puede_contabilizar_asientos = models.BooleanField(default=False)
     puede_reportes_contables = models.BooleanField(default=False)
+    puede_configurar_contabilidad = models.BooleanField(default=False)
+    puede_crear_periodos_contables = models.BooleanField(default=False)
+    puede_editar_periodos_contables = models.BooleanField(default=False)
+    puede_cerrar_periodos_contables = models.BooleanField(default=False)
+    puede_reabrir_periodos_contables = models.BooleanField(default=False)
+    puede_administrar_clasificaciones_contables = models.BooleanField(default=False)
+    puede_ver_bancos_contables = models.BooleanField(default=False)
+    puede_administrar_cuentas_financieras = models.BooleanField(default=False)
+    puede_importar_movimientos_bancarios = models.BooleanField(default=False)
+    puede_administrar_reglas_bancarias = models.BooleanField(default=False)
+    puede_clasificar_movimientos_bancarios = models.BooleanField(default=False)
+    puede_enlazar_movimientos_bancarios = models.BooleanField(default=False)
+    puede_conciliar_movimientos_bancarios = models.BooleanField(default=False)
+    puede_crear_cuentas_contables = models.BooleanField(default=False)
+    puede_editar_cuentas_contables = models.BooleanField(default=False)
+    puede_importar_catalogo_cuentas = models.BooleanField(default=False)
+    puede_editar_asientos = models.BooleanField(default=False)
+    puede_duplicar_asientos = models.BooleanField(default=False)
+    puede_reversar_asientos = models.BooleanField(default=False)
+    puede_regresar_asientos_borrador = models.BooleanField(default=False)
+    puede_regularizar_asientos = models.BooleanField(default=False)
+    puede_exportar_reportes_contables = models.BooleanField(default=False)
     puede_rrhh = models.BooleanField(default=False)
     puede_empleados = models.BooleanField(default=False)
     puede_planillas = models.BooleanField(default=False)
     puede_vacaciones = models.BooleanField(default=False)
     puede_configuracion_rrhh = models.BooleanField(default=False)
+    puede_crear_empleados = models.BooleanField(default=False)
+    puede_editar_empleados = models.BooleanField(default=False)
+    puede_eliminar_empleados = models.BooleanField(default=False)
+    puede_crear_planillas = models.BooleanField(default=False)
+    puede_editar_planillas = models.BooleanField(default=False)
+    puede_eliminar_planillas = models.BooleanField(default=False)
+    puede_generar_planillas = models.BooleanField(default=False)
+    puede_cerrar_planillas = models.BooleanField(default=False)
+    puede_reabrir_planillas = models.BooleanField(default=False)
+    puede_pagar_planillas = models.BooleanField(default=False)
+    puede_configurar_editores_planilla = models.BooleanField(default=False)
+    puede_gestionar_movimientos_planilla = models.BooleanField(default=False)
+    puede_gestionar_vacaciones = models.BooleanField(default=False)
+    puede_enviar_vouchers_planilla = models.BooleanField(default=False)
     puede_crm = models.BooleanField(default=False)
     puede_campanias = models.BooleanField(default=False)
     puede_citas = models.BooleanField(default=False)
     puede_configuracion_crm = models.BooleanField(default=False)
+    puede_administrar_plantillas_crm = models.BooleanField(default=False)
+    puede_crear_campanias = models.BooleanField(default=False)
+    puede_preparar_campanias = models.BooleanField(default=False)
+    puede_enviar_pruebas_campanias = models.BooleanField(default=False)
+    puede_enviar_campanias = models.BooleanField(default=False)
+    puede_conectar_whatsapp_crm = models.BooleanField(default=False)
+    puede_probar_whatsapp_crm = models.BooleanField(default=False)
     puede_clinica = models.BooleanField(default=False)
     puede_pacientes = models.BooleanField(default=False)
     puede_expediente_clinico = models.BooleanField(default=False)
     puede_tratamientos_clinicos = models.BooleanField(default=False)
     puede_configuracion_clinica = models.BooleanField(default=False)
+    puede_crear_profesionales_clinicos = models.BooleanField(default=False)
+    puede_editar_profesionales_clinicos = models.BooleanField(default=False)
+    puede_crear_servicios_clinicos = models.BooleanField(default=False)
+    puede_editar_servicios_clinicos = models.BooleanField(default=False)
+    puede_eliminar_servicios_clinicos = models.BooleanField(default=False)
     puede_ver_calendario = models.BooleanField(default=False)
     puede_crear_citas = models.BooleanField(default=False)
     puede_editar_citas = models.BooleanField(default=False)
     puede_eliminar_citas = models.BooleanField(default=False)
+    puede_reagendar_citas = models.BooleanField(default=False)
+    puede_cambiar_estado_citas = models.BooleanField(default=False)
+    puede_cancelar_citas = models.BooleanField(default=False)
     puede_crear_bloqueos_agenda = models.BooleanField(default=False)
     puede_editar_bloqueos_agenda = models.BooleanField(default=False)
     puede_eliminar_bloqueos_agenda = models.BooleanField(default=False)
@@ -176,14 +241,19 @@ class RolSistema(models.Model):
     puede_editar_diagnosticos = models.BooleanField(default=False)
     puede_ver_evaluacion_integral = models.BooleanField(default=False)
     puede_editar_evaluacion_integral = models.BooleanField(default=False)
+    puede_crear_evaluacion_integral = models.BooleanField(default=False)
     puede_ver_capilar = models.BooleanField(default=False)
     puede_editar_capilar = models.BooleanField(default=False)
+    puede_crear_capilar = models.BooleanField(default=False)
     puede_ver_tricopigmentacion = models.BooleanField(default=False)
     puede_editar_tricopigmentacion = models.BooleanField(default=False)
+    puede_crear_tricopigmentacion = models.BooleanField(default=False)
     puede_ver_cirugia_clinica = models.BooleanField(default=False)
     puede_editar_cirugia_clinica = models.BooleanField(default=False)
+    puede_crear_cirugia_clinica = models.BooleanField(default=False)
     puede_ver_medicina_estetica = models.BooleanField(default=False)
     puede_editar_medicina_estetica = models.BooleanField(default=False)
+    puede_crear_medicina_estetica = models.BooleanField(default=False)
     puede_ver_enfermeria = models.BooleanField(default=False)
     puede_ver_recetas = models.BooleanField(default=False)
     puede_crear_recetas = models.BooleanField(default=False)
@@ -195,6 +265,8 @@ class RolSistema(models.Model):
     puede_convertir_gastos_adicionales_factura = models.BooleanField(default=False)
     puede_ver_planes_tratamiento = models.BooleanField(default=False)
     puede_editar_planes_tratamiento = models.BooleanField(default=False)
+    puede_crear_planes_tratamiento = models.BooleanField(default=False)
+    puede_eliminar_planes_tratamiento = models.BooleanField(default=False)
     puede_escribir_enfermeria = models.BooleanField(default=False)
     puede_ver_terapias = models.BooleanField(default=False)
     puede_escribir_terapias = models.BooleanField(default=False)
@@ -211,6 +283,16 @@ class RolSistema(models.Model):
     puede_diagnostico_taller = models.BooleanField(default=False)
     puede_operacion_taller = models.BooleanField(default=False)
     puede_configuracion_taller = models.BooleanField(default=False)
+    puede_crear_recepciones_taller = models.BooleanField(default=False)
+    puede_crear_citas_taller = models.BooleanField(default=False)
+    puede_cambiar_estado_citas_taller = models.BooleanField(default=False)
+    puede_registrar_inspecciones_taller = models.BooleanField(default=False)
+    puede_cambiar_estado_ordenes_taller = models.BooleanField(default=False)
+    puede_asignar_ordenes_taller = models.BooleanField(default=False)
+    puede_editar_diagnosticos_taller = models.BooleanField(default=False)
+    puede_agregar_evidencias_taller = models.BooleanField(default=False)
+    puede_editar_configuracion_taller = models.BooleanField(default=False)
+    puede_crear_bahias_taller = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["nombre"]
@@ -223,6 +305,9 @@ class RolSistema(models.Model):
     @property
     def tiene_algun_acceso_facturacion(self):
         if self.solo_lectura_facturacion or self.solo_lectura_inventario:
+            return True
+        from .read_only_permissions import PERMISOS_MODULO
+        if any(getattr(self, permiso, False) for permiso in PERMISOS_MODULO["facturacion"] | PERMISOS_MODULO["inventario"]):
             return True
         return any(
             getattr(self, permiso)
@@ -270,6 +355,9 @@ class RolSistema(models.Model):
     def tiene_algun_acceso_contabilidad(self):
         if self.solo_lectura_contabilidad:
             return True
+        from .read_only_permissions import PERMISOS_MODULO
+        if any(getattr(self, permiso, False) for permiso in PERMISOS_MODULO["contabilidad"]):
+            return True
         return any(
             getattr(self, permiso)
             for permiso in [
@@ -284,6 +372,9 @@ class RolSistema(models.Model):
     @property
     def tiene_algun_acceso_rrhh(self):
         if self.solo_lectura_rrhh:
+            return True
+        from .read_only_permissions import PERMISOS_MODULO
+        if any(getattr(self, permiso, False) for permiso in PERMISOS_MODULO["rrhh"]):
             return True
         return any(
             getattr(self, permiso)
@@ -300,6 +391,9 @@ class RolSistema(models.Model):
     def tiene_algun_acceso_crm(self):
         if self.solo_lectura_crm or self.solo_lectura_agenda:
             return True
+        from .read_only_permissions import PERMISOS_MODULO
+        if any(getattr(self, permiso, False) for permiso in PERMISOS_MODULO["crm"] | PERMISOS_MODULO["agenda"]):
+            return True
         return any(
             getattr(self, permiso)
             for permiso in [
@@ -313,6 +407,9 @@ class RolSistema(models.Model):
     @property
     def tiene_algun_acceso_clinica(self):
         if self.solo_lectura_clinica:
+            return True
+        from .read_only_permissions import PERMISOS_MODULO
+        if any(getattr(self, permiso, False) for permiso in PERMISOS_MODULO["clinica"]):
             return True
         permisos = [
                 "puede_clinica",
@@ -336,6 +433,9 @@ class RolSistema(models.Model):
     @property
     def tiene_algun_acceso_tecnicentro(self):
         if self.solo_lectura_tecnicentro:
+            return True
+        from .read_only_permissions import PERMISOS_MODULO
+        if any(getattr(self, permiso, False) for permiso in PERMISOS_MODULO["tecnicentro"]):
             return True
         return any(
             getattr(self, permiso)

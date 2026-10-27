@@ -6,7 +6,7 @@
 {% block header_description %}Controla el cierre mensual para proteger asientos y reportes cuando un mes ya fue revisado.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'crear_periodo_contable' empresa.slug %}" class="erp-action-link">Nuevo período</a>
+{% if erp_access.crear_periodos_contables %}<a href="{% url 'crear_periodo_contable' empresa.slug %}" class="erp-action-link">Nuevo período</a>{% endif %}
 <a href="{% url 'contabilidad_dashboard' empresa.slug %}" class="erp-action-link">Volver a Contabilidad</a>
 {% endblock %}
 
@@ -59,23 +59,23 @@
                     <td>{{ periodo.observacion|default:"-"|truncatechars:80 }}</td>
                     <td class="actions">
                         <a class="erp-link" href="{% url 'checklist_cierre_periodo' empresa.slug periodo.id %}">Revisar cierre</a>
-                        <a class="erp-link" href="{% url 'editar_periodo_contable' empresa.slug periodo.id %}">Editar</a>
-                        {% if erp_access.contabilizar_asientos %}
+                        {% if erp_access.editar_periodos_contables %}<a class="erp-link" href="{% url 'editar_periodo_contable' empresa.slug periodo.id %}">Editar</a>{% endif %}
+                        {% if erp_access.reabrir_periodos_contables or erp_access.cerrar_periodos_contables or erp_access.contabilizar_asientos and not erp_access.acciones_v3 %}
                         {% if periodo.estado == "cerrado" %}
                         <details>
                             <summary class="erp-link">Reabrir período</summary>
-                            <form method="post" action="{% url 'abrir_periodo_contable' empresa.slug periodo.id %}">
+                            {% if erp_access.reabrir_periodos_contables or erp_access.contabilizar_asientos and not erp_access.acciones_v3 %}<form method="post" action="{% url 'abrir_periodo_contable' empresa.slug periodo.id %}">
                                 {% csrf_token %}
                                 <label for="motivo-reapertura-{{ periodo.id }}">Motivo de reapertura</label>
                                 <textarea id="motivo-reapertura-{{ periodo.id }}" name="motivo_reapertura" rows="3" required maxlength="400" placeholder="Explica la corrección que requiere reabrir este mes."></textarea>
                                 <button class="erp-btn-secondary" type="submit">Reabrir período</button>
-                            </form>
+                            </form>{% endif %}
                         </details>
                         {% elif periodo.control_cierre.total == 0 %}
-                        <form method="post" action="{% url 'cerrar_periodo_contable' empresa.slug periodo.id %}" style="display:inline;">
+                        {% if erp_access.cerrar_periodos_contables or erp_access.contabilizar_asientos and not erp_access.acciones_v3 %}<form method="post" action="{% url 'cerrar_periodo_contable' empresa.slug periodo.id %}" style="display:inline;">
                             {% csrf_token %}
                             <button class="erp-link" type="submit">Cerrar período</button>
-                        </form>
+                        </form>{% endif %}
                         {% endif %}
                         {% endif %}
                     </td>

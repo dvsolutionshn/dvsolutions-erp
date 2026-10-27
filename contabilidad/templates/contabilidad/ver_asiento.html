@@ -8,14 +8,14 @@
 {% block topbar_actions %}
 <a href="{% url 'asientos_contables' empresa.slug %}" class="erp-action-link">Volver a Asientos</a>
 {% if erp_access.reportes_contables %}<a href="{% url 'historicos_usd' empresa.slug %}" class="erp-action-link">Históricos USD</a>{% endif %}
-{% if erp_access.asientos_contables %}
+{% if erp_access.duplicar_asientos %}
 <form method="post" action="{% url 'duplicar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Duplicar</button>
 </form>
-{% if asiento.estado == "borrador" %}
-<a href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Editar</a>
 {% endif %}
+{% if asiento.estado == "borrador" and erp_access.editar_asientos %}
+<a href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Editar</a>
 {% endif %}
 {% if asiento.estado == "borrador" and erp_access.contabilizar_asientos %}
 <form method="post" action="{% url 'contabilizar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
@@ -23,18 +23,20 @@
     <button class="erp-action-link" type="submit">Contabilizar</button>
 </form>
 {% endif %}
-{% if asiento.estado == "contabilizado" and erp_access.contabilizar_asientos %}
-{% if not asiento.conversion_verificada %}
+{% if asiento.estado == "contabilizado" %}
+{% if not asiento.conversion_verificada and erp_access.regularizar_asientos %}
 <a href="{% url 'revisar_conversion_asiento' empresa.slug asiento.id %}" class="erp-action-link">{% if revision_integral %}Consultar revisión integral{% else %}Revisar todas las partidas históricas{% endif %}</a>
 {% endif %}
-{% if puede_regularizar_moneda %}
+{% if puede_regularizar_moneda and erp_access.regularizar_asientos %}
 <a href="{% url 'regularizar_moneda_factura' empresa.slug asiento.id %}" class="erp-action-link">Regularizar moneda de factura</a>
 {% endif %}
-{% if not revision_integral %}
+{% if not revision_integral and erp_access.regresar_asientos_borrador %}
 <form method="post" action="{% url 'regresar_asiento_borrador' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Regresar a borrador</button>
 </form>
+{% endif %}
+{% if not revision_integral and erp_access.reversar_asientos %}
 <form method="post" action="{% url 'reversar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Reversar</button>

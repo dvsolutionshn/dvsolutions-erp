@@ -557,7 +557,7 @@
                 <div class="erp-kpi-label">Automatizaciones</div>
                 <h3 class="erp-panel-title" style="margin:6px 0 0;">Alertas que guian al equipo</h3>
             </div>
-            {% if erp_access.editar_planes_tratamiento %}<a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>{% endif %}
+            {% if erp_access.crear_planes_tratamiento %}<a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>{% endif %}
         </div>
         <div class="clinic-automation-grid">
             {% for item in automatizaciones %}

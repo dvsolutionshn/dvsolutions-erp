@@ -65,6 +65,7 @@ from .clinical_permissions import (
     EMPRESAS_CLINICAS_CON_ROLES,
     PERMISOS_CLINICOS,
     TODOS_LOS_PERMISOS_CLINICOS,
+    PERMISOS_CLINICOS_LEGADOS,
 )
 
 
@@ -1699,7 +1700,9 @@ def rol_clinico_editar(request, slug, rol_id=None):
                 "es_rol_clinico": True,
                 "usa_permisos_clinicos_granulares": True,
                 "usa_permisos_clinicos_v2": True,
+                "usa_permisos_acciones_v3": True,
                 **valores,
+                **{campo: False for campo in PERMISOS_CLINICOS_LEGADOS},
             }
             if rol:
                 for campo, valor in defaults.items():
@@ -1754,6 +1757,7 @@ def rol_clinico_duplicar(request, slug, rol_id):
         es_rol_clinico=True,
         usa_permisos_clinicos_granulares=True,
         usa_permisos_clinicos_v2=True,
+        usa_permisos_acciones_v3=True,
     )
     for campo in TODOS_LOS_PERMISOS_CLINICOS:
         setattr(copia, campo, bool(getattr(origen, campo, False)))

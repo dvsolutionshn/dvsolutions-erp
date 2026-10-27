@@ -14,28 +14,28 @@
     <article class="erp-card"><div class="erp-kpi-label">Audiencia</div><p class="erp-stat-value" style="font-size:22px;">{{ campania.get_audiencia_display }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Estado</div><p class="erp-stat-value" style="font-size:22px;">{{ campania.get_estado_display }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Envios</div><p class="erp-stat-value">{{ envios.count }}</p></article>
-    <article class="erp-card">
+    {% if erp_access.preparar_campanias %}<article class="erp-card">
         <form method="post" action="{% url 'crm_preparar_envios_campania' empresa.slug campania.id %}">
             {% csrf_token %}
             <button class="erp-btn" type="submit">Preparar Mensajes para Todos</button>
         </form>
-    </article>
-    <article class="erp-card">
+    </article>{% endif %}
+    {% if erp_access.enviar_campanias %}<article class="erp-card">
         <form method="post" action="{% url 'crm_enviar_campania_whatsapp_api' empresa.slug campania.id %}">
             {% csrf_token %}
             <div class="erp-kpi-label">WhatsApp API</div>
             <button class="erp-btn" type="submit">Enviar Todos por API</button>
             <p class="erp-card-muted">Usa la plantilla comercial aprobada en Meta. Si hay imagen promocional, se envia como encabezado de la plantilla.</p>
         </form>
-    </article>
-    <article class="erp-card">
+    </article>{% endif %}
+    {% if erp_access.enviar_pruebas_campanias %}<article class="erp-card">
         <form method="post" action="{% url 'crm_enviar_campania_plantilla_prueba' empresa.slug campania.id %}">
             {% csrf_token %}
             <div class="erp-kpi-label">Demo sin imagen</div>
             <button class="erp-btn erp-btn-secondary" type="submit">Enviar hello_world a Todos</button>
             <p class="erp-card-muted">Usa la plantilla oficial de prueba de Meta para demostrar envio simultaneo mientras aprueban la plantilla comercial.</p>
         </form>
-    </article>
+    </article>{% endif %}
 </section>
 
 {% if campania.plantilla and campania.plantilla.imagen_promocional %}

@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from weasyprint import HTML
 
 from core.models import Empresa
+from core.clinical_permissions import rol_clinico_v3
 from contabilidad.models import AsientoContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_planilla_cerrada, registrar_asiento_planilla_pagada
 from crm.models import ConfiguracionCRM
@@ -47,6 +48,8 @@ def _puede_borrar_rrhh(request):
 
 
 def _puede_editar_planillas(request, empresa):
+    if rol_clinico_v3(request.user, empresa):
+        return request.user.tiene_permiso_erp("puede_editar_planillas", empresa)
     if _puede_borrar_rrhh(request):
         return True
     if not getattr(request.user, "pk", None):
@@ -62,6 +65,12 @@ def _bloquear_si_no_es_dueno_rrhh(request, empresa):
         return False
     messages.error(request, "Esta acción está restringida al dueño del sistema.")
     return True
+
+
+def _autoriza_v3_o_dueno(request, empresa, permiso):
+    if rol_clinico_v3(request.user, empresa):
+        return request.user.tiene_permiso_erp(permiso, empresa)
+    return _puede_borrar_rrhh(request)
 
 
 @login_required
@@ -166,7 +175,8 @@ def ver_empleado(request, empresa_slug, empleado_id):
 @login_required
 def eliminar_empleado_rrhh(request, empresa_slug, empleado_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    if _bloquear_si_no_es_dueno_rrhh(request, empresa):
+    if not _autoriza_v3_o_dueno(request, empresa, "puede_eliminar_empleados"):
+        messages.error(request, "Tu rol no permite eliminar empleados.")
         return redirect("empleados_rrhh", empresa_slug=empresa.slug)
     empleado = get_object_or_404(Empleado, id=empleado_id, empresa=empresa)
     if request.method == "POST":
@@ -208,8 +218,8 @@ def planillas_rrhh(request, empresa_slug):
 @login_required
 def configurar_editores_planilla(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    if not _puede_borrar_rrhh(request):
-        messages.error(request, "Solo Daniel Varela puede autorizar editores de planilla.")
+    if not _autoriza_v3_o_dueno(request, empresa, "puede_configurar_editores_planilla"):
+        messages.error(request, "Tu rol no permite autorizar editores de planilla.")
         return redirect("planillas_rrhh", empresa_slug=empresa.slug)
 
     config = configuracion_rrhh(empresa)
@@ -279,7 +289,8 @@ def ver_planilla(request, empresa_slug, periodo_id):
 @login_required
 def eliminar_planilla_rrhh(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    if _bloquear_si_no_es_dueno_rrhh(request, empresa):
+    if not _autoriza_v3_o_dueno(request, empresa, "puede_eliminar_planillas"):
+        messages.error(request, "Tu rol no permite eliminar planillas.")
         return redirect("planillas_rrhh", empresa_slug=empresa.slug)
     periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
     if request.method == "POST":
@@ -354,8 +365,8 @@ def cerrar_planilla(request, empresa_slug, periodo_id):
 @require_POST
 def reabrir_planilla(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    if not _puede_borrar_rrhh(request):
-        messages.error(request, "Solo Daniel Varela puede reabrir una planilla cerrada.")
+    if not _autoriza_v3_o_dueno(request, empresa, "puede_reabrir_planillas"):
+        messages.error(request, "Tu rol no permite reabrir una planilla cerrada.")
         return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo_id)
 
     try:

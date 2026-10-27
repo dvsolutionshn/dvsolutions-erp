@@ -5,7 +5,7 @@ from django.utils import timezone
 from core.models import ConfiguracionOnix, ConsumoOnix, Empresa
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
-from core.clinical_permissions import rol_clinico_granular
+from core.clinical_permissions import TODOS_LOS_PERMISOS_CLINICOS, rol_clinico_granular, rol_clinico_v3
 from core.read_only_permissions import modulo_facturacion_desde_ruta, rol_solo_lectura
 
 
@@ -271,6 +271,13 @@ def erp_access(request):
             and (user.is_superuser or getattr(user, "puede_administrar_usuarios_clinicos", False))
         ),
     }
+    # Expone cada acción nueva con el nombre sin el prefijo ``puede_``. Las
+    # claves históricas conservan arriba sus condiciones adicionales de módulo.
+    for campo in TODOS_LOS_PERMISOS_CLINICOS:
+        clave = campo.removeprefix("puede_")
+        if clave not in base and campo.startswith("puede_"):
+            base[clave] = permiso(campo)
+    base["acciones_v3"] = bool(rol_clinico_v3(user, empresa))
     if interfaz_clinica:
         base.update({
             "modulo_contabilidad": base["modulo_contabilidad"] and "contabilidad" in modulos_adicionales_clinica,

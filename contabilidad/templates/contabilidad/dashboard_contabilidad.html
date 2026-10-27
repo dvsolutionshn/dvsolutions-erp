@@ -10,7 +10,7 @@
 
 {% block topbar_actions %}
 {% if erp_access.reportes_contables %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ac-btn">Ver reportes</a>{% endif %}
-{% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="ac-btn ac-btn--primary">Nuevo asiento</a>{% endif %}
+{% if erp_access.crear_asientos %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="ac-btn ac-btn--primary">Nuevo asiento</a>{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -49,7 +49,7 @@
       <span class="ac-hero__company">{{ empresa.nombre }}</span>
       <span class="ac-hero__date">{% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %} {{ fecha_hoy|date:"d/m/Y" }}</span>
       <div class="ac-hero__actions">
-        {% if erp_access.asientos_contables %}<a class="ac-btn ac-btn--primary" href="{% url 'crear_asiento_contable' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear asiento</a>{% endif %}
+        {% if erp_access.crear_asientos %}<a class="ac-btn ac-btn--primary" href="{% url 'crear_asiento_contable' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear asiento</a>{% endif %}
         {% if erp_access.reportes_contables %}<a class="ac-btn" href="{% url 'estado_resultados' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %} Estado de resultados</a>{% endif %}
       </div>
     </div>
@@ -186,7 +186,7 @@
       <span class="ac-empty__icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span>
       <h3 class="ac-empty__title">Tu próximo movimiento empieza aquí</h3>
       <p class="ac-empty__text">Cuando registres tus primeros asientos, podrás seguir su estado y consultar sus detalles desde este espacio.</p>
-      {% if erp_access.asientos_contables %}<a class="ac-btn ac-btn--primary" href="{% url 'crear_asiento_contable' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear primer asiento</a>{% endif %}
+      {% if erp_access.crear_asientos %}<a class="ac-btn ac-btn--primary" href="{% url 'crear_asiento_contable' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear primer asiento</a>{% endif %}
     </div>
     {% endif %}
   </section>
