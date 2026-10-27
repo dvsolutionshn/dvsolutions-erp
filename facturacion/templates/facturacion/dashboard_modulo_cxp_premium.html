@@ -109,6 +109,9 @@
         </header>
         <div class="billing-grid">
             {% if erp_access.reportes %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="reportes_facturacion" titulo="Reportes" categoria="Análisis" descripcion="Consulta reportes de ventas, impuestos y desempeño financiero." icono="chart" tono="indigo" empresa=empresa only %}{% endif %}
+            {% if empresa.slug == "hospital_mia" or empresa.slug == "medical_spa" or empresa.slug == "luque_aestetic" or empresa.slug == "serviciosmedicos" %}
+            {% if erp_access.reportes %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="reporte_ventas_producto" titulo="Ventas por Producto" categoria="Análisis" descripcion="Consulta cantidades vendidas y facturas por producto, fechas y vendedor." icono="chart" tono="teal" empresa=empresa only %}{% endif %}
+            {% endif %}
             {% if erp_access.cai %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="cai_facturacion" titulo="CAI" categoria="Control fiscal" descripcion="Administra rangos autorizados y correlativos de facturación." icono="tax" tono="amber" empresa=empresa only %}{% endif %}
             {% if erp_access.impuestos %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="impuestos_facturacion" titulo="Impuestos" categoria="Tributos" descripcion="Configura los impuestos que se aplican a tus documentos." icono="percent" tono="teal" empresa=empresa only %}{% endif %}
             {% if erp_access.configuracion_facturacion %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="configuracion_facturacion" titulo="Configuración" categoria="Preferencias" descripcion="Personaliza el diseño, los datos y las leyendas de tus facturas." icono="settings" tono="blue" empresa=empresa only %}{% endif %}

@@ -7,6 +7,9 @@
 {% block header_description %}Tablero ejecutivo construido desde la operación del ERP para leer ventas, cobranza, cartera y comportamiento comercial en una sola vista.{% endblock %}
 
 {% block topbar_actions %}
+{% if empresa.slug == "hospital_mia" or empresa.slug == "medical_spa" or empresa.slug == "luque_aestetic" or empresa.slug == "serviciosmedicos" %}
+{% if erp_access.reportes %}<a class="erp-action-link" href="{% url 'reporte_ventas_producto' empresa.slug %}">Ventas por Producto</a>{% endif %}
+{% endif %}
 <a class="erp-action-link" href="{% url 'reportes_facturacion' empresa.slug %}?{{ request.GET.urlencode }}">Volver a reportes</a>
 <a class="erp-action-link" href="/{{ empresa.slug }}/dashboard/facturacion/reportes/excel/?{{ request.GET.urlencode }}">Exportar Excel</a>
 {% endblock %}

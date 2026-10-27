@@ -7,6 +7,9 @@
 {% block header_title %}Reportes de Facturacion{% endblock %}
 {% block header_description %}Vista ejecutiva de ventas, impuestos, saldos y comportamiento de cobro con una presentacion mas clara y profesional.{% endblock %}
 {% block topbar_actions %}
+{% if empresa.slug == "hospital_mia" or empresa.slug == "medical_spa" or empresa.slug == "luque_aestetic" or empresa.slug == "serviciosmedicos" %}
+{% if erp_access.reportes %}<a class="erp-action-link" href="{% url 'reporte_ventas_producto' empresa.slug %}">Ventas por Producto</a>{% endif %}
+{% endif %}
 {% if empresa.slug == "digital_planning" %}
 <a class="erp-action-link" href="{% url 'reporte_retenciones_pagos' empresa.slug %}">Retenciones en pagos</a>
 {% endif %}

@@ -1,0 +1,83 @@
+{% extends "core/erp_base.html" %}
+{% load static humanize %}
+
+{% block title %}Ventas por Producto - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Facturación · {{ empresa.nombre }}{% endblock %}
+{% block header_title %}Ventas por Producto{% endblock %}
+{% block header_description %}Consulta las ventas de un producto, sus facturas y el vendedor en el periodo que elijas.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'reportes_facturacion' empresa.slug %}">Volver a reportes</a>
+{% if reporte_generado and puede_exportar %}
+<a class="erp-action-link" href="{{ export_excel_url }}">Descargar Excel</a>
+<a class="erp-action-link" href="{{ export_pdf_url }}">Descargar PDF</a>
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'facturacion/reporte_ventas_producto.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="rvp-shell">
+  <section class="erp-card rvp-filter-card" aria-labelledby="rvp-filter-title">
+    <div class="rvp-section-heading"><div><h2 id="rvp-filter-title">Consulta de ventas</h2><p>Selecciona un producto de {{ empresa.nombre }} y el rango de fechas.</p></div><span class="rvp-badge">Importes en HNL</span></div>
+    {% if form.non_field_errors %}<div class="rvp-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    <form method="get" class="rvp-filters" id="rvp-form">
+      <div class="rvp-field rvp-product-field" data-product-search data-search-url="{{ search_productos_url }}">
+        <label for="rvp-producto-busqueda">Producto o servicio</label>
+        {{ form.producto }}
+        <div class="rvp-combobox">
+          <input type="text" id="rvp-producto-busqueda" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="rvp-product-options" autocomplete="off" placeholder="Buscar por nombre, código o referencia…" value="{% if producto_seleccionado %}{{ producto_seleccionado.nombre }}{% if producto_seleccionado.codigo %} · {{ producto_seleccionado.codigo }}{% endif %}{% endif %}">
+          <button type="button" class="rvp-product-toggle" aria-label="Mostrar productos" aria-controls="rvp-product-options" tabindex="-1">⌄</button>
+          <div class="rvp-product-popup" hidden>
+            <div id="rvp-product-options" class="rvp-product-options" role="listbox" aria-label="Productos disponibles"></div>
+            <p class="rvp-product-status" role="status" aria-live="polite"></p>
+            <button type="button" class="rvp-load-more" hidden>Cargar más productos</button>
+          </div>
+        </div>
+        {% if form.producto.errors %}<div class="rvp-errors">{{ form.producto.errors }}</div>{% endif %}
+        <small>Busca y elige un resultado. Incluye productos históricos e inactivos.</small>
+        <noscript><p class="rvp-errors">Activa JavaScript para buscar y seleccionar el producto.</p></noscript>
+      </div>
+      <div class="rvp-field"><label for="{{ form.fecha_desde.id_for_label }}">Fecha inicial</label>{{ form.fecha_desde }}{{ form.fecha_desde.errors }}</div>
+      <div class="rvp-field"><label for="{{ form.fecha_hasta.id_for_label }}">Fecha final</label>{{ form.fecha_hasta }}{{ form.fecha_hasta.errors }}</div>
+      <div class="rvp-field"><label for="{{ form.vendedor.id_for_label }}">Vendedor</label>{{ form.vendedor }}{{ form.vendedor.errors }}</div>
+      <div class="rvp-field"><label for="{{ form.estado.id_for_label }}">Estado de factura</label>{{ form.estado }}{{ form.estado.errors }}</div>
+      <div class="rvp-filter-actions"><button type="submit" class="erp-btn">Consultar ventas</button><a class="erp-btn-secondary" href="{% url 'reporte_ventas_producto' empresa.slug %}">Limpiar</a></div>
+    </form>
+  </section>
+
+  {% if reporte_generado %}
+  <section class="rvp-results" aria-labelledby="rvp-results-title">
+    <div class="rvp-section-heading"><div><h2 id="rvp-results-title">{{ producto_seleccionado.nombre }}</h2><p>{% if producto_seleccionado.codigo %}Código {{ producto_seleccionado.codigo }} · {% endif %}{{ empresa.nombre }} · {{ form.fecha_desde.value }} al {{ form.fecha_hasta.value }}</p></div>{% if form.estado.value == 'borrador' %}<span class="rvp-badge rvp-badge-warning">Consulta de borradores</span>{% elif form.estado.value == 'anulada' %}<span class="rvp-badge rvp-badge-danger">Consulta de anuladas</span>{% elif not form.estado.value %}<span class="rvp-badge rvp-badge-warning">Incluye borradores y anuladas</span>{% endif %}</div>
+    <div class="rvp-kpis">
+      <article class="rvp-kpi"><span>Cantidad vendida</span><strong>{{ resumen.cantidad|floatformat:2|intcomma }}</strong><small>{{ producto_seleccionado.get_unidad_medida_display }}</small></article>
+      <article class="rvp-kpi rvp-kpi-primary"><span>Total de venta</span><strong>L. {{ resumen.total|floatformat:2|intcomma }}</strong><small>Con descuentos e impuestos</small></article>
+      <article class="rvp-kpi"><span>Facturas</span><strong>{{ resumen.documentos|intcomma }}</strong><small>Sin facturas anuladas</small></article>
+      <article class="rvp-kpi"><span>Precio promedio</span><strong>{% if resumen.precio_promedio != None %}L. {{ resumen.precio_promedio|floatformat:2|intcomma }}{% else %}—{% endif %}</strong><small>Por {{ producto_seleccionado.get_unidad_medida_display|lower }}, con impuestos y descuentos</small></article>
+    </div>
+    <div class="rvp-note">Las facturas anuladas aparecen para consulta y se excluyen de los totales. Los borradores se suman únicamente al seleccionar Borrador o Todos los estados.</div>
+    <div class="erp-card rvp-detail-card">
+      <div class="rvp-section-heading"><div><h3>Detalle de facturas</h3><p>{{ pagina_obj.paginator.count|intcomma }} registro{{ pagina_obj.paginator.count|pluralize }} en el periodo seleccionado.</p></div>{% if puede_exportar %}<div class="rvp-exports"><a class="erp-btn-secondary" href="{{ export_excel_url }}">Excel</a><a class="erp-btn-secondary" href="{{ export_pdf_url }}">PDF</a></div>{% endif %}</div>
+      <div class="rvp-table-wrap" role="region" aria-label="Detalle de ventas por producto" tabindex="0">
+        <table class="rvp-table">
+          <thead><tr><th>Fecha</th><th>Factura</th><th>Cliente</th><th class="rvp-number">Cantidad</th><th class="rvp-number">Precio unitario</th><th class="rvp-number">Descuento</th><th class="rvp-number">Total</th><th>Vendedor</th><th>Estado</th></tr></thead>
+          <tbody>{% for fila in pagina_obj %}<tr{% if fila.anulada %} class="rvp-row-cancelled"{% endif %}>
+            <td>{{ fila.fecha|date:"d/m/Y" }}</td>
+            <td>{% if fila.factura_url %}<a class="erp-link" href="{{ fila.factura_url }}">{{ fila.numero_factura|default:"Sin número" }}</a>{% else %}{{ fila.numero_factura|default:"Sin número" }}{% endif %}</td>
+            <td class="rvp-text-cell">{{ fila.cliente }}</td><td class="rvp-number">{{ fila.cantidad|floatformat:2|intcomma }}</td><td class="rvp-number">L. {{ fila.precio_unitario|floatformat:2|intcomma }}</td><td class="rvp-number">L. {{ fila.descuento|floatformat:2|intcomma }}</td><td class="rvp-number rvp-total-cell">L. {{ fila.total|floatformat:2|intcomma }}</td><td class="rvp-text-cell">{{ fila.vendedor|default:"Sin vendedor" }}</td><td><span class="rvp-badge{% if fila.anulada %} rvp-badge-danger{% elif fila.estado == 'Borrador' or fila.estado == 'borrador' %} rvp-badge-warning{% endif %}">{% if fila.anulada %}ANULADA{% else %}{{ fila.estado|capfirst }}{% endif %}</span></td>
+          </tr>{% empty %}<tr><td colspan="9" class="rvp-empty"><h3>No se encontraron ventas</h3><p>No hay facturas de este producto que coincidan con las fechas y los filtros seleccionados.</p></td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+      {% if pagina_obj.has_other_pages %}<nav class="rvp-pagination" aria-label="Páginas del detalle">{% if pagina_anterior_url %}<a class="erp-btn-secondary" href="{{ pagina_anterior_url }}">Anterior</a>{% endif %}<span>Página {{ pagina_obj.number }} de {{ pagina_obj.paginator.num_pages }}</span>{% if pagina_siguiente_url %}<a class="erp-btn-secondary" href="{{ pagina_siguiente_url }}">Siguiente</a>{% endif %}</nav>{% endif %}
+    </div>
+  </section>
+  {% else %}
+  <section class="erp-card rvp-empty"><h2>Consulta el historial de un producto</h2><p>Elige el producto, las fechas y, si lo necesitas, un vendedor o estado. Verás la cantidad vendida, el importe y las facturas correspondientes.</p></section>
+  {% endif %}
+  <p class="rvp-method-note">Se usa la fecha de emisión de cada factura y el vendedor asignado a ella. Los importes se muestran en lempiras; las facturas en USD se convierten con el tipo de cambio guardado. El precio unitario corresponde al precio de la factura antes del descuento; el descuento se muestra sin impuesto. El total y el precio promedio incluyen impuestos y descuentos aplicados. Las notas de crédito no se descuentan de este reporte de venta facturada.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}{{ block.super }}<script src="{% static 'facturacion/reporte_ventas_producto.js' %}" defer></script>{% endblock %}

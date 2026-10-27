@@ -1,0 +1,39 @@
+{% load humanize %}
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Ventas por Producto</title>
+<style>
+@page { size: A4 landscape; margin: 14mm 12mm 17mm; @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8pt sans-serif; color: #64748b; } }
+body { font-family: sans-serif; font-size: 9pt; color: #18344b; }
+h1 { font-size: 21pt; margin: 0 0 5pt; } h2 { font-size: 13pt; margin: 16pt 0 5pt; }
+.muted { color: #526779; } .filters { margin: 12pt 0; line-height: 1.6; }
+.summary { width: 100%; margin: 12pt 0; border-collapse: collapse; }
+.summary td { padding: 10pt; background: #eef5fa; width: 25%; border: 2pt solid white; }
+.summary strong { display: block; font-size: 17pt; margin: 4pt 0; }
+table.detail { width: 100%; border-collapse: collapse; table-layout: fixed; }
+thead { display: table-header-group; } tr { break-inside: avoid; }
+th { text-align: left; background: #174c70; color: white; padding: 7pt 5pt; font-size: 8pt; }
+td { vertical-align: top; } .detail td { padding: 7pt 5pt; border-bottom: 1px solid #dce5ed; overflow-wrap: anywhere; font-size: 8pt; }
+.num { text-align: right; } .cancelled { color: #9c2630; background: #fff2f2; }
+.note { font-size: 8pt; line-height: 1.5; color: #526779; margin-top: 12pt; }
+</style></head><body>
+<h1>Ventas por Producto</h1><div class="muted">{{ empresa.nombre }}</div>
+<h2>{{ producto_seleccionado.nombre }}</h2>
+{% if producto_seleccionado.codigo %}<div>Código / referencia: {{ producto_seleccionado.codigo }}</div>{% endif %}
+<div class="filters"><strong>Periodo:</strong> {{ filtros.fecha_desde|date:"d/m/Y" }} al {{ filtros.fecha_hasta|date:"d/m/Y" }}<br>
+<strong>Usuario / vendedor:</strong> {% if filtros.vendedor %}{{ filtros.vendedor.get_full_name|default:filtros.vendedor.username }}{% else %}Todos{% endif %} ·
+<strong>Estado:</strong> {% if filtros.estado %}{{ filtros.estado|capfirst }}{% else %}Todos los estados{% endif %}</div>
+<table class="summary"><tr>
+<td>Cantidad<strong>{{ resumen.cantidad|floatformat:2|intcomma }}</strong>{{ producto_seleccionado.get_unidad_medida_display }}</td>
+<td>Total vendido<strong>L. {{ resumen.total|floatformat:2|intcomma }}</strong>Descuentos e impuestos incluidos</td>
+<td>Facturas<strong>{{ resumen.documentos|intcomma }}</strong>Excluye anuladas</td>
+<td>Precio promedio<strong>{% if resumen.precio_promedio != None %}L. {{ resumen.precio_promedio|floatformat:2|intcomma }}{% else %}—{% endif %}</strong>Por {{ producto_seleccionado.get_unidad_medida_display|lower }}</td>
+</tr></table>
+<p class="note">Las anuladas se identifican como ANULADA y aportan cero al resumen. Los borradores sólo se suman al seleccionar Borrador o Todos los estados y no son ventas definitivas.</p>
+<table class="detail"><colgroup><col style="width:8%"><col style="width:14%"><col style="width:17%"><col style="width:7%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:14%"><col style="width:9%"></colgroup>
+<thead><tr><th>Fecha</th><th>Factura</th><th>Cliente / paciente</th><th class="num">Cantidad</th><th class="num">Precio unitario HNL</th><th class="num">Descuento HNL</th><th class="num">Total producto HNL</th><th>Usuario / vendedor</th><th>Estado</th></tr></thead>
+<tbody>{% for fila in filas %}<tr{% if fila.anulada %} class="cancelled"{% endif %}>
+<td>{{ fila.fecha|date:"d/m/Y" }}</td><td>{{ fila.numero_factura }}</td><td>{{ fila.cliente }}</td>
+<td class="num">{{ fila.cantidad|floatformat:2|intcomma }}</td><td class="num">{{ fila.precio_unitario|floatformat:2|intcomma }}</td><td class="num">{{ fila.descuento|floatformat:2|intcomma }}</td><td class="num">{{ fila.total|floatformat:2|intcomma }}</td><td>{{ fila.vendedor }}</td><td>{% if fila.anulada %}ANULADA{% else %}{{ fila.estado }}{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="9">No hay ventas para los filtros seleccionados.</td></tr>{% endfor %}</tbody></table>
+<p class="note">Importes en HNL; los documentos USD se convierten al tipo de cambio guardado en cada factura. Se suman exclusivamente las líneas del producto seleccionado con sus descuentos e impuestos históricos. El precio unitario es el registrado antes del descuento; el descuento corresponde al importe de la línea sin impuesto. Promedio = total con impuesto y descuento aplicado / cantidad. Las notas de crédito no se descuentan en este reporte de venta facturada. El vendedor es el asignado en la factura.</p>
+</body></html>

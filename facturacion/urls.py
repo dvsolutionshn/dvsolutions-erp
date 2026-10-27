@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .reporte_ventas_producto import reporte_ventas_producto, buscar_productos_ventas
 from .captura_rapida import captura_rapida
 from .importacion_clientes import importar_cliente
 from .vincular_proveedores import vincular_libro
@@ -149,6 +150,8 @@ urlpatterns = [
     path('<int:factura_id>/nota-credito/', views.generar_nota_credito_desde_factura, name='generar_nota_credito_desde_factura'),
 
     path('reportes/', views.reportes_facturacion, name='reportes_facturacion'),
+    path('reportes/ventas-producto/', reporte_ventas_producto, name='reporte_ventas_producto'),
+    path('reportes/ventas-producto/productos/', buscar_productos_ventas, name='buscar_productos_ventas'),
     path('reportes/dashboard-bi/', views.dashboard_bi_facturacion, name='dashboard_bi_facturacion'),
     path('reportes/power-bi/', views.configuracion_power_bi_reportes, name='configuracion_power_bi_reportes'),
     path('reportes/bancos/', views.reporte_ingresos_bancos, name='reporte_ingresos_bancos'),
