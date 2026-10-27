@@ -6,6 +6,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.text import slugify
+from django.utils.translation import override as override_language
 
 from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
 
@@ -545,14 +546,27 @@ class SolicitarRecuperacionForm(forms.Form):
 
 
 class EstablecerAccesoForm(SetPasswordForm):
+    error_messages = {
+        **SetPasswordForm.error_messages,
+        "password_mismatch": "Las contraseñas no coinciden. Escríbelas de nuevo.",
+    }
+
+    def full_clean(self):
+        # Esta pantalla es en espanol; conserva los validadores y sus codigos.
+        with override_language("es"):
+            return super().full_clean()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["new_password1"].label = "Nueva contrasena"
+        self.fields["new_password1"].label = "Nueva contraseña"
         self.fields["new_password1"].help_text = (
-            "Usa una contrasena segura que no sea comun, totalmente numerica ni similar a tus datos."
+            "Evita contraseñas comunes, solo numéricas o similares a tus datos."
         )
-        self.fields["new_password2"].label = "Confirmar contrasena"
-        self.fields["new_password2"].help_text = "Escribe nuevamente la misma contrasena."
+        self.fields["new_password2"].label = "Confirma tu contraseña"
+        self.fields["new_password2"].help_text = "Vuelve a escribir la misma contraseña."
+        for field in self.fields.values():
+            field.widget.attrs.update({"class": "oa-input", "autocomplete": "new-password"})
+            field.error_messages["required"] = "Completa este campo para continuar."
 
 
 class PlanComercialForm(forms.ModelForm):

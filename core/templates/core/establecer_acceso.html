@@ -4,36 +4,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crear contrasena - DV Solutions ERP</title>
-    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="color-scheme" content="light">
+    <title>{% if token_invalido %}Enlace no disponible{% elif token_obj.tipo == 'invitacion' %}Activa tu acceso{% else %}Recupera tu acceso{% endif %} | Oasis</title>
+    <link rel="stylesheet" href="{% static 'core/css/access_activation.css' %}">
+    <script src="{% static 'core/js/access_activation.js' %}" defer></script>
 </head>
-<body style="margin:0;min-height:100vh;background:#eef4f8;display:grid;place-items:center;padding:24px;">
-    <main class="erp-form-card" style="width:min(560px,100%);box-shadow:0 24px 70px rgba(14,34,56,.14);">
-        {% if token_invalido %}
-            <div class="erp-kpi-label">Enlace no disponible</div>
-            <h3>Este enlace vencio o ya fue utilizado</h3>
-            <p>Solicita una nueva invitacion al administrador de DV Solutions o utiliza la recuperacion de contrasena desde el acceso de tu empresa.</p>
-        {% else %}
-            <div class="erp-kpi-label">{% if token_obj.tipo == 'invitacion' %}Invitacion empresarial{% else %}Recuperacion de acceso{% endif %}</div>
-            <h3>Crea tu contrasena</h3>
-            <p>{{ usuario_obj.get_full_name|default:usuario_obj.email }}, define una contrasena privada para acceder a {{ usuario_obj.empresa.nombre|default:"DV Solutions ERP" }}.</p>
-            <form method="post" class="erp-compact-form" style="margin-top:20px;">
+<body class="oa-page">
+    <main class="oa-shell">
+        <aside class="oa-story" aria-label="Bienvenido a Oasis">
+            <div class="oa-story-brand">
+                <img src="{% static 'core/images/oasis-email-logo.png' %}" alt="Oasis" width="136" height="136">
+                <p class="oa-brand-label">Tu espacio de trabajo</p>
+            </div>
+            <div class="oa-story-content">
+                <p class="oa-eyebrow">{% if token_invalido %}CONTINUEMOS JUNTOS{% elif token_obj.tipo == 'invitacion' %}UN NUEVO COMIENZO{% else %}VUELVE A TU ESPACIO{% endif %}</p>
+                <h2>{% if token_invalido %}Tu próximo paso<br>comienza aquí.{% elif token_obj.tipo == 'invitacion' %}Tu equipo<br>te espera.{% else %}Retoma tu día.<br>Estamos contigo.{% endif %}</h2>
+                <p>{% if token_invalido %}Un nuevo enlace te permitirá continuar con la configuración de tu acceso.{% elif token_obj.tipo == 'invitacion' %}Crea tu acceso personal y comienza a trabajar en un espacio pensado para tu empresa.{% else %}Crea una nueva contraseña para volver a conectar con tu equipo y tu trabajo.{% endif %}</p>
+            </div>
+            {% if not token_invalido %}
+            <ol class="oa-steps" aria-label="Pasos para {% if token_obj.tipo == 'invitacion' %}activar{% else %}recuperar{% endif %} tu acceso">
+                <li>
+                    <span class="oa-step-number" aria-hidden="true">01</span>
+                    <div><strong>{% if token_obj.tipo == 'invitacion' %}Invitación recibida{% else %}Solicitud recibida{% endif %}</strong><span>El primer paso está completo.</span></div>
+                </li>
+                <li aria-current="step">
+                    <span class="oa-step-number" aria-hidden="true">02</span>
+                    <div><strong>{% if token_obj.tipo == 'invitacion' %}Crea tu contraseña{% else %}Renueva tu contraseña{% endif %}</strong><span>Elige una que solo tú conozcas.</span></div>
+                </li>
+                <li>
+                    <span class="oa-step-number" aria-hidden="true">03</span>
+                    <div><strong>Entra a tu empresa</strong><span>Inicia sesión con tu correo.</span></div>
+                </li>
+            </ol>
+            {% endif %}
+            <p class="oa-story-note">Un acceso personal para conectar con tu equipo.</p>
+        </aside>
+
+        <section class="oa-form-panel" id="oa-access" aria-labelledby="oa-title">
+            {% if token_invalido %}
+            <div class="oa-invalid">
+                <div class="oa-invalid-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><path d="M10 13.5 14 9.5M7.5 15.5l-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0m3 1 1-1a3.5 3.5 0 0 1 5 5l-4 4a3.5 3.5 0 0 1-5 0" transform="translate(1 0)"/><path d="m4 3 17 18"/></svg></div>
+                <div class="oa-form-heading">
+                <p class="oa-eyebrow">ENLACE NO DISPONIBLE</p>
+                <h1 id="oa-title">Necesitas un nuevo enlace.</h1>
+                <p>Por seguridad, este enlace ya no está disponible. Puede haber vencido o haber sido utilizado.</p>
+                <p>Solicita una nueva invitación al administrador de tu empresa. Si ya tienes una cuenta, puedes recuperar tu acceso desde el inicio de sesión.</p>
+                </div>
+                <a class="oa-submit" href="{% url 'public_access' %}">Ir al inicio de sesión <span aria-hidden="true">→</span></a>
+                <p class="oa-note">Cada enlace es personal y funciona una sola vez.</p>
+            </div>
+            {% else %}
+            <div class="oa-form-heading">
+                <p class="oa-eyebrow">{% if token_obj.tipo == 'invitacion' %}ACTIVA TU ACCESO{% else %}RECUPERA TU ACCESO{% endif %}</p>
+                <h1 id="oa-title">{% if token_obj.tipo == 'invitacion' %}Crea tu contraseña.{% else %}Tu nueva contraseña.{% endif %}</h1>
+                <p>Hola, <strong>{{ usuario_obj.get_full_name|default:usuario_obj.email }}</strong>. {% if token_obj.tipo == 'invitacion' %}Estás a un paso de comenzar.{% else %}Preparemos tu regreso.{% endif %}</p>
+            </div>
+
+            <div class="oa-company">
+                {% if usuario_obj.empresa.logo %}<img src="{{ usuario_obj.empresa.logo.url }}" alt="Logo de {{ usuario_obj.empresa.nombre }}" width="140" height="64">{% endif %}
+                <div class="oa-company-info"><span class="oa-company-label">{% if usuario_obj.empresa %}TU EMPRESA{% else %}TU ESPACIO{% endif %}</span><strong>{{ usuario_obj.empresa.nombre|default:"Oasis" }}</strong></div>
+            </div>
+            <p class="oa-account oa-account-email"><span>Correo de acceso: </span><strong>{{ usuario_obj.email }}</strong></p>
+
+            <form method="post" class="oa-form" data-access-form>
                 {% csrf_token %}
-                {% if form.non_field_errors %}<div class="erp-field-errors">{{ form.non_field_errors }}</div>{% endif %}
-                {% for field in form %}
-                <div class="erp-field">
+                {% for hidden_field in form.hidden_fields %}{{ hidden_field }}{% endfor %}
+                {% if form.errors %}
+                <div class="oa-error-summary" role="alert" aria-labelledby="oa-errors-title" tabindex="-1">
+                    <strong id="oa-errors-title">Revisa los datos para continuar.</strong>
+                    <ul>
+                        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                        {% for field in form.visible_fields %}{% for error in field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% for field in form.visible_fields %}
+                <div class="oa-field{% if field.errors %} is-invalid{% endif %}">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text|safe }}</div>{% endif %}
-                    {{ field.errors }}
+                    <div class="oa-password">
+                        {{ field }}
+                        <button class="oa-password-toggle" type="button" data-password-toggle data-password-target="{{ field.id_for_label }}" data-password-description="{% if field.name == 'new_password2' %}contraseña de confirmación{% else %}nueva contraseña{% endif %}" aria-controls="{{ field.id_for_label }}" aria-label="Mostrar {% if field.name == 'new_password2' %}contraseña de confirmación{% else %}nueva contraseña{% endif %}" aria-pressed="false" hidden><span data-password-label>Mostrar</span></button>
+                    </div>
+                    {% if field.help_text %}<div class="oa-field-help" id="{{ field.id_for_label }}_helptext">{{ field.help_text|safe }}</div>{% endif %}
+                    {% if field.errors %}<div class="oa-field-errors">{{ field.errors }}</div>{% endif %}
                 </div>
                 {% endfor %}
-                <div class="erp-form-actions">
-                    <span class="erp-field-help">El enlace se invalidara inmediatamente despues de guardar.</span>
-                    <button class="erp-btn" type="submit">Guardar contrasena</button>
-                </div>
+                <button class="oa-submit" type="submit">{% if token_obj.tipo == 'invitacion' %}Activar mi acceso{% else %}Guardar nueva contraseña{% endif %} <span aria-hidden="true">→</span></button>
+                <p class="oa-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg><span>Al guardar, este enlace quedará utilizado. Después podrás iniciar sesión con tu correo y tu contraseña.</span></p>
             </form>
-        {% endif %}
+            {% endif %}
+        </section>
     </main>
+    <footer class="oa-footer"><strong>OASIS</strong><span>Conecta tu equipo. Impulsa tu empresa.</span></footer>
 </body>
 </html>
