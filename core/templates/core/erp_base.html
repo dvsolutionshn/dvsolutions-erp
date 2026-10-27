@@ -489,10 +489,60 @@
                 {% endfor %}
             </div>
             {% endif %}
+            {% if erp_access.solo_lectura %}
+            <div class="erp-message" role="status" style="margin-bottom:16px;border-color:#9cc7df;background:#eef8fd;color:#174c68;">
+                <strong>Modo sólo lectura.</strong> Puedes consultar la información de este módulo, pero no crear, editar, eliminar, anular ni ejecutar procesos.
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </main>
     </div>
 </div>
+{% if erp_access.solo_lectura %}
+<script>
+(() => {
+    const acciones = new Set([
+        "crear", "nuevo", "nueva", "editar", "eliminar", "borrar", "anular", "aplicar",
+        "pago", "pagar", "ajuste", "entrada", "registrar", "subir", "enviar", "guardar",
+        "validar", "duplicar", "transferir", "traslado-rapido", "regalias", "cerrar", "abrir",
+        "clasificar", "enlazar-factura", "enlazar-compra", "contabilizar", "reversar",
+        "regresar-borrador", "regularizar-moneda", "revisar-conversion", "cambiar-fecha",
+        "corregir-numero", "configuracion", "aprobar", "convertir", "convertir-factura",
+        "importar", "sustituir-rumi", "cargar", "generar", "reabrir", "conciliar",
+        "desconciliar", "preparar-envios", "conectar-whatsapp-meta", "enviar-prueba-whatsapp",
+        "enviar-prueba-masiva", "enviar-whatsapp-api", "whatsapp-api", "email", "estado",
+        "asignar", "evidencia", "inspeccion", "confirmar-sexo", "agregar", "agregar-sesion",
+        "completar", "restriccion", "habilitar"
+    ]);
+    const esAccion = value => {
+        try {
+            const url = new URL(value, window.location.href);
+            const partes = url.pathname.split("/").filter(Boolean).map(item => item.toLowerCase());
+            return partes.some(item => acciones.has(item)) ||
+                ["editar", "eliminar", "crear", "accion"].some(key => url.searchParams.has(key));
+        } catch (_) {
+            return false;
+        }
+    };
+    document.querySelectorAll("a[href]").forEach(link => {
+        if (esAccion(link.getAttribute("href"))) link.hidden = true;
+    });
+    document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(form => {
+        form.querySelectorAll('button[type="submit"], input[type="submit"], [formaction]').forEach(control => {
+            control.hidden = true;
+            control.disabled = true;
+        });
+        form.addEventListener("submit", event => event.preventDefault());
+    });
+    document.querySelectorAll("[formaction]").forEach(control => {
+        if (esAccion(control.getAttribute("formaction"))) {
+            control.hidden = true;
+            control.disabled = true;
+        }
+    });
+})();
+</script>
+{% endif %}
 {% if mostrar_asistente_erp and empresa and request.user.is_authenticated %}
 <svg class="erp-onix-symbols" aria-hidden="true" focusable="false">
     <symbol id="onixAgentIcon" viewBox="0 0 64 64">

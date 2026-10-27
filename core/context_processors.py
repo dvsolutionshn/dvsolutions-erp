@@ -6,6 +6,7 @@ from core.models import ConfiguracionOnix, ConsumoOnix, Empresa
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
 from core.clinical_permissions import rol_clinico_granular
+from core.read_only_permissions import modulo_facturacion_desde_ruta, rol_solo_lectura
 
 
 def _empresa_actual(request, user):
@@ -91,7 +92,27 @@ def erp_access(request):
     rol_piloto = rol_clinico_granular(user, empresa) if permisos_clinicos_granulares else None
     permisos_clinicos_v2 = bool(rol_piloto and rol_piloto.usa_permisos_clinicos_v2)
 
+    solo_lectura_modulo = None
+    path_parts = [part for part in (getattr(request, "path_info", "") or "").split("/") if part]
+    if empresa and len(path_parts) >= 3 and path_parts[1] == "dashboard":
+        seccion = path_parts[2]
+        suffix = "/".join(path_parts[3:])
+        modulo = {
+            "contabilidad": "contabilidad",
+            "rrhh": "rrhh",
+            "crm": "crm",
+            "citas": "agenda",
+            "clinica": "clinica",
+            "tecnicentro": "tecnicentro",
+        }.get(seccion)
+        if seccion == "facturacion":
+            modulo = modulo_facturacion_desde_ruta(suffix)
+        if modulo and rol_solo_lectura(user, empresa, modulo):
+            solo_lectura_modulo = modulo
+
     base = {
+        "solo_lectura": bool(solo_lectura_modulo),
+        "solo_lectura_modulo": solo_lectura_modulo,
         "interfaz_clinica": interfaz_clinica,
         "modo_clinico_simple": modo_clinico_simple_activo(user, empresa),
         "modulo_facturacion": facturacion_activa and algun("facturacion"),

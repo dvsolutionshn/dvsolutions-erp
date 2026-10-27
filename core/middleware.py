@@ -15,6 +15,7 @@ from core.access import (
     permiso_tecnicentro_desde_ruta,
 )
 from core.models import Empresa
+from core.read_only_permissions import evaluar_ruta_solo_lectura, modulo_facturacion_desde_ruta
 from core.clinical_permissions import (
     PERMISOS_ACCESO_HISTORIAL,
     permiso_facturacion_clinico_granular,
@@ -29,6 +30,14 @@ from core.audit_context import reset_audit_request, set_audit_request
 
 def _usuario_puede_acceder_empresa(usuario, empresa):
     return bool(usuario.is_superuser or usuario.puede_acceder_empresa(empresa))
+
+
+def _bloqueo_solo_lectura(request, empresa, modulo, suffix):
+    estado = evaluar_ruta_solo_lectura(request, empresa, modulo, suffix)
+    if estado is False:
+        messages.error(request, "Tu rol tiene acceso de sólo lectura y no puede ejecutar esta acción.")
+        return redirect("dashboard", slug=empresa.slug)
+    return estado
 
 
 class AuditoriaRequestMiddleware:
@@ -67,8 +76,18 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "El modulo de facturacion no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
+                suffix = "/".join(parts[3:])
+                solo_lectura = _bloqueo_solo_lectura(
+                    request, empresa, modulo_facturacion_desde_ruta(suffix), suffix
+                )
+                if solo_lectura is not None:
+                    if solo_lectura is not True:
+                        return solo_lectura
+                    with translation.override("es-ni"):
+                        request.LANGUAGE_CODE = "es-ni"
+                        return self.get_response(request)
+
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    suffix = "/".join(parts[3:])
                     permiso = permiso_facturacion_desde_ruta(suffix)
                     rol_granular = rol_clinico_granular(request.user, empresa)
                     permiso_accion = (
@@ -108,8 +127,16 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "El modulo de contabilidad no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
+                suffix = "/".join(parts[3:])
+                solo_lectura = _bloqueo_solo_lectura(request, empresa, "contabilidad", suffix)
+                if solo_lectura is not None:
+                    if solo_lectura is not True:
+                        return solo_lectura
+                    with translation.override("es-ni"):
+                        request.LANGUAGE_CODE = "es-ni"
+                        return self.get_response(request)
+
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    suffix = "/".join(parts[3:])
                     permiso = permiso_contabilidad_desde_ruta(suffix)
                     permiso_accion = permiso_contabilidad_accion(suffix)
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
@@ -143,8 +170,14 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "El modulo de recursos humanos no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
+                suffix = "/".join(parts[3:])
+                solo_lectura = _bloqueo_solo_lectura(request, empresa, "rrhh", suffix)
+                if solo_lectura is not None:
+                    if solo_lectura is not True:
+                        return solo_lectura
+                    return self.get_response(request)
+
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    suffix = "/".join(parts[3:])
                     permiso = permiso_rrhh_desde_ruta(suffix)
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
@@ -169,8 +202,14 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "El modulo CRM, Marketing y Agenda no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
+                suffix = "/".join(parts[3:])
+                solo_lectura = _bloqueo_solo_lectura(request, empresa, "crm", suffix)
+                if solo_lectura is not None:
+                    if solo_lectura is not True:
+                        return solo_lectura
+                    return self.get_response(request)
+
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    suffix = "/".join(parts[3:])
                     permiso = permiso_crm_desde_ruta(suffix)
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
@@ -223,6 +262,12 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "El modulo de citas no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
+                solo_lectura = _bloqueo_solo_lectura(request, empresa, "agenda", suffix)
+                if solo_lectura is not None:
+                    if solo_lectura is not True:
+                        return solo_lectura
+                    return self.get_response(request)
+
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     rol_granular = rol_clinico_granular(request.user, empresa)
                     if rol_granular:
@@ -272,8 +317,16 @@ class EmpresaAccessMiddleware:
 
                 suffix = "/".join(parts[3:])
                 if parts[3:4] == ["gastos-adicionales"]:
+                    if not gastos_adicionales_habilitados(empresa):
+                        messages.error(request, "Gastos Adicionales no está habilitado para esta empresa.")
+                        return redirect("dashboard", slug=empresa.slug)
+                    solo_lectura = _bloqueo_solo_lectura(request, empresa, "clinica", suffix)
+                    if solo_lectura is not None:
+                        if solo_lectura is not True:
+                            return solo_lectura
+                        return self.get_response(request)
                     permisos = permisos_gastos_adicionales_desde_ruta(suffix, request.method)
-                    if not gastos_adicionales_habilitados(empresa) or not permisos or not any(
+                    if not permisos or not any(
                         request.user.tiene_permiso_erp(permiso, empresa) for permiso in permisos
                     ):
                         messages.error(request, "Tu usuario no tiene acceso a esta acción de Gastos Adicionales.")
@@ -283,6 +336,12 @@ class EmpresaAccessMiddleware:
                 if not empresa.tiene_modulo_activo("clinica_medica"):
                     messages.error(request, "El modulo clinico no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
+
+                solo_lectura = _bloqueo_solo_lectura(request, empresa, "clinica", suffix)
+                if solo_lectura is not None:
+                    if solo_lectura is not True:
+                        return solo_lectura
+                    return self.get_response(request)
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     rol_granular = rol_clinico_granular(request.user, empresa)
@@ -330,8 +389,13 @@ class EmpresaAccessMiddleware:
                 if not empresa.tiene_modulo_activo("tecnicentro"):
                     messages.error(request, "El modulo Tecnicentro no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
+                suffix = "/".join(parts[3:])
+                solo_lectura = _bloqueo_solo_lectura(request, empresa, "tecnicentro", suffix)
+                if solo_lectura is not None:
+                    if solo_lectura is not True:
+                        return solo_lectura
+                    return self.get_response(request)
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    suffix = "/".join(parts[3:])
                     permiso = permiso_tecnicentro_desde_ruta(suffix)
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para esta operacion del taller.")

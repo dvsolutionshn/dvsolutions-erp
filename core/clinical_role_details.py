@@ -11,6 +11,14 @@ from .clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, PERMISOS_CLINICOS
 # Basado en clinical_permissions, access y los guards de las vistas existentes.
 # No se deducen permisos a partir de nombres como Recepción, Enfermería o Bodega.
 DESCRIPCIONES_PERMISOS = {
+    "solo_lectura_facturacion": "Permite consultar Facturación y bloquea en backend cualquier creación, edición, cobro, anulación, eliminación, envío o configuración.",
+    "solo_lectura_inventario": "Permite consultar productos, proveedores, existencias, compras y Kardex; bloquea todo movimiento o cambio de inventario.",
+    "solo_lectura_contabilidad": "Permite consultar Contabilidad, cuentas, asientos y reportes; bloquea crear, editar, contabilizar, reversar, cerrar o reabrir.",
+    "solo_lectura_rrhh": "Permite consultar Recursos Humanos; bloquea cambios en empleados, planillas, movimientos, vacaciones y configuración.",
+    "solo_lectura_crm": "Permite consultar CRM y campañas; bloquea crear, editar, ejecutar, enviar o configurar.",
+    "solo_lectura_agenda": "Permite consultar calendario y citas; bloquea crear, reagendar, marcar, cancelar o administrar bloqueos.",
+    "solo_lectura_clinica": "Permite consultar el módulo clínico y expedientes; bloquea cualquier registro o modificación clínica.",
+    "solo_lectura_tecnicentro": "Permite consultar el taller; bloquea recepción, diagnósticos, operaciones y configuración nuevas o modificadas.",
     "puede_ver_calendario": "Consultar el calendario y las citas autorizadas. No permite crear, editar ni eliminar citas por sí solo.",
     "puede_crear_citas": "Registrar citas nuevas mediante el formulario de agenda. La consulta del calendario y otras acciones conservan sus permisos propios.",
     "puede_editar_citas": "Editar, reagendar o cambiar el estado de citas. Los bloqueos de disponibilidad también comprueban las reglas del profesional y de la empresa.",

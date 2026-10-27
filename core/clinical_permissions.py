@@ -13,6 +13,16 @@ EMPRESAS_CLINICAS_CON_ROLES = {
 }
 
 PERMISOS_CLINICOS = (
+    ("Sólo lectura por módulo", (
+        ("solo_lectura_facturacion", "Sólo ver Facturación"),
+        ("solo_lectura_inventario", "Sólo ver Inventario y Compras"),
+        ("solo_lectura_contabilidad", "Sólo ver Contabilidad"),
+        ("solo_lectura_rrhh", "Sólo ver Recursos Humanos"),
+        ("solo_lectura_crm", "Sólo ver CRM y Marketing"),
+        ("solo_lectura_agenda", "Sólo ver Agenda y Citas"),
+        ("solo_lectura_clinica", "Sólo ver Clínica y Expedientes"),
+        ("solo_lectura_tecnicentro", "Sólo ver Tecnicentro"),
+    )),
     ("Calendario", (
         ("puede_ver_calendario", "Ver calendario y citas"),
         ("puede_crear_citas", "Crear citas"),

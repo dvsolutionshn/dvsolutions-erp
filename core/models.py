@@ -64,6 +64,14 @@ class RolSistema(models.Model):
     es_rol_clinico = models.BooleanField(default=False)
     usa_permisos_clinicos_granulares = models.BooleanField(default=False)
     usa_permisos_clinicos_v2 = models.BooleanField(default=False)
+    solo_lectura_facturacion = models.BooleanField(default=False)
+    solo_lectura_inventario = models.BooleanField(default=False)
+    solo_lectura_contabilidad = models.BooleanField(default=False)
+    solo_lectura_rrhh = models.BooleanField(default=False)
+    solo_lectura_crm = models.BooleanField(default=False)
+    solo_lectura_agenda = models.BooleanField(default=False)
+    solo_lectura_clinica = models.BooleanField(default=False)
+    solo_lectura_tecnicentro = models.BooleanField(default=False)
     puede_punto_venta = models.BooleanField(default=False)
     puede_configuracion_facturacion = models.BooleanField(default=False)
     puede_cierres_caja = models.BooleanField(default=False)
@@ -214,6 +222,8 @@ class RolSistema(models.Model):
 
     @property
     def tiene_algun_acceso_facturacion(self):
+        if self.solo_lectura_facturacion or self.solo_lectura_inventario:
+            return True
         return any(
             getattr(self, permiso)
             for permiso in [
@@ -258,6 +268,8 @@ class RolSistema(models.Model):
 
     @property
     def tiene_algun_acceso_contabilidad(self):
+        if self.solo_lectura_contabilidad:
+            return True
         return any(
             getattr(self, permiso)
             for permiso in [
@@ -271,6 +283,8 @@ class RolSistema(models.Model):
 
     @property
     def tiene_algun_acceso_rrhh(self):
+        if self.solo_lectura_rrhh:
+            return True
         return any(
             getattr(self, permiso)
             for permiso in [
@@ -284,6 +298,8 @@ class RolSistema(models.Model):
 
     @property
     def tiene_algun_acceso_crm(self):
+        if self.solo_lectura_crm or self.solo_lectura_agenda:
+            return True
         return any(
             getattr(self, permiso)
             for permiso in [
@@ -296,6 +312,8 @@ class RolSistema(models.Model):
 
     @property
     def tiene_algun_acceso_clinica(self):
+        if self.solo_lectura_clinica:
+            return True
         permisos = [
                 "puede_clinica",
                 "puede_pacientes",
@@ -317,6 +335,8 @@ class RolSistema(models.Model):
 
     @property
     def tiene_algun_acceso_tecnicentro(self):
+        if self.solo_lectura_tecnicentro:
+            return True
         return any(
             getattr(self, permiso)
             for permiso in [
@@ -594,6 +614,11 @@ class Usuario(AbstractUser):
         if self.is_superuser or self.es_administrador_empresa:
             return True
         rol = self.rol_para_empresa(empresa)
+        from .read_only_permissions import permiso_solo_lectura
+
+        override_solo_lectura = permiso_solo_lectura(rol, permiso)
+        if override_solo_lectura is not None:
+            return override_solo_lectura
         if permiso == "puede_ver_manuales_pdf" and rol and rol.activo and rol.puede_administrar_manuales_pdf:
             return True
         return bool(
