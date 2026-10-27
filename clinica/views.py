@@ -31,7 +31,7 @@ from django.views.decorators.http import require_GET, require_POST, require_safe
 from weasyprint import HTML
 
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados
-from core.clinical_permissions import rol_clinico_granular
+from core.clinical_permissions import permiso_historia_por_tipo, rol_clinico_granular, rol_clinico_v2
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
@@ -185,6 +185,26 @@ from crm.services import (
 logger = logging.getLogger(__name__)
 MANUAL_PDF_LINK_SALT = "clinica.manual-pdf.descarga"
 MANUAL_PDF_LINK_MAX_AGE_DEFAULT = 7 * 24 * 60 * 60
+
+
+def _puede_historia_tipo(usuario, empresa, tipo, *, editar=False):
+    rol_v2 = rol_clinico_v2(usuario, empresa)
+    if not rol_v2:
+        if not rol_clinico_granular(usuario, empresa):
+            return usuario.tiene_permiso_erp("puede_expediente_clinico", empresa)
+        permisos_especificos = {
+            "enfermeria": ("puede_ver_historia_clinica", "puede_escribir_enfermeria"),
+            "terapias": ("puede_ver_terapias", "puede_escribir_terapias"),
+            "camara_hiperbarica": ("puede_ver_camara_hiperbarica", "puede_escribir_camara_hiperbarica"),
+            "terapias_postquirurgicas": ("puede_ver_postquirurgicas", "puede_escribir_postquirurgicas"),
+        }
+        permisos = permisos_especificos.get(tipo)
+        permiso = permisos[1 if editar else 0] if permisos else (
+            "puede_editar_historia_clinica" if editar else "puede_ver_historia_clinica"
+        )
+        return usuario.tiene_permiso_erp(permiso, empresa)
+    permiso = permiso_historia_por_tipo(tipo, editar=editar)
+    return bool(permiso and usuario.tiene_permiso_erp(permiso, empresa))
 
 def _texto_busqueda_profesional(valor):
     return unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii").lower().strip()
@@ -2739,6 +2759,10 @@ def archivo_anexo_app(request, empresa_slug, paciente_id, clase, registro_id, pa
     if not es_anexos_app(request, empresa):
         raise Http404("Los archivos protegidos están disponibles desde la app clínica.")
     autorizar_anexos_app(request, empresa)
+    if rol_clinico_v2(request.user, empresa) and not request.user.tiene_permiso_erp(
+        "puede_descargar_anexos_clinicos", empresa
+    ):
+        raise PermissionDenied("No tiene permiso para abrir o descargar anexos clínicos.")
     modelos = {
         "examen": (ExamenPaciente, {"archivo"}),
         "evolucion": (PacienteFotoEvolucion, {"imagen", "video"}),
@@ -2776,6 +2800,15 @@ def historias_especialidad(request, empresa_slug, paciente_id):
     ) if modo_preconsulta_app else []
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
     preconsultas = paciente.preconsultas.filter(estado="completada").select_related("creada_por")
+    if rol_clinico_v2(request.user, empresa):
+        tipos_permitidos = [
+            codigo for codigo, _nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
+            if _puede_historia_tipo(request.user, empresa, codigo)
+        ]
+        if not tipos_permitidos:
+            raise PermissionDenied("No tiene permiso para consultar secciones de la historia clínica.")
+        historias = historias.filter(tipo__in=tipos_permitidos)
+        preconsultas = preconsultas.filter(tipo__in=["general", *tipos_permitidos])
     if area_app:
         historias = historias.filter(tipo=area_app["codigo"])
         preconsultas = preconsultas.filter(tipo=area_app["codigo"])
@@ -2790,7 +2823,8 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "ultima_preconsulta": paciente.preconsultas.filter(tipo=codigo, estado="completada").order_by("-fecha_completada", "-fecha_creacion").first(),
         }
         for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
-        if not area_app or codigo == area_app["codigo"]
+        if (not area_app or codigo == area_app["codigo"])
+        and (not rol_clinico_v2(request.user, empresa) or codigo in tipos_permitidos)
     ]
     if modo_preconsulta_app:
         for item in tipos:
@@ -2912,10 +2946,54 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
     permisos_granulares = bool(rol_clinico_granular(request.user, empresa))
+    permisos_v2 = bool(rol_clinico_v2(request.user, empresa))
     puede_editar_antecedentes = request.user.tiene_permiso_erp(
-        "puede_editar_historia_clinica" if permisos_granulares else "puede_expediente_clinico",
+        "puede_editar_antecedentes_clinicos" if permisos_v2 else (
+            "puede_editar_historia_clinica" if permisos_granulares else "puede_expediente_clinico"
+        ),
         empresa,
     )
+    puede_ver_antecedentes = request.user.tiene_permiso_erp(
+        "puede_ver_antecedentes_clinicos" if permisos_v2 else (
+            "puede_ver_historia_clinica" if permisos_granulares else "puede_expediente_clinico"
+        ), empresa,
+    )
+    puede_ver_examen = request.user.tiene_permiso_erp(
+        "puede_ver_examen_fisico" if permisos_v2 else (
+            "puede_ver_historia_clinica" if permisos_granulares else "puede_expediente_clinico"
+        ), empresa,
+    )
+    puede_editar_examen = request.user.tiene_permiso_erp(
+        "puede_editar_examen_fisico" if permisos_v2 else (
+            "puede_editar_historia_clinica" if permisos_granulares else "puede_expediente_clinico"
+        ), empresa,
+    )
+    puede_ver_diagnosticos = request.user.tiene_permiso_erp(
+        "puede_ver_diagnosticos" if permisos_v2 else (
+            "puede_ver_historia_clinica" if permisos_granulares else "puede_expediente_clinico"
+        ), empresa,
+    )
+    puede_editar_diagnosticos = request.user.tiene_permiso_erp(
+        "puede_editar_diagnosticos" if permisos_v2 else (
+            "puede_editar_historia_clinica" if permisos_granulares else "puede_expediente_clinico"
+        ), empresa,
+    )
+    puede_ver_evaluacion = _puede_historia_tipo(request.user, empresa, "evaluacion_integral")
+    puede_editar_evaluacion = _puede_historia_tipo(request.user, empresa, "evaluacion_integral", editar=True)
+    puede_ver_tricopigmentacion = _puede_historia_tipo(request.user, empresa, "tricopigmentacion")
+    puede_editar_tricopigmentacion = _puede_historia_tipo(
+        request.user, empresa, "tricopigmentacion", editar=True
+    )
+    if permisos_v2:
+        permiso_seccion = {
+            "antecedentes": puede_ver_antecedentes or puede_editar_antecedentes,
+            "funciones_organicas": puede_ver_evaluacion or puede_editar_evaluacion,
+            "examen_fisico": puede_ver_examen or puede_editar_examen,
+            "diagnostico": puede_ver_diagnosticos or puede_editar_diagnosticos,
+            "tricopigmentacion": puede_ver_tricopigmentacion or puede_editar_tricopigmentacion,
+        }.get(seccion_activa, True)
+        if not permiso_seccion:
+            raise PermissionDenied("No tiene permiso para consultar esta sección clínica.")
     antecedente_adicional = (
         antecedente_paciente_app(empresa, paciente) if formulario_antecedentes_app else
         AntecedenteAdicionalPaciente.objects.filter(empresa=empresa, paciente=paciente)
@@ -3005,6 +3083,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             empresa=empresa,
             paciente=paciente,
         )
+        if not _puede_historia_tipo(request.user, empresa, historia.tipo, editar=True):
+            raise PermissionDenied("No tiene permiso para eliminar notas de esta especialidad.")
         tipo_nombre = historia.get_tipo_display()
         historia.delete()
         messages.success(request, f"Nota clínica de {tipo_nombre} eliminada correctamente.")
@@ -3016,6 +3096,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             empresa=empresa,
             paciente=paciente,
         )
+        if not _puede_historia_tipo(request.user, empresa, historia.tipo, editar=True):
+            raise PermissionDenied("No tiene permiso para editar esta nota clínica.")
         if historia.bloqueada:
             messages.error(request, "Esta nota finalizada está bloqueada y no puede modificarse.")
             return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
@@ -3040,6 +3122,13 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     accion_evaluacion = acciones_evaluacion.get(request.POST.get("accion")) if request.method == "POST" else None
     if accion_evaluacion:
         seccion_formulario, prefijo_formulario = accion_evaluacion
+        permiso_evaluacion = (
+            puede_editar_examen
+            if seccion_formulario == "examen_fisico"
+            else _puede_historia_tipo(request.user, empresa, "evaluacion_integral", editar=True)
+        )
+        if not permiso_evaluacion:
+            raise PermissionDenied("No tiene permiso para registrar esta sección clínica.")
         evaluacion_form = EvaluacionClinicaIntegralForm(
             request.POST,
             empresa=empresa,
@@ -3099,6 +3188,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         if formulario_especial_app:
             return render_historia_especial_app(request, empresa, paciente, formulario_especial_app, evaluacion_form)
     if request.method == "POST" and request.POST.get("accion") == "guardar_tricopigmentacion":
+        if not _puede_historia_tipo(request.user, empresa, "tricopigmentacion", editar=True):
+            raise PermissionDenied("No tiene permiso para registrar tricopigmentación.")
         tricopigmentacion_form = TricopigmentacionForm(
             request.POST,
             empresa=empresa,
@@ -3129,6 +3220,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         if formulario_especial_app:
             return render_historia_especial_app(request, empresa, paciente, formulario_especial_app, tricopigmentacion_form)
     if request.method == "POST" and tipo_post in tipos_validos:
+        if not _puede_historia_tipo(request.user, empresa, tipo_post, editar=True):
+            raise PermissionDenied("No tiene permiso para registrar esta especialidad clínica.")
         form_inline = HistoriaClinicaEspecialidadForm(
             request.POST,
             empresa=empresa,
@@ -3168,6 +3261,21 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         paciente.historias_especialidad.select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")
     )
+    if permisos_v2:
+        historias = [
+            historia for historia in historias
+            if _puede_historia_tipo(request.user, empresa, historia.tipo)
+        ]
+        for historia in historias:
+            if not puede_ver_antecedentes:
+                historia.antecedentes = ""
+                historia.historia_enfermedad_actual = ""
+            if not puede_ver_examen:
+                historia.signos_vitales = ""
+                historia.examen_fisico = ""
+            if not puede_ver_diagnosticos:
+                historia.diagnostico = ""
+                historia.analisis_clinico = ""
     historias_evaluacion = [historia for historia in historias if historia.tipo == "evaluacion_integral"]
     historias_tricopigmentacion = [historia for historia in historias if historia.tipo == "tricopigmentacion"]
     for historia in historias_evaluacion:
@@ -3253,6 +3361,18 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         }
         for preconsulta in preconsultas
     ]
+    if permisos_v2 and not puede_ver_antecedentes:
+        bloques_preconsulta = [
+            {
+                "preconsulta": bloque["preconsulta"],
+                "secciones": [
+                    seccion for seccion in bloque["secciones"]
+                    if "Motivo" in seccion.get("titulo", "")
+                ],
+            }
+            for bloque in bloques_preconsulta
+        ]
+        bloques_preconsulta = [bloque for bloque in bloques_preconsulta if bloque["secciones"]]
     bloques_motivo = [
         {
             "preconsulta": bloque["preconsulta"],
@@ -3275,6 +3395,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     ]
     bloques_motivo = [bloque for bloque in bloques_motivo if bloque["secciones"]]
     bloques_antecedentes = [bloque for bloque in bloques_antecedentes if bloque["secciones"]]
+    if permisos_v2 and not puede_ver_antecedentes:
+        bloques_antecedentes = []
     if seccion_activa == "motivo_consulta":
         bloques_preconsulta_enfoque = bloques_motivo
         informacion_titulo = "Motivo de consulta"
@@ -3293,6 +3415,10 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         if codigo in {"evaluacion_integral", "tricopigmentacion", "camara_hiperbarica", "terapias_postquirurgicas"}:
             continue
         if seccion_activa == "especialidad" and tipo_enfoque and codigo != tipo_enfoque:
+            continue
+        puede_ver_tipo = _puede_historia_tipo(request.user, empresa, codigo)
+        puede_editar_tipo = _puede_historia_tipo(request.user, empresa, codigo, editar=True)
+        if permisos_v2 and not (puede_ver_tipo or puede_editar_tipo):
             continue
         historias_tipo = [historia for historia in historias if historia.tipo == codigo]
         initial_formulario = {"fecha_atencion": ahora}
@@ -3316,6 +3442,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "historias": historias_tipo,
             "preconsultas": [preconsulta for preconsulta in preconsultas if preconsulta.tipo == codigo],
             "form": formulario,
+            "puede_editar": puede_editar_tipo,
         })
     if evaluacion_form is None:
         evaluacion_initial = {"fecha_atencion": ahora}
@@ -3381,9 +3508,11 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     )
     historial_antecedente_adicional = (
         antecedente_adicional.historial.select_related("profesional", "usuario").all()
-        if antecedente_adicional
+        if antecedente_adicional and puede_ver_antecedentes
         else AntecedenteAdicionalHistorial.objects.none()
     )
+    if permisos_v2 and not puede_ver_antecedentes:
+        antecedente_adicional = None
     return render_pacientes_app(
         request,
         empresa,
@@ -3421,6 +3550,15 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "programa_postquirurgico": programa_postquirurgico,
             "puede_eliminar_notas_clinicas": puede_eliminar_notas_clinicas,
             "puede_editar_antecedentes": puede_editar_antecedentes,
+            "puede_ver_antecedentes": puede_ver_antecedentes,
+            "puede_ver_examen": puede_ver_examen,
+            "puede_editar_examen": puede_editar_examen,
+            "puede_ver_diagnosticos": puede_ver_diagnosticos,
+            "puede_editar_diagnosticos": puede_editar_diagnosticos,
+            "puede_ver_evaluacion": puede_ver_evaluacion,
+            "puede_editar_evaluacion": puede_editar_evaluacion,
+            "puede_ver_tricopigmentacion": puede_ver_tricopigmentacion,
+            "puede_editar_tricopigmentacion": puede_editar_tricopigmentacion,
             "antecedente_adicional": antecedente_adicional,
             "antecedente_adicional_form": antecedente_adicional_form,
             "historial_antecedente_adicional": historial_antecedente_adicional,
@@ -3730,6 +3868,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
+    if not _puede_historia_tipo(request.user, empresa, tipo, editar=True):
+        raise PermissionDenied("No tiene permiso para crear esta clase de historia clínica.")
     if tipo in {"evaluacion_integral", "tricopigmentacion"}:
         ancla = "evaluacion-integral" if tipo == "evaluacion_integral" else "tricopigmentacion"
         destino = reverse(
@@ -3964,6 +4104,8 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         empresa=empresa,
         paciente=paciente,
     )
+    if not _puede_historia_tipo(request.user, empresa, historia.tipo, editar=request.method == "POST"):
+        raise PermissionDenied("No tiene permiso para consultar o editar esta clase de historia clínica.")
     autorizar_historias_app(request, empresa, historia.tipo, editar=True)
     puede_ver_historia = not es_historias_app(request, empresa) or request.user.tiene_permiso_erp(
         "puede_ver_historia_clinica" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico", empresa,

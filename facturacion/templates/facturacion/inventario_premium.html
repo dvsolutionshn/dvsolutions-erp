@@ -14,7 +14,7 @@
 <a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras</a>
 <a class="erp-action-link" href="{% url 'entradas_inventario_dashboard' empresa.slug %}">Entradas</a>
 <a class="erp-action-link" href="{% url 'ajustar_inventario' empresa.slug %}">Nuevo Ajuste</a>
-<a class="erp-action-link" href="{% url 'kardex_inventario' empresa.slug %}">Ver Kardex</a>
+{% if erp_access.ver_kardex %}<a class="erp-action-link" href="{% url 'kardex_inventario' empresa.slug %}">Ver Kardex</a>{% endif %}
 {% endblock %}
 
 {% block extra_head %}

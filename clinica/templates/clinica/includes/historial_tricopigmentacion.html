@@ -7,7 +7,7 @@
         </div>
     </div>
     <div class="panel-body">
-        <form method="post" action="#tricopigmentacion" class="tricopig-form">
+        {% if puede_editar_tricopigmentacion %}<form method="post" action="#tricopigmentacion" class="tricopig-form">
             {% csrf_token %}
             <input type="hidden" name="accion" value="guardar_tricopigmentacion">
             <div class="tricopig-grid">
@@ -19,7 +19,7 @@
                 {% endfor %}
             </div>
             <div class="form-actions"><button class="save-clinical-btn" type="submit">Guardar control de tricopigmentación</button></div>
-        </form>
+        </form>{% endif %}
         <div class="integral-history">
             <h4>Sesiones registradas</h4>
             {% for historia in historias_tricopigmentacion %}

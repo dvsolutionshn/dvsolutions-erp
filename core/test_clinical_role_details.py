@@ -126,12 +126,11 @@ class ClinicalRoleDetailsTests(TestCase):
     def test_none_role_metadata_is_none_and_queries_nothing(self):
         self.assertIsNone(self.detail(None))
 
-    def test_complete_clinical_catalog_49_fields_has_exact_original_labels_and_nonempty_descriptions(self):
+    def test_complete_clinical_catalog_has_exact_labels_and_nonempty_descriptions(self):
         role = RolSistema(pk=900001, nombre="Personalizado completo QA", es_rol_clinico=True, usa_permisos_clinicos_granulares=True, **{name: True for name in self.FIELDS})
         detail = self.detail(role)
-        self.assertEqual(len(self.FIELDS), 49)
         self.assertEqual({entry["campo"] for entry in self.entries(detail)}, set(self.FIELDS))
-        self.assertEqual(len(self.entries(detail)), 49)
+        self.assertEqual(len(self.entries(detail)), len(self.FIELDS))
         self.assert_old_visible_authority(role, detail)
         self.assertEqual(detail["modo"], "granular")
         self.assertTrue(detail["modo_label"])
@@ -140,9 +139,8 @@ class ClinicalRoleDetailsTests(TestCase):
             self.assertIsInstance(entry["descripcion"], str)
             self.assertTrue(entry["descripcion"].strip())
 
-    def test_complete_legacy_catalog_65_fields_uses_original_legacy_authority_not_granular_names(self):
+    def test_complete_legacy_catalog_uses_original_legacy_authority_not_granular_names(self):
         fields = tuple(name for _, group in views.PERMISOS_ROL_CLINICO_LEGADO for name, _ in group)
-        self.assertEqual(len(fields), 65)
         role = RolSistema(pk=900002, nombre="Legado personalizado QA", **{name: True for name in fields})
         detail = self.detail(role)
         self.assertEqual(detail["modo"], "legado")

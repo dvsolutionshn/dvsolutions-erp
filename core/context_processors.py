@@ -5,6 +5,7 @@ from django.utils import timezone
 from core.models import ConfiguracionOnix, ConsumoOnix, Empresa
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
+from core.clinical_permissions import rol_clinico_granular
 
 
 def _empresa_actual(request, user):
@@ -87,6 +88,8 @@ def erp_access(request):
     permisos_clinicos_granulares = bool(
         rol_actual and rol_actual.activo and rol_actual.usa_permisos_clinicos_granulares
     )
+    rol_piloto = rol_clinico_granular(user, empresa) if permisos_clinicos_granulares else None
+    permisos_clinicos_v2 = bool(rol_piloto and rol_piloto.usa_permisos_clinicos_v2)
 
     base = {
         "interfaz_clinica": interfaz_clinica,
@@ -142,13 +145,24 @@ def erp_access(request):
         "eliminar_borradores": permiso("puede_eliminar_borradores"),
         "eliminar_facturas": permiso("puede_eliminar_facturas"),
         "registrar_pagos_clientes": permiso("puede_registrar_pagos_clientes"),
+        "editar_pagos_clientes": permiso("puede_editar_pagos_clientes") if permisos_clinicos_v2 else permiso("puede_registrar_pagos_clientes"),
+        "anular_pagos_clientes": permiso("puede_anular_pagos_clientes") if permisos_clinicos_v2 else permiso("puede_anular_facturas"),
+        "correccion_fiscal_facturas": permiso("puede_correccion_fiscal_facturas") if permisos_clinicos_v2 else permiso("puede_editar_facturas"),
+        "imprimir_facturas": permiso("puede_imprimir_facturas") if permisos_clinicos_v2 else permiso("puede_ver_facturas"),
+        "enviar_facturas": permiso("puede_enviar_facturas") if permisos_clinicos_v2 else permiso("puede_ver_facturas"),
+        "ventas_por_producto": permiso("puede_ver_reporte_ventas_producto") if permisos_clinicos_v2 else permiso("puede_reportes"),
         "crear_clientes": permiso("puede_crear_clientes"),
         "editar_clientes": permiso("puede_editar_clientes"),
         "crear_productos": permiso("puede_crear_productos"),
         "editar_productos": permiso("puede_editar_productos"),
+        "eliminar_productos": permiso("puede_eliminar_productos") if permisos_clinicos_v2 else permiso("puede_productos"),
         "crear_proveedores": permiso("puede_crear_proveedores"),
         "editar_proveedores": permiso("puede_editar_proveedores"),
         "ajustar_inventario": permiso("puede_ajustar_inventario"),
+        "ver_kardex": permiso("puede_ver_kardex") if permisos_clinicos_v2 else permiso("puede_inventario"),
+        "crear_lotes": permiso("puede_crear_lotes") if permisos_clinicos_v2 else permiso("puede_inventario"),
+        "ver_bodegas": permiso("puede_ver_bodegas") if permisos_clinicos_v2 else permiso("puede_inventario"),
+        "registrar_salidas_inventario": permiso("puede_registrar_salidas_inventario") if permisos_clinicos_v2 else permiso("puede_inventario"),
         "crear_compras": permiso("puede_crear_compras"),
         "editar_compras": permiso("puede_editar_compras"),
         "aplicar_compras": permiso("puede_aplicar_compras"),
@@ -181,6 +195,11 @@ def erp_access(request):
         "crear_citas": permiso("puede_crear_citas") if permisos_clinicos_granulares else permiso("puede_citas"),
         "editar_citas": permiso("puede_editar_citas") if permisos_clinicos_granulares else permiso("puede_citas"),
         "eliminar_citas": permiso("puede_eliminar_citas") if permisos_clinicos_granulares else permiso("puede_citas"),
+        "crear_bloqueos_agenda": permiso("puede_crear_bloqueos_agenda") if permisos_clinicos_v2 else permiso("puede_editar_citas" if permisos_clinicos_granulares else "puede_citas"),
+        "editar_bloqueos_agenda": permiso("puede_editar_bloqueos_agenda") if permisos_clinicos_v2 else permiso("puede_editar_citas" if permisos_clinicos_granulares else "puede_citas"),
+        "eliminar_bloqueos_agenda": permiso("puede_eliminar_bloqueos_agenda") if permisos_clinicos_v2 else permiso("puede_eliminar_citas" if permisos_clinicos_granulares else "puede_citas"),
+        "marcar_citas_pagadas": permiso("puede_marcar_citas_pagadas") if permisos_clinicos_v2 else permiso("puede_editar_citas" if permisos_clinicos_granulares else "puede_citas"),
+        "marcar_citas_cortesia": permiso("puede_marcar_citas_cortesia") if permisos_clinicos_v2 else permiso("puede_editar_citas" if permisos_clinicos_granulares else "puede_citas"),
         "ver_datos_generales_paciente": permiso("puede_ver_datos_generales_paciente") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "crear_pacientes": permiso("puede_crear_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "editar_pacientes": permiso("puede_editar_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
@@ -194,6 +213,7 @@ def erp_access(request):
         "editar_historia_clinica": permiso("puede_editar_historia_clinica") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
         "ver_anexos_clinicos": permiso("puede_ver_anexos_clinicos") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
         "subir_anexos_clinicos": permiso("puede_subir_anexos_clinicos") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
+        "descargar_anexos_clinicos": permiso("puede_descargar_anexos_clinicos") if permisos_clinicos_v2 else permiso("puede_ver_anexos_clinicos" if permisos_clinicos_granulares else "puede_expediente_clinico"),
         "ver_recetas": permiso("puede_ver_recetas") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
         "crear_recetas": permiso("puede_crear_recetas") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
         "ver_planes_tratamiento": permiso("puede_ver_planes_tratamiento") if permisos_clinicos_granulares else permiso("puede_tratamientos_clinicos"),

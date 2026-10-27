@@ -16,10 +16,13 @@ from core.access import (
 )
 from core.models import Empresa
 from core.clinical_permissions import (
+    PERMISOS_ACCESO_HISTORIAL,
+    permiso_facturacion_clinico_granular,
     permisos_gastos_adicionales_desde_ruta,
     permiso_agenda_granular,
     permiso_clinica_granular,
     rol_clinico_granular,
+    rol_clinico_v2,
 )
 from core.audit_context import reset_audit_request, set_audit_request
 
@@ -67,7 +70,12 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_facturacion_desde_ruta(suffix)
-                    permiso_accion = permiso_facturacion_accion(suffix)
+                    rol_granular = rol_clinico_granular(request.user, empresa)
+                    permiso_accion = (
+                        permiso_facturacion_clinico_granular(suffix, request.method)
+                        if rol_granular and rol_granular.usa_permisos_clinicos_v2
+                        else permiso_facturacion_accion(suffix)
+                    )
                     if permiso_accion == "puede_transferir_inventario" and not rol_clinico_granular(request.user, empresa):
                         permiso_accion = "puede_inventario"
                     if permiso and not permiso_accion and not request.user.tiene_permiso_erp(permiso, empresa):
@@ -218,7 +226,12 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     rol_granular = rol_clinico_granular(request.user, empresa)
                     if rol_granular:
-                        permiso = permiso_agenda_granular(suffix, request.method)
+                        if rol_clinico_v2(request.user, empresa):
+                            permiso = permiso_agenda_granular(suffix, request.method, request.POST)
+                        elif suffix.startswith("disponibilidad/"):
+                            permiso = "puede_editar_citas"
+                        else:
+                            permiso = permiso_agenda_granular(suffix, request.method, request.POST)
                         if permiso == "__denegar__" or (
                             permiso and not request.user.tiene_permiso_erp(permiso, empresa)
                         ):
@@ -274,13 +287,22 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     rol_granular = rol_clinico_granular(request.user, empresa)
                     permiso = (
-                        permiso_clinica_granular(suffix, request.method)
+                        permiso_clinica_granular(
+                            suffix, request.method,
+                            v2=bool(rol_clinico_v2(request.user, empresa)),
+                        )
                         if rol_granular
                         else permiso_clinica_desde_ruta(suffix, request.method)
                     )
                     if permiso == "__denegar__":
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta sección clínica.")
                         return redirect("dashboard", slug=empresa.slug)
+                    if (
+                        rol_clinico_v2(request.user, empresa)
+                        and permiso in {"puede_ver_historia_clinica", "puede_editar_historia_clinica"}
+                        and any(request.user.tiene_permiso_erp(nombre, empresa) for nombre in PERMISOS_ACCESO_HISTORIAL)
+                    ):
+                        permiso = None
                     acceso_administracion_manuales = bool(
                         suffix.strip("/") == "configuracion"
                         and request.user.tiene_permiso_erp("puede_administrar_manuales_pdf", empresa)

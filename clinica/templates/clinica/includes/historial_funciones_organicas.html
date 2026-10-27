@@ -7,7 +7,7 @@
         </div>
     </div>
     <div class="panel-body">
-        <form method="post" action="?seccion=funciones_organicas#funciones-organicas" class="integral-form">
+        {% if puede_editar_evaluacion %}<form method="post" action="?seccion=funciones_organicas#funciones-organicas" class="integral-form">
             {% csrf_token %}
             <input type="hidden" name="accion" value="guardar_funciones_organicas">
             <div class="integral-meta-grid">
@@ -34,7 +34,7 @@
                 </div>
             </section>
             <div class="form-actions"><button class="save-clinical-btn" type="submit">Guardar funciones orgánicas</button></div>
-        </form>
+        </form>{% endif %}
         <div class="integral-history">
             <h4>Funciones orgánicas registradas</h4>
             {% for historia in historias_funciones %}

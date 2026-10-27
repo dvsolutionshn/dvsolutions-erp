@@ -4,7 +4,7 @@
 {% block header_kicker %}Módulo de citas{% endblock %}
 {% block header_title %}Calendario de Citas{% endblock %}
 {% block header_description %}Vista mensual, semanal y diaria de la agenda de {{ empresa.nombre }}.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="#editor" data-open-editor-top>+ Crear cita</a>{% if puede_gestionar_bloqueos %}<a class="erp-action-link" href="#disponibilidad-medica">Bloquear horario</a>{% endif %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="#editor" data-open-editor-top>+ Crear cita</a>{% if puede_crear_bloqueos %}<a class="erp-action-link" href="#disponibilidad-medica">Bloquear horario</a>{% endif %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
 
 {% block content %}
 {% load static %}
@@ -1158,7 +1158,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
         <div><strong>{{ bloqueo.periodo_display }}</strong><span>Período bloqueado</span></div>
         <div><strong>{{ bloqueo.profesional.nombre }}</strong><span>No disponible</span></div>
         <div><strong>{{ bloqueo.motivo|default:"Sin motivo indicado" }}</strong><span>{% if bloqueo.dia_completo %}Día completo{% else %}Bloqueo parcial{% endif %}</span></div>
-        {% if bloqueo.puede_gestionar %}<div class="availability-actions"><a href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar_bloqueo={{ bloqueo.id }}#disponibilidad-medica">Editar</a><form method="post" action="{% url 'agenda_bloqueo_eliminar' empresa.slug bloqueo.id %}" onsubmit="return confirm('¿Eliminar este bloqueo de disponibilidad?')">{% csrf_token %}<button type="submit">Eliminar</button></form></div>{% endif %}
+        {% if bloqueo.puede_editar or bloqueo.puede_eliminar %}<div class="availability-actions">{% if bloqueo.puede_editar %}<a href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar_bloqueo={{ bloqueo.id }}#disponibilidad-medica">Editar</a>{% endif %}{% if bloqueo.puede_eliminar %}<form method="post" action="{% url 'agenda_bloqueo_eliminar' empresa.slug bloqueo.id %}" onsubmit="return confirm('¿Eliminar este bloqueo de disponibilidad?')">{% csrf_token %}<button type="submit">Eliminar</button></form>{% endif %}</div>{% endif %}
       </article>
       {% empty %}<div class="calendar-empty">No hay bloqueos registrados en el período mostrado.</div>{% endfor %}
     </div>

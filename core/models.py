@@ -15,6 +15,7 @@ PERMISOS_CLINICOS_GRANULARES = {
     "puede_ver_motivo_restriccion_paciente",
     "puede_ver_historia_clinica", "puede_crear_historia_clinica", "puede_editar_historia_clinica",
     "puede_ver_anexos_clinicos", "puede_subir_anexos_clinicos", "puede_eliminar_anexos_clinicos",
+    "puede_descargar_anexos_clinicos",
     "puede_ver_recetas", "puede_crear_recetas", "puede_enviar_recetas",
     "puede_ver_gastos_adicionales", "puede_crear_gastos_adicionales", "puede_editar_gastos_adicionales",
     "puede_enviar_gastos_adicionales", "puede_convertir_gastos_adicionales_factura",
@@ -22,6 +23,20 @@ PERMISOS_CLINICOS_GRANULARES = {
     "puede_ver_terapias", "puede_escribir_terapias", "puede_ver_camara_hiperbarica",
     "puede_escribir_camara_hiperbarica", "puede_ver_postquirurgicas", "puede_escribir_postquirurgicas",
     "puede_ver_manuales_pdf", "puede_enviar_manuales_pdf", "puede_administrar_manuales_pdf",
+    "puede_editar_pagos_clientes", "puede_anular_pagos_clientes", "puede_correccion_fiscal_facturas",
+    "puede_imprimir_facturas", "puede_enviar_facturas", "puede_ver_reporte_ventas_producto",
+    "puede_ver_kardex", "puede_crear_lotes", "puede_ver_bodegas", "puede_registrar_salidas_inventario",
+    "puede_crear_bloqueos_agenda", "puede_editar_bloqueos_agenda", "puede_eliminar_bloqueos_agenda",
+    "puede_marcar_citas_pagadas", "puede_marcar_citas_cortesia",
+    "puede_ver_antecedentes_clinicos", "puede_editar_antecedentes_clinicos",
+    "puede_ver_examen_fisico", "puede_editar_examen_fisico",
+    "puede_ver_diagnosticos", "puede_editar_diagnosticos",
+    "puede_ver_evaluacion_integral", "puede_editar_evaluacion_integral",
+    "puede_ver_capilar", "puede_editar_capilar",
+    "puede_ver_tricopigmentacion", "puede_editar_tricopigmentacion",
+    "puede_ver_cirugia_clinica", "puede_editar_cirugia_clinica",
+    "puede_ver_medicina_estetica", "puede_editar_medicina_estetica",
+    "puede_ver_enfermeria",
 }
 
 
@@ -48,6 +63,7 @@ class RolSistema(models.Model):
     activo = models.BooleanField(default=True)
     es_rol_clinico = models.BooleanField(default=False)
     usa_permisos_clinicos_granulares = models.BooleanField(default=False)
+    usa_permisos_clinicos_v2 = models.BooleanField(default=False)
     puede_punto_venta = models.BooleanField(default=False)
     puede_configuracion_facturacion = models.BooleanField(default=False)
     puede_cierres_caja = models.BooleanField(default=False)
@@ -74,13 +90,24 @@ class RolSistema(models.Model):
     puede_eliminar_borradores = models.BooleanField(default=False)
     puede_eliminar_facturas = models.BooleanField(default=False)
     puede_registrar_pagos_clientes = models.BooleanField(default=False)
+    puede_editar_pagos_clientes = models.BooleanField(default=False)
+    puede_anular_pagos_clientes = models.BooleanField(default=False)
+    puede_correccion_fiscal_facturas = models.BooleanField(default=False)
+    puede_imprimir_facturas = models.BooleanField(default=False)
+    puede_enviar_facturas = models.BooleanField(default=False)
+    puede_ver_reporte_ventas_producto = models.BooleanField(default=False)
     puede_crear_clientes = models.BooleanField(default=False)
     puede_editar_clientes = models.BooleanField(default=False)
     puede_crear_productos = models.BooleanField(default=False)
     puede_editar_productos = models.BooleanField(default=False)
+    puede_eliminar_productos = models.BooleanField(default=False)
     puede_crear_proveedores = models.BooleanField(default=False)
     puede_editar_proveedores = models.BooleanField(default=False)
     puede_ajustar_inventario = models.BooleanField(default=False)
+    puede_ver_kardex = models.BooleanField(default=False)
+    puede_crear_lotes = models.BooleanField(default=False)
+    puede_ver_bodegas = models.BooleanField(default=False)
+    puede_registrar_salidas_inventario = models.BooleanField(default=False)
     puede_crear_compras = models.BooleanField(default=False)
     puede_editar_compras = models.BooleanField(default=False)
     puede_aplicar_compras = models.BooleanField(default=False)
@@ -112,6 +139,11 @@ class RolSistema(models.Model):
     puede_crear_citas = models.BooleanField(default=False)
     puede_editar_citas = models.BooleanField(default=False)
     puede_eliminar_citas = models.BooleanField(default=False)
+    puede_crear_bloqueos_agenda = models.BooleanField(default=False)
+    puede_editar_bloqueos_agenda = models.BooleanField(default=False)
+    puede_eliminar_bloqueos_agenda = models.BooleanField(default=False)
+    puede_marcar_citas_pagadas = models.BooleanField(default=False)
+    puede_marcar_citas_cortesia = models.BooleanField(default=False)
     puede_ver_pacientes = models.BooleanField(default=False)
     puede_ver_datos_generales_paciente = models.BooleanField(default=False)
     puede_crear_pacientes = models.BooleanField(default=False)
@@ -127,6 +159,24 @@ class RolSistema(models.Model):
     puede_ver_anexos_clinicos = models.BooleanField(default=False)
     puede_subir_anexos_clinicos = models.BooleanField(default=False)
     puede_eliminar_anexos_clinicos = models.BooleanField(default=False)
+    puede_descargar_anexos_clinicos = models.BooleanField(default=False)
+    puede_ver_antecedentes_clinicos = models.BooleanField(default=False)
+    puede_editar_antecedentes_clinicos = models.BooleanField(default=False)
+    puede_ver_examen_fisico = models.BooleanField(default=False)
+    puede_editar_examen_fisico = models.BooleanField(default=False)
+    puede_ver_diagnosticos = models.BooleanField(default=False)
+    puede_editar_diagnosticos = models.BooleanField(default=False)
+    puede_ver_evaluacion_integral = models.BooleanField(default=False)
+    puede_editar_evaluacion_integral = models.BooleanField(default=False)
+    puede_ver_capilar = models.BooleanField(default=False)
+    puede_editar_capilar = models.BooleanField(default=False)
+    puede_ver_tricopigmentacion = models.BooleanField(default=False)
+    puede_editar_tricopigmentacion = models.BooleanField(default=False)
+    puede_ver_cirugia_clinica = models.BooleanField(default=False)
+    puede_editar_cirugia_clinica = models.BooleanField(default=False)
+    puede_ver_medicina_estetica = models.BooleanField(default=False)
+    puede_editar_medicina_estetica = models.BooleanField(default=False)
+    puede_ver_enfermeria = models.BooleanField(default=False)
     puede_ver_recetas = models.BooleanField(default=False)
     puede_crear_recetas = models.BooleanField(default=False)
     puede_enviar_recetas = models.BooleanField(default=False)
@@ -190,8 +240,19 @@ class RolSistema(models.Model):
                 "puede_cambiar_fecha_factura",
                 "puede_anular_facturas",
                 "puede_registrar_pagos_clientes",
+                "puede_editar_pagos_clientes",
+                "puede_anular_pagos_clientes",
+                "puede_correccion_fiscal_facturas",
+                "puede_imprimir_facturas",
+                "puede_enviar_facturas",
+                "puede_ver_reporte_ventas_producto",
+                "puede_ver_kardex",
+                "puede_crear_lotes",
+                "puede_ver_bodegas",
+                "puede_registrar_salidas_inventario",
                 "puede_crear_clientes",
                 "puede_crear_productos",
+                "puede_eliminar_productos",
             ]
         )
 

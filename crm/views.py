@@ -12,6 +12,7 @@ from urllib.parse import quote, urlencode
 from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
@@ -25,6 +26,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 
 from core.access import interfaz_clinica_activa
 from core.models import Empresa
+from core.clinical_permissions import rol_clinico_v2
 from contabilidad.models import CuentaFinanciera
 from contabilidad.services import asegurar_cuentas_financieras_base_honduras
 from facturacion.models import (
@@ -149,12 +151,24 @@ def _profesional_pertenece_agenda_espejo(profesional, empresa):
 
 
 def _puede_gestionar_bloqueos_otros(user, empresa):
+    rol_v2 = rol_clinico_v2(user, empresa)
     return bool(
         user.is_authenticated
         and user.puede_acceder_empresa(empresa)
         and (
             user.is_superuser
             or user.es_administrador_empresa
+            or (
+                rol_v2
+                and any(
+                    user.tiene_permiso_erp(permiso, empresa)
+                    for permiso in (
+                        "puede_crear_bloqueos_agenda",
+                        "puede_editar_bloqueos_agenda",
+                        "puede_eliminar_bloqueos_agenda",
+                    )
+                )
+            )
             or user.tiene_permiso_erp("puede_citas", empresa)
             or user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
         )
@@ -169,6 +183,21 @@ def _puede_gestionar_bloqueo(user, empresa, profesional):
         and user.puede_acceder_empresa(empresa)
         and profesional.usuario_id == user.id
     )
+
+
+def _limitar_campos_especiales_cita(request, empresa, form):
+    """Impide alterar pago/cortesía incluso mediante un POST construido a mano."""
+    if not rol_clinico_v2(request.user, empresa):
+        return
+    for campo, permiso in (
+        ("pagada", "puede_marcar_citas_pagadas"),
+        ("cortesia", "puede_marcar_citas_cortesia"),
+    ):
+        autorizado = request.user.tiene_permiso_erp(permiso, empresa)
+        if request.method == "POST" and campo in request.POST and not autorizado:
+            raise PermissionDenied(f"No tiene permiso para modificar el campo {campo} de la cita.")
+        if not autorizado:
+            form.fields.pop(campo, None)
 
 
 def _empresa_desde_slug(empresa_slug):
@@ -562,8 +591,20 @@ def _contexto_calendario(
         bloqueos_qs = bloqueos_qs.filter(profesional_id=int(filtro_profesional))
     bloqueos = list(bloqueos_qs)
     puede_gestionar_otros_bloqueos = _puede_gestionar_bloqueos_otros(request.user, empresa_agenda)
+    rol_v2 = rol_clinico_v2(request.user, empresa)
+    puede_crear_bloqueos = bool(
+        not rol_v2 or request.user.tiene_permiso_erp("puede_crear_bloqueos_agenda", empresa)
+    )
+    puede_editar_bloqueos = bool(
+        not rol_v2 or request.user.tiene_permiso_erp("puede_editar_bloqueos_agenda", empresa)
+    )
+    puede_eliminar_bloqueos = bool(
+        not rol_v2 or request.user.tiene_permiso_erp("puede_eliminar_bloqueos_agenda", empresa)
+    )
     for bloqueo in bloqueos:
-        bloqueo.puede_gestionar = _puede_gestionar_bloqueo(request.user, empresa_agenda, bloqueo.profesional)
+        gestion_base = _puede_gestionar_bloqueo(request.user, empresa_agenda, bloqueo.profesional)
+        bloqueo.puede_editar = gestion_base and puede_editar_bloqueos
+        bloqueo.puede_eliminar = gestion_base and puede_eliminar_bloqueos
     bloqueo_editando = None
     bloqueo_editar_id = (request.GET.get("editar_bloqueo") or "").strip()
     if bloqueo_editar_id:
@@ -574,7 +615,7 @@ def _contexto_calendario(
             )
         except (BloqueoDisponibilidadMedica.DoesNotExist, TypeError, ValueError):
             candidato = None
-        if candidato and _puede_gestionar_bloqueo(request.user, empresa_agenda, candidato.profesional):
+        if candidato and puede_editar_bloqueos and _puede_gestionar_bloqueo(request.user, empresa_agenda, candidato.profesional):
             bloqueo_editando = candidato
     bloqueo_form_kwargs = {
         "empresa": empresa_agenda,
@@ -585,9 +626,12 @@ def _contexto_calendario(
     if not bloqueo_editando:
         bloqueo_form_kwargs["initial"] = {"fecha": seleccionada, "fecha_fin": seleccionada}
     bloqueo_form = BloqueoDisponibilidadMedicaForm(**bloqueo_form_kwargs)
-    puede_gestionar_bloqueos = bool(
+    puede_gestionar_bloqueos_base = bool(
         puede_gestionar_otros_bloqueos
         or ProfesionalSalud.objects.filter(empresa=empresa_agenda, activo=True, usuario=request.user).exists()
+    )
+    puede_gestionar_bloqueos = puede_gestionar_bloqueos_base and bool(
+        puede_crear_bloqueos or (bloqueo_editando and puede_editar_bloqueos)
     )
 
     filtros_query = urlencode({
@@ -773,6 +817,7 @@ def _contexto_calendario(
         "bloqueo_form": bloqueo_form,
         "bloqueo_editando": bloqueo_editando,
         "puede_gestionar_bloqueos": puede_gestionar_bloqueos,
+        "puede_crear_bloqueos": puede_gestionar_bloqueos_base and puede_crear_bloqueos,
     }
     return contexto
 
@@ -1482,6 +1527,7 @@ def citas(request, empresa_slug):
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto, usuario=request.user)
+    _limitar_campos_especiales_cita(request, empresa, form)
     if request.method == "POST" and form.is_valid():
         try:
             cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
@@ -1500,6 +1546,7 @@ def agenda_citas(request, empresa_slug):
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto, usuario=request.user)
+    _limitar_campos_especiales_cita(request, empresa, form)
     if request.method == "POST" and form.is_valid():
         try:
             cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)

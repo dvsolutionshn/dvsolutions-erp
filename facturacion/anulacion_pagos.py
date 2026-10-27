@@ -13,16 +13,19 @@ from contabilidad.models import (
 from contabilidad.proteccion_conversion import asiento_tiene_revision
 from contabilidad.services import registrar_reversion_documento
 from core.models import RegistroAuditoria
+from core.clinical_permissions import rol_clinico_granular
 
 from .models import CierreCaja, Factura, PagoFactura
 
 
 def puede_anular_pago(usuario, empresa):
+    rol = rol_clinico_granular(usuario, empresa)
+    permiso = "puede_anular_pagos_clientes" if rol and rol.usa_permisos_clinicos_v2 else "puede_anular_facturas"
     return bool(
         getattr(usuario, 'is_authenticated', False)
         and usuario.is_active
         and usuario.puede_acceder_empresa(empresa)
-        and usuario.tiene_permiso_erp('puede_anular_facturas', empresa)
+        and usuario.tiene_permiso_erp(permiso, empresa)
     )
 
 

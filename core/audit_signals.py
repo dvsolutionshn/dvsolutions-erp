@@ -136,6 +136,9 @@ def _request_data(action):
 
 
 def _empresa_id(instance, user=None):
+    empresa_contexto = getattr(instance, "_audit_empresa_id", None)
+    if empresa_contexto:
+        return empresa_contexto
     if instance._meta.app_label == "core" and instance._meta.model_name == "empresa":
         return instance.pk
     direct = getattr(instance, "empresa_id", None)

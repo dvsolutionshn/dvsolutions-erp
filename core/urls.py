@@ -56,6 +56,7 @@ from .views import (
     usuario_clinico_permisos_editar_app,
     roles_clinicos,
     rol_clinico_editar,
+    rol_clinico_duplicar,
 )
 
 urlpatterns = [
@@ -119,6 +120,7 @@ urlpatterns = [
     path('<slug:slug>/dashboard/roles-clinicos/', roles_clinicos, name='roles_clinicos'),
     path('<slug:slug>/dashboard/roles-clinicos/nuevo/', rol_clinico_editar, name='rol_clinico_crear'),
     path('<slug:slug>/dashboard/roles-clinicos/<int:rol_id>/editar/', rol_clinico_editar, name='rol_clinico_editar'),
+    path('<slug:slug>/dashboard/roles-clinicos/<int:rol_id>/duplicar/', rol_clinico_duplicar, name='rol_clinico_duplicar'),
     path('<slug:slug>/dashboard/auditoria/<slug:app_label>/<slug:modelo>/<str:objeto_id>/', auditoria_objeto, name='auditoria_objeto'),
     path('<slug:slug>/dashboard/', dashboard, name='dashboard'),
     path('<slug:slug>/logout/', cerrar_sesion, name='cerrar_sesion'),

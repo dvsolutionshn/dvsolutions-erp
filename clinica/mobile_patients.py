@@ -8,7 +8,12 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
+from core.clinical_permissions import (
+    EMPRESAS_CLINICAS_CON_ROLES,
+    PERMISOS_ACCESO_HISTORIAL,
+    rol_clinico_granular,
+    rol_clinico_v2,
+)
 from crm.mobile_modules import inicio_app_disponible, url_modulos_app
 
 
@@ -21,6 +26,8 @@ def es_pacientes_app(request, empresa):
 
 
 def permiso_pacientes_app(request, empresa, granular, legado):
+    if granular == "puede_ver_historia_clinica" and rol_clinico_v2(request.user, empresa):
+        return any(request.user.tiene_permiso_erp(nombre, empresa) for nombre in PERMISOS_ACCESO_HISTORIAL)
     nombre = granular if rol_clinico_granular(request.user, empresa) else legado
     return request.user.tiene_permiso_erp(nombre, empresa)
 

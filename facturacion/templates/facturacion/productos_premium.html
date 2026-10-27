@@ -451,12 +451,12 @@
                         </td>
                         <td class="actions">
                             <div class="erp-actions-cluster">
-                                <a class="erp-pill-link" href="{% url 'editar_producto_facturacion' empresa.slug producto.id %}">Editar</a>
-                                <form method="post" action="{% url 'eliminar_producto_facturacion' empresa.slug producto.id %}" class="erp-inline-form js-delete-product-form">
+                                {% if erp_access.editar_productos %}<a class="erp-pill-link" href="{% url 'editar_producto_facturacion' empresa.slug producto.id %}">Editar</a>{% endif %}
+                                {% if erp_access.eliminar_productos %}<form method="post" action="{% url 'eliminar_producto_facturacion' empresa.slug producto.id %}" class="erp-inline-form js-delete-product-form">
                                     {% csrf_token %}
                                     <input type="hidden" name="motivo" value="">
                                     <button class="erp-pill-btn danger" type="submit">Eliminar</button>
-                                </form>
+                                </form>{% endif %}
                             </div>
                         </td>
                     </tr>

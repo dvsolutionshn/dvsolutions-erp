@@ -7,7 +7,7 @@
         </div>
     </div>
     <div class="panel-body special-control-grid">
-        <article class="special-control-card is-hyperbaric">
+        {% if erp_access.ver_camara_hiperbarica %}<article class="special-control-card is-hyperbaric">
             <div class="special-control-icon">O₂</div>
             <div>
                 <span>Cámara Hiperbárica</span>
@@ -17,8 +17,8 @@
                 {% else %}<p>Sin programa registrado todavía. El cuadro está listo para la primera sesión.</p>{% endif %}
             </div>
             <a class="save-clinical-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Ver control completo</a>
-        </article>
-        <article class="special-control-card is-post">
+        </article>{% endif %}
+        {% if erp_access.ver_postquirurgicas %}<article class="special-control-card is-post">
             <div class="special-control-icon">12</div>
             <div>
                 <span>Terapias Post Quirúrgicas</span>
@@ -28,6 +28,6 @@
                 {% else %}<p>Sin programa registrado todavía. El cuadro está listo para la primera sesión.</p>{% endif %}
             </div>
             <a class="save-clinical-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Ver cuadro completo</a>
-        </article>
+        </article>{% endif %}
     </div>
 </section>

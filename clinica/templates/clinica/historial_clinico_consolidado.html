@@ -261,14 +261,14 @@
     <nav class="summary-section-nav" aria-label="Secciones de la historia clínica">
         <a href="?seccion=motivo_consulta#informacion-paciente">Motivo de consulta</a>
         <a href="?seccion=funciones_organicas#funciones-organicas">Funciones orgánicas</a>
-        <a href="?seccion=examen_fisico#examen-fisico">Examen físico</a>
-        <a href="?seccion=antecedentes#informacion-paciente">Antecedentes</a>
-        <a href="?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>
-        <a href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}">Plan y tratamiento</a>
+        {% if puede_ver_examen or puede_editar_examen %}<a href="?seccion=examen_fisico#examen-fisico">Examen físico</a>{% endif %}
+        {% if puede_ver_antecedentes or puede_editar_antecedentes %}<a href="?seccion=antecedentes#informacion-paciente">Antecedentes</a>{% endif %}
+        {% if puede_ver_diagnosticos or puede_editar_diagnosticos %}<a href="?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>{% endif %}
+        {% if erp_access.ver_planes_tratamiento %}<a href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}">Plan y tratamiento</a>{% endif %}
         <a href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Especialidades</a>
-        <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>
-        <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
-        <a href="?seccion=tricopigmentacion#tricopigmentacion">Tricopigmentación</a>
+        {% if erp_access.ver_camara_hiperbarica %}<a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>{% endif %}
+        {% if erp_access.ver_postquirurgicas %}<a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>{% endif %}
+        {% if puede_ver_tricopigmentacion or puede_editar_tricopigmentacion %}<a href="?seccion=tricopigmentacion#tricopigmentacion">Tricopigmentación</a>{% endif %}
         <a href="?seccion=completa">Historia completa</a>
         <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
     </nav>
@@ -376,18 +376,18 @@
     </section>
     {% endif %}
 
-    {% if seccion_activa == "completa" or seccion_activa == "funciones_organicas" %}
+    {% if puede_ver_evaluacion or puede_editar_evaluacion %}{% if seccion_activa == "completa" or seccion_activa == "funciones_organicas" %}
     {% include "clinica/includes/historial_funciones_organicas.html" %}
-    {% endif %}
-    {% if seccion_activa == "completa" or seccion_activa == "examen_fisico" %}
+    {% endif %}{% endif %}
+    {% if puede_ver_examen or puede_editar_examen %}{% if seccion_activa == "completa" or seccion_activa == "examen_fisico" %}
     {% include "clinica/includes/historial_examen_fisico.html" %}
-    {% endif %}
+    {% endif %}{% endif %}
     {% if seccion_activa == "completa" %}
     {% include "clinica/includes/historial_controles_especiales.html" %}
     {% endif %}
-    {% if seccion_activa == "completa" or seccion_activa == "tricopigmentacion" %}
+    {% if puede_ver_tricopigmentacion or puede_editar_tricopigmentacion %}{% if seccion_activa == "completa" or seccion_activa == "tricopigmentacion" %}
     {% include "clinica/includes/historial_tricopigmentacion.html" %}
-    {% endif %}
+    {% endif %}{% endif %}
 
     {% if seccion_activa == "completa" or seccion_activa == "diagnostico" or seccion_activa == "plan_tratamiento" or seccion_activa == "especialidad" %}
     <section class="sheet-panel" id="trabajo-clinico">
@@ -419,6 +419,7 @@
                     <span class="area-toggle">Abrir / trabajar aquí</span>
                 </summary>
                 <div class="area-body">
+                    {% if tipo.puede_editar %}
                     <form class="inline-form" method="post" action="#trabajo-{{ tipo.codigo }}">
                         {% csrf_token %}
                         <input type="hidden" name="tipo_historia" value="{{ tipo.codigo }}">
@@ -529,6 +530,7 @@
                             <button class="save-clinical-btn" type="submit">{% if seccion_activa == "diagnostico" %}Guardar diagnóstico{% elif seccion_activa == "plan_tratamiento" %}Guardar plan y tratamiento{% else %}Guardar historia clínica de {{ tipo.nombre }}{% endif %}</button>
                         </div>
                     </form>
+                    {% endif %}
 
                     <div class="history-strip">
                         <h5>Historial guardado en {{ tipo.nombre }}</h5>
@@ -544,11 +546,11 @@
                                 </div>
                                 <div class="doctor-note-actions">
                                     <span class="sheet-chip status-chip {% if historia.bloqueada %}done{% endif %}">{{ historia.get_estado_display }}</span>
-                                    {% if not historia.bloqueada %}
+                                    {% if tipo.puede_editar and not historia.bloqueada %}
                                     <button class="inline-edit-btn" type="button" data-edit-target="historia-edit-{{ historia.id }}">Editar texto</button>
                                     {% endif %}
                                     <a class="inline-edit-btn" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver bloqueada{% else %}Detalle completo{% endif %}</a>
-                                    {% if puede_eliminar_notas_clinicas %}
+                                    {% if puede_eliminar_notas_clinicas and tipo.puede_editar %}
                                     <form class="inline-delete-form" method="post" action="#trabajo-{{ tipo.codigo }}" onsubmit="return confirm('¿Eliminar esta nota clínica? Esta acción no se puede deshacer.');">
                                         {% csrf_token %}
                                         <input type="hidden" name="accion" value="eliminar_historia">
@@ -567,7 +569,7 @@
                                 <span class="erp-card-muted">Sin historia, diagnóstico o plan registrado.</span>
                                 {% endif %}
                             </div>
-                            {% if not historia.bloqueada %}
+                            {% if tipo.puede_editar and not historia.bloqueada %}
                             <form class="doctor-note-edit" id="historia-edit-{{ historia.id }}" method="post" action="#trabajo-{{ tipo.codigo }}">
                                 {% csrf_token %}
                                 <input type="hidden" name="accion" value="editar_texto_historia">

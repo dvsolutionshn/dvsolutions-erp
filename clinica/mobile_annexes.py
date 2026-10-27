@@ -11,7 +11,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import content_disposition_header
 
-from core.clinical_permissions import rol_clinico_granular
+from core.clinical_permissions import rol_clinico_granular, rol_clinico_v2
 from .mobile_patients import contexto_pacientes_app, es_pacientes_app, respuesta_pacientes_app, url_paciente_app
 from .models import DocumentoClinicoPaciente
 
@@ -67,7 +67,7 @@ def evolucion_paciente_app(empresa, paciente, registros):
     } for registro in registros if registro.empresa_id == empresa.pk and registro.paciente_id == paciente.pk]
 
 
-def _item_anexo_app(empresa, paciente, clase, registro):
+def _item_anexo_app(empresa, paciente, clase, registro, *, puede_descargar=True):
     parte = "imagen" if clase == "evolucion" and registro.imagen else "video" if clase == "evolucion" else "archivo"
     archivo = getattr(registro, parte)
     extension = Path(archivo.name).suffix.lower() if archivo else ""
@@ -100,7 +100,7 @@ def _item_anexo_app(empresa, paciente, clase, registro):
         "descripcion": getattr(registro, "descripcion", "") or "",
         "usuario": (actor.get_full_name() or actor.username) if actor else "Usuario no disponible",
         "metadatos": metadata, "archivo_url": url,
-        "download_url": url_archivo_anexo_app(empresa, paciente, clase, registro, parte, descargar=True) if archivo else "",
+        "download_url": url_archivo_anexo_app(empresa, paciente, clase, registro, parte, descargar=True) if archivo and puede_descargar else "",
         "imagen_url": url if extension in {".jpg", ".jpeg", ".png", ".webp"} else "",
         "video_url": url if extension in {".mp4", ".mov", ".webm", ".avi"} else "",
         "print_url": print_url, "es_imagen": extension in {".jpg", ".jpeg", ".png", ".webp"},
@@ -122,6 +122,10 @@ def contexto_anexos_app(request, empresa, paciente, clase, *, categoria=None, co
     )
     rutas = [(key, None, valores[0]) for key, valores in RUTAS_ANEXOS.items() if key != "documento"]
     rutas.extend(("documento", key, titulo) for key, titulo in DocumentoClinicoPaciente.CATEGORIA_CHOICES)
+    puede_descargar = (
+        request.user.tiene_permiso_erp("puede_descargar_anexos_clinicos", empresa)
+        if rol_clinico_v2(request.user, empresa) else can_view
+    )
     contexto.update({
         "can_view_annexes": can_view, "can_view_attachments": can_view, "can_upload_annexes": can_upload,
         "mobile_annex_class": clase, "mobile_annex_title": config["titulo"] if config else RUTAS_ANEXOS[clase][0],
@@ -133,7 +137,11 @@ def contexto_anexos_app(request, empresa, paciente, clase, *, categoria=None, co
             "url": url_anexo_app(empresa, paciente, key, cat, subir=not can_view),
             "active": clase == key and categoria == cat,
         } for key, cat, titulo in rutas if can_view or can_upload],
-        "mobile_annex_items": [_item_anexo_app(empresa, paciente, clase, item) for item in registros if item.empresa_id == empresa.pk and item.paciente_id == paciente.pk] if can_view else [],
+        "mobile_annex_items": [
+            _item_anexo_app(empresa, paciente, clase, item, puede_descargar=puede_descargar)
+            for item in registros
+            if item.empresa_id == empresa.pk and item.paciente_id == paciente.pk
+        ] if can_view else [],
     })
     return contexto
 

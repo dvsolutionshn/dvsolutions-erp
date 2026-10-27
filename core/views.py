@@ -1698,14 +1698,18 @@ def rol_clinico_editar(request, slug, rol_id=None):
                 "activo": request.POST.get("activo") == "1",
                 "es_rol_clinico": True,
                 "usa_permisos_clinicos_granulares": True,
+                "usa_permisos_clinicos_v2": True,
                 **valores,
             }
             if rol:
                 for campo, valor in defaults.items():
                     setattr(rol, campo, valor)
+                rol._audit_empresa_id = empresa.pk
                 rol.save()
             else:
-                rol = RolSistema.objects.create(codigo=codigo, **defaults)
+                rol = RolSistema(codigo=codigo, **defaults)
+                rol._audit_empresa_id = empresa.pk
+                rol.save()
             messages.success(request, f"El rol {rol.nombre} fue guardado.")
             return redirect("roles_clinicos", slug=empresa.slug)
     grupos = [
@@ -1719,6 +1723,44 @@ def rol_clinico_editar(request, slug, rol_id=None):
         for nombre, permisos in PERMISOS_CLINICOS
     ]
     return render(request, "core/rol_clinico_form.html", {"empresa": empresa, "rol": rol, "grupos": grupos})
+
+
+@login_required
+@require_POST
+def rol_clinico_duplicar(request, slug, rol_id):
+    empresa = _resolver_empresa_request(request, slug)
+    if not _puede_administrar_usuarios_clinicos(request.user, empresa):
+        return JsonResponse({"error": "No tiene permiso para administrar roles de esta empresa."}, status=403)
+    origen = get_object_or_404(RolSistema, pk=rol_id, es_rol_clinico=True)
+    nombre_base = f"Copia de {origen.nombre}"[:120]
+    nombre = nombre_base
+    consecutivo = 2
+    while RolSistema.objects.filter(nombre=nombre, es_rol_clinico=True).exists():
+        sufijo = f" ({consecutivo})"
+        nombre = f"{nombre_base[:120 - len(sufijo)]}{sufijo}"
+        consecutivo += 1
+    codigo_base = f"clinico-{slugify(nombre)}"[:50] or "clinico-copia"
+    codigo = codigo_base
+    consecutivo = 2
+    while RolSistema.objects.filter(codigo=codigo).exists():
+        sufijo = f"-{consecutivo}"
+        codigo = f"{codigo_base[:50 - len(sufijo)]}{sufijo}"
+        consecutivo += 1
+    copia = RolSistema(
+        nombre=nombre,
+        codigo=codigo,
+        descripcion=origen.descripcion,
+        activo=False,
+        es_rol_clinico=True,
+        usa_permisos_clinicos_granulares=True,
+        usa_permisos_clinicos_v2=True,
+    )
+    for campo in TODOS_LOS_PERMISOS_CLINICOS:
+        setattr(copia, campo, bool(getattr(origen, campo, False)))
+    copia._audit_empresa_id = empresa.pk
+    copia.save()
+    messages.success(request, f"Se duplicó {origen.nombre}. La copia quedó inactiva para que pueda revisarla.")
+    return redirect("rol_clinico_editar", slug=empresa.slug, rol_id=copia.pk)
 
 
 @login_required

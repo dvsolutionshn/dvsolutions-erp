@@ -169,7 +169,7 @@
                         <td class="actions">
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'ver_factura' empresa.slug factura.id %}">Ver</a>
-                                {% if empresa.slug == "iss" %}
+                                {% if empresa.slug == "iss" and erp_access.imprimir_facturas %}
                                 <a class="erp-pill-link" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}" download>PDF</a>
                                 {% endif %}
                                 {% if erp_access.editar_facturas and factura.estado != "anulada" and not factura.tiene_notas_credito_activas %}
@@ -188,7 +188,7 @@
                                 {% if erp_access.cambiar_fecha_factura and factura.estado != "anulada" %}
                                 <a class="erp-pill-link" href="{% url 'cambiar_fecha_factura' empresa.slug factura.id %}">Cambiar fecha</a>
                                 {% endif %}
-                                {% if erp_access.editar_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" %}
+                                {% if erp_access.correccion_fiscal_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" %}
                                 <a class="erp-pill-link" href="{% url 'corregir_numero_factura' empresa.slug factura.id %}">Corregir numero</a>
                                 {% endif %}
                                 {% if erp_access.crear_facturas %}

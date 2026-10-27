@@ -12,12 +12,13 @@
     <button class="erp-btn" type="submit">Validar factura</button>
 </form>
 {% endif %}
-{% if factura.estado != "borrador" %}
+{% if factura.estado != "borrador" and erp_access.enviar_facturas %}
 <form method="post" action="{% url 'enviar_factura_whatsapp' empresa.slug factura.id %}" class="erp-inline-form">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Enviar WhatsApp</button>
 </form>
 {% endif %}
+{% if erp_access.imprimir_facturas %}
 <button
     class="erp-action-link erp-print-button"
     type="button"
@@ -68,6 +69,7 @@
 >
     PDF Notas
 </button>
+{% endif %}
 {% endif %}
 {% endblock %}
 
@@ -493,12 +495,14 @@
                 <div class="erp-card-muted">La factura se guardo correctamente. Si quieres, puedes descargar el PDF o revisar esta vista simplificada antes de compartirla.</div>
             </div>
             <div class="erp-actions-right">
-                <a class="erp-btn" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}">Generar PDF</a>
+                {% if erp_access.imprimir_facturas %}<a class="erp-btn" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}">Generar PDF</a>{% endif %}
+                {% if erp_access.enviar_facturas %}
                 <form method="post" action="{% url 'enviar_factura_whatsapp' empresa.slug factura.id %}" class="erp-inline-form">
                     {% csrf_token %}
                     <button class="erp-btn-secondary" type="submit">Enviar por WhatsApp</button>
                 </form>
-                <a class="erp-btn-secondary" href="{% url 'descargar_factura_pdf_alternativo' empresa.slug factura.id %}">Probar PDF alternativo</a>
+                {% endif %}
+                {% if erp_access.imprimir_facturas %}<a class="erp-btn-secondary" href="{% url 'descargar_factura_pdf_alternativo' empresa.slug factura.id %}">Probar PDF alternativo</a>{% endif %}
                 <a class="erp-btn-secondary" href="{% url 'facturas_dashboard' empresa.slug %}">Volver a facturas</a>
             </div>
         </div>
@@ -748,7 +752,7 @@
                 {% if erp_access.cambiar_fecha_factura and factura.estado != "anulada" %}
                 <a class="erp-btn-secondary" href="{% url 'cambiar_fecha_factura' empresa.slug factura.id %}">Cambiar fecha</a>
                 {% endif %}
-                {% if erp_access.editar_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" %}
+                {% if erp_access.correccion_fiscal_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" %}
                 <a class="erp-btn-secondary" href="{% url 'corregir_numero_factura' empresa.slug factura.id %}">Corregir numero fiscal</a>
                 {% endif %}
                 {% if erp_access.editar_facturas and factura.estado == "borrador" %}

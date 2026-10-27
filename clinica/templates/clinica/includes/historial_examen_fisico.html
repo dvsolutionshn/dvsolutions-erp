@@ -7,7 +7,7 @@
         </div>
     </div>
     <div class="panel-body">
-        <form method="post" action="?seccion=examen_fisico#examen-fisico" class="integral-form">
+        {% if puede_editar_examen %}<form method="post" action="?seccion=examen_fisico#examen-fisico" class="integral-form">
             {% csrf_token %}
             <input type="hidden" name="accion" value="guardar_examen_fisico">
             <div class="integral-meta-grid">
@@ -28,7 +28,7 @@
                 </div>
             </section>
             <div class="form-actions"><button class="save-clinical-btn" type="submit">Guardar examen físico</button></div>
-        </form>
+        </form>{% endif %}
         <div class="integral-history">
             <h4>Exámenes físicos registrados</h4>
             {% for historia in historias_examen %}
