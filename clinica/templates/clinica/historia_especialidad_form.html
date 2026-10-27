@@ -123,67 +123,6 @@
                 {% for error in form.fecha_atencion.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
             </div>
         </div>
-        <section class="alopecia-classification" data-alopecia-classification data-initial-scale="{{ form.escala_alopecia_activa|default:'' }}">
-            <div class="alopecia-heading">
-                <h3>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h3>
-                <p>Seleccione una sola etapa actual. La clasificación se guardará como una evaluación independiente en el historial capilar.</p>
-            </div>
-            <div class="alopecia-body">
-                {{ form.alopecia_escala }}
-                {% if paciente.sexo_normalizado == "masculino" %}
-                    <div class="alopecia-fixed-scale">Escala sugerida por sexo registrado: <strong>Hamilton-Norwood</strong></div>
-                {% elif paciente.sexo_normalizado == "femenino" %}
-                    <div class="alopecia-fixed-scale">Escala sugerida por sexo registrado: <strong>Ludwig</strong></div>
-                {% else %}
-                    <div class="alopecia-scale-picker">
-                        <label>{{ form.paciente_sexo_confirmado.label }}</label>
-                        {{ form.paciente_sexo_confirmado }}
-                        <p class="alopecia-help">Confirme este dato para mostrar la escala visual correspondiente y actualizar el expediente.</p>
-                    </div>
-                    {% for error in form.paciente_sexo_confirmado.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
-                {% endif %}
-                {% for error in form.alopecia_escala.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
-
-                <div class="alopecia-panel" data-scale="hamilton_norwood" {% if form.escala_alopecia_activa != "hamilton_norwood" %}hidden{% endif %}>
-                    <div class="alopecia-grid">
-                        {% for etapa in alopecia_hamilton_grados %}
-                        <label class="alopecia-card">
-                            <img class="alopecia-photo" src="{% static etapa.imagen %}" alt="Hamilton-Norwood {{ etapa.label }}: {{ etapa.descripcion }}">
-                            <span class="alopecia-mark"><input type="radio" name="{{ form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if form.escala_alopecia_activa == "hamilton_norwood" and form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div class="alopecia-panel" data-scale="ludwig" {% if form.escala_alopecia_activa != "ludwig" %}hidden{% endif %}>
-                    <div class="alopecia-grid">
-                        {% for etapa in alopecia_ludwig_grados %}
-                        <label class="alopecia-card">
-                            <img class="alopecia-photo" src="{% static etapa.imagen %}" alt="Ludwig {{ etapa.label }}: {{ etapa.descripcion }}">
-                            <span class="alopecia-mark"><input type="radio" name="{{ form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if form.escala_alopecia_activa == "ludwig" and form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% for error in form.alopecia_grado.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
-                <p class="alopecia-help">Guía visual esquemática para apoyar la selección; la clasificación definitiva corresponde al criterio profesional.</p>
-
-                <div class="alopecia-history">
-                    <h4>Historial de clasificación</h4>
-                    {% if clasificaciones_alopecia %}
-                    <table class="alopecia-history-table">
-                        <thead><tr><th>Fecha</th><th>Escala</th><th>Grado</th><th>Profesional</th></tr></thead>
-                        <tbody>
-                            {% for clasificacion in clasificaciones_alopecia %}
-                            <tr><td>{{ clasificacion.fecha|date:"d/m/Y H:i" }}</td><td>{{ clasificacion.get_escala_display }}</td><td><strong>{{ clasificacion.grado_display }}</strong></td><td>{{ clasificacion.responsable_display }}</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
-                    <div class="alopecia-empty">Aún no hay clasificaciones guardadas para este paciente.</div>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
         {% endif %}
         <div class="clinical-form-grid">
         {% for field in form %}
@@ -213,6 +152,67 @@
                             {{ form.capilar_patron_clinico_otros }}
                             {% for error in form.capilar_patron_clinico_otros.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
                         </div>
+                    </div>
+                </div>
+            </section>
+            <section class="alopecia-classification" data-alopecia-classification data-initial-scale="{{ form.escala_alopecia_activa|default:'' }}">
+                <div class="alopecia-heading">
+                    <h3>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h3>
+                    <p>Seleccione una sola etapa actual. La clasificación se guardará como una evaluación independiente en el historial capilar.</p>
+                </div>
+                <div class="alopecia-body">
+                    {{ form.alopecia_escala }}
+                    {% if paciente.sexo_normalizado == "masculino" %}
+                        <div class="alopecia-fixed-scale">Escala sugerida por sexo registrado: <strong>Hamilton-Norwood</strong></div>
+                    {% elif paciente.sexo_normalizado == "femenino" %}
+                        <div class="alopecia-fixed-scale">Escala sugerida por sexo registrado: <strong>Ludwig</strong></div>
+                    {% else %}
+                        <div class="alopecia-scale-picker">
+                            <label>{{ form.paciente_sexo_confirmado.label }}</label>
+                            {{ form.paciente_sexo_confirmado }}
+                            <p class="alopecia-help">Confirme este dato para mostrar la escala visual correspondiente y actualizar el expediente.</p>
+                        </div>
+                        {% for error in form.paciente_sexo_confirmado.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+                    {% endif %}
+                    {% for error in form.alopecia_escala.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+
+                    <div class="alopecia-panel" data-scale="hamilton_norwood" {% if form.escala_alopecia_activa != "hamilton_norwood" %}hidden{% endif %}>
+                        <div class="alopecia-grid">
+                            {% for etapa in alopecia_hamilton_grados %}
+                            <label class="alopecia-card">
+                                <img class="alopecia-photo" src="{% static etapa.imagen %}" alt="Hamilton-Norwood {{ etapa.label }}: {{ etapa.descripcion }}">
+                                <span class="alopecia-mark"><input type="radio" name="{{ form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if form.escala_alopecia_activa == "hamilton_norwood" and form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="alopecia-panel" data-scale="ludwig" {% if form.escala_alopecia_activa != "ludwig" %}hidden{% endif %}>
+                        <div class="alopecia-grid">
+                            {% for etapa in alopecia_ludwig_grados %}
+                            <label class="alopecia-card">
+                                <img class="alopecia-photo" src="{% static etapa.imagen %}" alt="Ludwig {{ etapa.label }}: {{ etapa.descripcion }}">
+                                <span class="alopecia-mark"><input type="radio" name="{{ form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if form.escala_alopecia_activa == "ludwig" and form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% for error in form.alopecia_grado.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+                    <p class="alopecia-help">Guía visual esquemática para apoyar la selección; la clasificación definitiva corresponde al criterio profesional.</p>
+
+                    <div class="alopecia-history">
+                        <h4>Historial de clasificación</h4>
+                        {% if clasificaciones_alopecia %}
+                        <table class="alopecia-history-table">
+                            <thead><tr><th>Fecha</th><th>Escala</th><th>Grado</th><th>Profesional</th></tr></thead>
+                            <tbody>
+                                {% for clasificacion in clasificaciones_alopecia %}
+                                <tr><td>{{ clasificacion.fecha|date:"d/m/Y H:i" }}</td><td>{{ clasificacion.get_escala_display }}</td><td><strong>{{ clasificacion.grado_display }}</strong></td><td>{{ clasificacion.responsable_display }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <div class="alopecia-empty">Aún no hay clasificaciones guardadas para este paciente.</div>
+                        {% endif %}
                     </div>
                 </div>
             </section>

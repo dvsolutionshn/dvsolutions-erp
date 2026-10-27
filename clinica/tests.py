@@ -314,11 +314,11 @@ class ClinicaPacienteTests(TestCase):
             contenido.index("<h5>Hallazgos tricológicos</h5>"),
         )
         self.assertLess(
-            contenido.index("<h5>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h5>"),
             contenido.index("<h5>Hallazgos tricológicos</h5>"),
+            contenido.index("<h5>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h5>"),
         )
         self.assertLess(
-            contenido.index("<h5>Hallazgos tricológicos</h5>"),
+            contenido.index("<h5>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h5>"),
             contenido.index('<label for="id_historia_capilar-plan_tratamiento">'),
         )
 
@@ -2246,11 +2246,11 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Efluvio telógeno")
         contenido = response.content.decode()
         self.assertLess(
-            contenido.index("<h3>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h3>"),
             contenido.index("<h3>Hallazgos tricológicos</h3>"),
+            contenido.index("<h3>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h3>"),
         )
         self.assertLess(
-            contenido.index("<h3>Hallazgos tricológicos</h3>"),
+            contenido.index("<h3>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h3>"),
             contenido.index('<label for="id_plan_tratamiento">'),
         )
         self.assertContains(response, 'data-scale="ludwig" hidden')
