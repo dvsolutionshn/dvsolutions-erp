@@ -1,126 +1,79 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
-{% block title %}Usuarios{% endblock %}
+{% block title %}Usuarios y accesos{% endblock %}
+{% block body_class %}user-form-page users-directory-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
 {% block header_title %}Usuarios y accesos{% endblock %}
-{% block header_description %}Administra identidades, empresas permitidas, roles y estado de acceso desde una sola vista.{% endblock %}
+{% block header_description %}Administra las personas, sus empresas y el estado de sus cuentas.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/users-directory.css' %}">
+<script src="{% static 'core/users-directory.js' %}" defer></script>
+{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'superadmin_usuario_create' %}" class="erp-action-link">+ Nuevo usuario</a>
+<a href="{% url 'superadmin_usuario_create' %}" class="ua-btn">+ Nuevo usuario</a>
 {% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Total usuarios</div>
-        <p class="erp-stat-value">{{ resumen.total }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Superadmins</div>
-        <p class="erp-stat-value">{{ resumen.superadmins }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Admins de empresa</div>
-        <p class="erp-stat-value">{{ resumen.admins_empresa }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Activos</div>
-        <p class="erp-stat-value">{{ resumen.activos }}</p>
-    </article>
-</section>
-
-<section class="erp-card control-view-toolbar">
-    <div class="erp-toolbar">
-        <div>
-            <strong>Vista de usuarios</strong>
-            <p class="erp-card-muted" style="margin:4px 0 0;">Los retirados no pueden ingresar, pero conservan intacto su historial.</p>
+<div class="user-form users-directory" data-users-directory>
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v2" stroke-linecap="round"/></svg></span><div><p class="ua-eyebrow">Personas y permisos</p><h1>Tu equipo, en un solo lugar.</h1><p class="ua-description">Encuentra cada cuenta y revisa el acceso que tiene en tus empresas.</p></div></div><span class="ua-mode">Administración de accesos</span></header>
+    <section class="ud-stats" aria-label="Resumen de cuentas operativas">
+        <article class="ud-stat"><span class="ud-stat-icon" aria-hidden="true">U</span><div><p>Usuarios operativos</p><strong>{{ resumen.total }}</strong></div></article>
+        <article class="ud-stat" data-tone="teal"><span class="ud-stat-icon" aria-hidden="true">✓</span><div><p>Cuentas activas</p><strong>{{ resumen.activos }}</strong></div></article>
+        <article class="ud-stat" data-tone="amber"><span class="ud-stat-icon" aria-hidden="true">E</span><div><p>Admins de empresa</p><strong>{{ resumen.admins_empresa }}</strong></div></article>
+        <article class="ud-stat" data-tone="blue"><span class="ud-stat-icon" aria-hidden="true">S</span><div><p>Superadministradores</p><strong>{{ resumen.superadmins }}</strong></div></article>
+    </section>
+    <section class="ua-panel ud-directory-panel" aria-labelledby="ud-directory-title">
+        <div class="ud-panel-heading"><div><p class="ua-eyebrow">Personas de tu organización</p><h2 id="ud-directory-title">Directorio de usuarios</h2><p class="ua-description">Consulta empresas, perfiles y estado de acceso desde esta vista.</p></div><a href="{% url 'superadmin_usuario_create' %}" class="ua-btn ua-btn--primary">+ Crear usuario</a></div>
+        <nav class="ud-view-tabs" aria-label="Vista de usuarios">
+            <a href="{% url 'superadmin_usuarios' %}" {% if estado_seleccionado == 'operativos' %}aria-current="page"{% endif %}>Operativos</a>
+            <a href="{% url 'superadmin_usuarios' %}?estado=retirados" {% if estado_seleccionado == 'retirados' %}aria-current="page"{% endif %}>Retirados <span>{{ resumen.retirados }}</span></a>
+            <a href="{% url 'superadmin_usuarios' %}?estado=todos" {% if estado_seleccionado == 'todos' %}aria-current="page"{% endif %}>Todos</a>
+        </nav>
+        <div class="ud-filter-tools" data-user-filter-tools hidden>
+            <label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" placeholder="Buscar por nombre, correo o rol..." aria-label="Buscar usuarios" data-user-search autocomplete="off"></label>
+            <label class="ud-filter"><span class="ud-sr-only">Filtrar por empresa</span><select aria-label="Filtrar usuarios por empresa" data-user-company><option value="">Todas las empresas</option>{% for empresa in empresas_filtro %}<option value="{{ empresa.pk }}">{{ empresa.nombre }}{% if not empresa.activa %} · Inactiva{% endif %}</option>{% endfor %}<option value="none">Sin empresas asignadas</option></select></label>
+            <label class="ud-filter"><span class="ud-sr-only">Filtrar por estado</span><select aria-label="Filtrar usuarios por estado" data-user-status><option value="">Todos los estados</option><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="pendiente">Invitación pendiente</option><option value="error">Error de envío</option><option value="vencido">Invitación vencida</option><option value="sin_enviar">Invitación sin enviar</option><option value="sin_confirmar">Envío sin confirmar</option><option value="revocado">Invitación revocada</option><option value="utilizado">Invitación utilizada</option><option value="retirado">Retirado</option></select></label>
         </div>
-        <div class="control-view-switch">
-            <a class="erp-btn-secondary {% if estado_seleccionado == 'operativos' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}">Operativos</a>
-            <a class="erp-btn-secondary {% if estado_seleccionado == 'retirados' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}?estado=retirados">Retirados ({{ resumen.retirados }})</a>
-            <a class="erp-btn-secondary {% if estado_seleccionado == 'todos' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}?estado=todos">Todos</a>
+        <div class="ud-table-wrap" data-user-table-wrap>
+            <table class="ud-table"><caption class="ud-sr-only">Usuarios, empresas, configuración de permisos y acciones de administración.</caption><thead><tr><th scope="col">Persona y correo</th><th scope="col">Empresas</th><th scope="col">Rol y permisos</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead><tbody>
+                {% for fila in filas_usuarios %}{% with usuario=fila.usuario %}
+                <tr data-user-row data-user-identifier="{{ usuario.username }}" data-user-companies="{{ fila.empresa_ids }}" data-user-all-companies="{{ fila.todas_empresas|yesno:'true,false' }}" data-user-state="{{ fila.estado.codigo }}">
+                    <td class="ud-person-cell" data-label="Persona y correo"><div class="ud-person"><span class="ud-avatar" aria-hidden="true">{{ fila.iniciales }}</span><div><strong>{{ fila.nombre }}</strong><span class="ud-email">{{ usuario.email|default:'Sin correo' }}</span>{% if usuario.id == request.user.id %}<small class="ud-self">Tu cuenta</small>{% endif %}</div></div></td>
+                    <td class="ud-companies-cell" data-label="Empresas">
+                        {% if fila.todas_empresas %}<span class="ud-tag ud-tag--purple">Todas las empresas</span>{% if usuario.empresa %}<small class="ud-cell-note">Principal: {{ usuario.empresa.nombre }}</small>{% endif %}
+                        {% elif fila.empresas %}<div class="ud-company-names">{% for acceso in fila.empresas|slice:':2' %}<div><strong>{{ acceso.empresa.nombre }}</strong>{% if acceso.principal %}<small>Principal</small>{% endif %}{% if not acceso.empresa.activa %}<small>Empresa inactiva</small>{% endif %}</div>{% endfor %}</div>{% if fila.empresas|length > 2 %}<details class="ud-company-extra"><summary>+{{ fila.empresas|length|add:'-2' }} empresas</summary><ul>{% for acceso in fila.empresas|slice:'2:' %}<li>{{ acceso.empresa.nombre }}</li>{% endfor %}</ul></details>{% endif %}
+                        {% else %}<span class="ud-muted">Sin empresas asignadas</span>{% endif %}
+                    </td>
+                    <td class="ud-access-cell" data-label="Rol y permisos">
+                        <div class="ud-profile-badges">
+                            {% if usuario.is_superuser %}<span class="ud-tag ud-tag--purple">Superadmin</span>{% endif %}
+                            {% if usuario.es_administrador_empresa %}<span class="ud-tag ud-tag--amber">Admin Empresa</span>{% endif %}
+                            {% if usuario.modo_clinico_simple %}<span class="ud-tag">Vista clínica simple</span>{% endif %}
+                            {% if usuario.rol_sistema %}<span class="ud-tag">Global: {{ usuario.rol_sistema.nombre }}{% if not usuario.rol_sistema.activo %} · Inactivo{% endif %}</span>{% endif %}
+                            {% if fila.tiene_personalizados %}<span class="ud-tag ud-tag--purple">Permisos personalizados</span>{% endif %}
+                            {% if fila.tiene_roles_empresa %}<span class="ud-tag">Rol por empresa</span>{% endif %}
+                            {% if not usuario.is_superuser and not usuario.es_administrador_empresa and not usuario.rol_sistema and not fila.tiene_personalizados and not fila.tiene_roles_empresa %}<span class="ud-tag">Sin rol asignado</span>{% endif %}
+                        </div>
+                        {% if usuario.is_superuser or usuario.es_administrador_empresa %}<p class="ud-cell-note">Acceso completo por tipo de cuenta.</p>{% endif %}
+                        {% if fila.empresas %}<details class="ud-access-details"><summary>Ver configuración por empresa <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary><ul>{% for acceso in fila.empresas %}<li><strong>{{ acceso.empresa.nombre }}</strong><span>{% if acceso.modo == 'personalizado' %}Permisos personalizados · {{ acceso.seleccionados }} seleccionado{{ acceso.seleccionados|pluralize }}{% elif acceso.rol %}{{ acceso.rol.nombre }}{% if not acceso.rol_activo %} · Rol inactivo{% endif %}{% if acceso.modo == 'rol_global' %} · Global{% endif %}{% else %}Sin rol asignado{% endif %}</span></li>{% endfor %}</ul></details>{% endif %}
+                        {% if usuario.groups.all %}<details class="ud-technical-groups"><summary>Grupos técnicos <span>{{ usuario.groups.all|length }}</span></summary><div>{% for grupo in usuario.groups.all %}<span class="ud-tag">{{ grupo.name }}</span>{% endfor %}</div></details>{% endif %}
+                    </td>
+                    <td class="ud-status-cell" data-label="Estado"><span class="ud-status" data-tone="{{ fila.estado.tono }}"><i aria-hidden="true"></i>{{ fila.estado.label }}</span>{% if fila.estado.nota %}<p class="ud-cell-note">{{ fila.estado.nota }}</p>{% endif %}{% if usuario.last_login %}<small class="ud-last-login">Último acceso {{ usuario.last_login|date:'d/m/Y' }}</small>{% endif %}</td>
+                    <td class="ud-actions-cell" data-label="Acciones"><div class="ud-actions">
+                        {% if usuario.retirado_control %}<form method="post" action="{% url 'superadmin_usuario_restore' usuario.id %}">{% csrf_token %}<button type="submit" class="ud-action ud-action--primary">Restaurar<span class="ud-sr-only"> a {{ fila.nombre }}</span></button></form>
+                        {% else %}<a class="ud-action ud-action--primary" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar<span class="ud-sr-only"> a {{ fila.nombre }}</span></a>{% if usuario.id != request.user.id %}<a class="ud-action ud-action--danger" href="{% url 'superadmin_usuario_delete' usuario.id %}">Retirar<span class="ud-sr-only"> a {{ fila.nombre }}</span></a>{% endif %}{% endif %}
+                        {% if fila.puede_reenviar %}<form method="post" action="{% url 'superadmin_usuario_reenviar_invitacion' usuario.id %}">{% csrf_token %}<button type="submit" class="ud-action">Reenviar invitación<span class="ud-sr-only"> a {{ fila.nombre }}</span></button></form>{% endif %}
+                    </div></td>
+                </tr>
+                {% endwith %}{% empty %}<tr><td colspan="5"><div class="ud-empty"><span class="ud-empty-icon" aria-hidden="true">U</span><h3>{% if estado_seleccionado == 'retirados' %}No hay usuarios retirados{% else %}Tu equipo empieza aquí{% endif %}</h3><p>{% if estado_seleccionado == 'retirados' %}Las cuentas retiradas aparecerán aquí para conservar su historial y permitir restaurarlas.{% else %}Crea una cuenta, elige sus empresas y configura su acceso antes de invitarla.{% endif %}</p><a class="ua-btn ua-btn--primary" href="{% if estado_seleccionado == 'retirados' %}{% url 'superadmin_usuarios' %}{% else %}{% url 'superadmin_usuario_create' %}{% endif %}">{% if estado_seleccionado == 'retirados' %}Ver usuarios operativos{% else %}+ Crear primer usuario{% endif %}</a></div></td></tr>{% endfor %}
+            </tbody></table>
         </div>
-    </div>
-</section>
-
-<section class="erp-card erp-table-card">
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Persona y correo</th>
-                    <th>Empresas</th>
-                    <th>Rol y permisos</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for usuario in usuarios %}
-                <tr>
-                    <td><strong>{{ usuario.get_full_name|default:usuario.username }}</strong><br><small>{{ usuario.email|default:"Sin correo" }}</small></td>
-                    <td>
-                        <strong>{{ usuario.empresa.nombre|default:"Sin empresa principal" }}</strong>
-                        {% if usuario.empresas_acceso.all %}
-                            <br>
-                            {% for empresa_acceso in usuario.empresas_acceso.all %}
-                                <span class="erp-badge neutral">{{ empresa_acceso.nombre }}</span>
-                            {% endfor %}
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if usuario.is_superuser %}<span class="erp-badge info">Superadmin</span>{% endif %}
-                        {% if usuario.es_administrador_empresa %}<span class="erp-badge warning">Admin Empresa</span>{% endif %}
-                        {% if usuario.modo_clinico_simple %}<span class="erp-badge info">Vista Clinica Simple</span>{% endif %}
-                        {% if usuario.rol_sistema %}<span class="erp-badge success">{{ usuario.rol_sistema.nombre }}</span>{% endif %}
-                        {% for asignacion in usuario.permisos_individuales_empresas %}
-                            <span class="erp-badge info">Permisos personalizados · {{ asignacion.empresa.nombre }}</span>
-                        {% endfor %}
-                        {% for grupo in usuario.groups.all %}
-                            <span class="erp-badge neutral">{{ grupo.name }}</span>
-                        {% endfor %}
-                        {% if not usuario.is_superuser and not usuario.es_administrador_empresa and not usuario.rol_sistema and not usuario.groups.all and not usuario.permisos_individuales_empresas %}<span class="erp-badge neutral">Sin rol asignado</span>{% endif %}
-                    </td>
-                    <td>
-                        {% if usuario.retirado_control %}
-                            <span class="erp-badge neutral">Retirado</span>
-                        {% elif usuario.is_active %}
-                            <span class="erp-badge success">Activo</span>
-                        {% elif usuario.invitaciones_recientes %}
-                            {% with invitacion=usuario.invitaciones_recientes.0 %}
-                            <span class="erp-badge {% if invitacion.estado_envio == 'error' %}danger{% elif invitacion.vigente %}warning{% else %}neutral{% endif %}">{{ invitacion.estado_display }}</span>
-                            {% if invitacion.estado_envio == 'error' %}
-                            <div class="erp-field-help">No se envio esta invitacion. Revisa SMTP y vuelve a intentarlo.</div>
-                            {% endif %}
-                            {% endwith %}
-                        {% else %}
-                            <span class="erp-badge danger">Inactivo</span>
-                        {% endif %}
-                    </td>
-                    <td class="actions">
-                        {% if usuario.retirado_control %}
-                        <form method="post" action="{% url 'superadmin_usuario_restore' usuario.id %}" style="display:inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="erp-link" style="border:0;background:none;padding:0;cursor:pointer;">Restaurar</button>
-                        </form>
-                        {% else %}
-                            <a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar</a>
-                            {% if usuario.id != request.user.id %}
-                            <a class="erp-link" style="color:#b42318;" href="{% url 'superadmin_usuario_delete' usuario.id %}">Retirar</a>
-                            {% endif %}
-                        {% endif %}
-                        {% if usuario.email and not usuario.is_active and not usuario.has_usable_password and not usuario.retirado_control %}
-                        <form method="post" action="{% url 'superadmin_usuario_reenviar_invitacion' usuario.id %}" style="display:inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="erp-link" style="border:0;background:none;padding:0;cursor:pointer;">Reenviar invitacion</button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="erp-empty">Todavia no hay usuarios registrados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+        <div class="ud-empty ud-no-results" data-user-no-results hidden><h3>No encontramos usuarios con esos filtros</h3><p>Prueba con otro nombre, empresa o estado.</p><button type="button" class="ua-btn ua-btn--quiet" data-user-reset>Limpiar filtros</button></div>
+        <div class="ud-table-footer"><p role="status" aria-live="polite" data-user-results>{{ filas_usuarios|length }} usuarios en esta vista.</p><button type="button" class="ud-reset-link" data-user-reset hidden>Limpiar filtros</button></div>
+    </section>
+    <p class="ud-directory-note">Los usuarios retirados no pueden ingresar, pero conservan intacto su historial. Los roles y permisos personalizados se administran de forma independiente en cada empresa.</p>
+</div>
 {% endblock %}

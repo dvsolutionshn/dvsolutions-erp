@@ -69,6 +69,7 @@ from .clinical_permissions import (
     PERMISOS_CLINICOS_LEGADOS,
 )
 from .user_permissions import catalogo_permisos_empresa, seleccion_permisos_empresa
+from .user_directory import construir_filas_usuarios
 
 
 HOST_LOCAL_PATTERNS = {
@@ -2242,6 +2243,11 @@ def superadmin_usuarios(request):
         "empresas_acceso",
         Prefetch(
             "permisos_por_empresa",
+            queryset=UsuarioEmpresaPermiso.objects.select_related("rol_sistema", "empresa"),
+            to_attr="asignaciones_directorio",
+        ),
+        Prefetch(
+            "permisos_por_empresa",
             queryset=UsuarioEmpresaPermiso.objects.filter(
                 activo=True, permisos_personalizados__isnull=False,
             ).select_related("empresa"),
@@ -2251,7 +2257,7 @@ def superadmin_usuarios(request):
             "tokens_acceso",
             queryset=TokenAccesoUsuario.objects.filter(
                 tipo=TokenAccesoUsuario.TIPO_INVITACION
-            ).order_by("-fecha_creacion"),
+            ).order_by("-fecha_creacion", "-id"),
             to_attr="invitaciones_recientes",
         ),
     )
@@ -2267,6 +2273,8 @@ def superadmin_usuarios(request):
     context = {
         **_superadmin_base_context(),
         "usuarios": usuarios,
+        "filas_usuarios": construir_filas_usuarios(usuarios),
+        "empresas_filtro": Empresa.objects.order_by("nombre"),
         "estado_seleccionado": estado,
         "resumen": {
             "total": resumen_base.filter(retirado_control=False).count(),
