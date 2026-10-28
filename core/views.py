@@ -2289,13 +2289,27 @@ def superadmin_usuarios(request):
 
 @superadmin_required
 def superadmin_planes(request):
-    planes = PlanComercial.objects.annotate(
-        modulos_count=Count("planmodulo", filter=Q(planmodulo__activo=True), distinct=True),
-        empresas_count=Count("empresas", distinct=True),
-    ).order_by("nombre")
+    planes = list(
+        PlanComercial.objects.annotate(
+            modulos_count=Count("planmodulo", filter=Q(planmodulo__activo=True), distinct=True),
+            empresas_count=Count("empresas", distinct=True),
+        ).prefetch_related(
+            Prefetch(
+                "planmodulo_set",
+                queryset=PlanModulo.objects.filter(activo=True).select_related("modulo").order_by("modulo__nombre"),
+                to_attr="modulos_catalogo",
+            ),
+        ).order_by("nombre")
+    )
     context = {
         **_superadmin_base_context(),
         "planes": planes,
+        "resumen_planes": {
+            "total": len(planes),
+            "activos": sum(1 for plan in planes if plan.activo),
+            "inactivos": sum(1 for plan in planes if not plan.activo),
+            "empresas": sum(plan.empresas_count for plan in planes),
+        },
     }
     return render(request, "core/superadmin_planes.html", context)
 

@@ -1,33 +1,46 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
-{% block title %}Planes{% endblock %}
-{% block header_title %}Planes Comerciales{% endblock %}
-{% block header_description %}Define los módulos incluidos, el valor comercial y la disponibilidad de cada plan del ERP.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'superadmin_plan_create' %}" class="erp-action-link">+ Nuevo plan</a>
+{% block title %}Planes comerciales{% endblock %}
+{% block body_class %}user-form-page plans-directory-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
+{% block header_title %}Planes comerciales{% endblock %}
+{% block header_description %}Organiza los precios, los módulos incluidos y la disponibilidad de tus planes.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/plans-directory.css' %}">
+<script src="{% static 'core/plans-directory.js' %}" defer></script>
 {% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_plan_create' %}" class="ua-btn">+ Nuevo plan</a>{% endblock %}
 
 {% block content %}
-<section class="control-catalog-intro">
-    <div><span class="control-eyebrow">Oferta comercial</span><h3>Portafolio de planes</h3><p>Cada tarjeta resume precio, alcance y adopción sin repetir información.</p></div>
-    <span class="control-catalog-count">{{ planes|length }} plan{{ planes|length|pluralize:"es" }}</span>
-</section>
+<div class="user-form plans-directory" data-plans-directory>
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span><div><p class="ua-eyebrow">Oferta comercial</p><h1>Tu oferta, en un solo lugar.</h1><p class="ua-description">Consulta el precio y los servicios de cada plan para tus empresas.</p></div></div><span class="ua-mode">Planes y servicios</span></header>
 
-<section class="control-entity-grid">
-    {% for plan in planes %}
-    <article class="control-entity-card">
-        <header><span class="control-entity-icon">P</span><span class="erp-badge {% if plan.activo %}success{% else %}danger{% endif %}">{% if plan.activo %}Activo{% else %}Inactivo{% endif %}</span></header>
-        <div class="control-entity-copy"><small>{{ plan.codigo }}</small><h3>{{ plan.nombre }}</h3><p>Configuración comercial lista para asignar a empresas.</p></div>
-        <div class="control-plan-price"><small>Valor mensual</small><strong>L. {{ plan.precio_mensual }}</strong></div>
-        <div class="control-entity-metrics">
-            <span><strong>{{ plan.modulos_count }}</strong><small>Módulos</small></span>
-            <span><strong>{{ plan.empresas_count }}</strong><small>Empresas</small></span>
-        </div>
-        <a class="control-entity-action" href="{% url 'superadmin_plan_edit' plan.id %}"><span>Configurar plan</span><b>→</b></a>
-    </article>
-    {% empty %}
-    <div class="control-empty-state"><span>P</span><h3>Aún no hay planes comerciales</h3><p>Crea el primero para organizar la oferta del ERP.</p></div>
-    {% endfor %}
-</section>
+    <section class="pd-stats" aria-label="Resumen de planes comerciales">
+        <article class="pd-stat"><span class="pd-stat-icon" aria-hidden="true">P</span><div><p>Total de planes</p><strong>{{ resumen_planes.total }}</strong></div></article>
+        <article class="pd-stat" data-tone="teal"><span class="pd-stat-icon" aria-hidden="true">✓</span><div><p>Planes activos</p><strong>{{ resumen_planes.activos }}</strong></div></article>
+        <article class="pd-stat" data-tone="slate"><span class="pd-stat-icon" aria-hidden="true">—</span><div><p>Planes inactivos</p><strong>{{ resumen_planes.inactivos }}</strong></div></article>
+        <article class="pd-stat" data-tone="blue"><span class="pd-stat-icon" aria-hidden="true">E</span><div><p>Empresas con plan</p><strong>{{ resumen_planes.empresas }}</strong></div></article>
+    </section>
+
+    <section class="ua-panel" aria-labelledby="pd-catalog-title"><div class="pd-panel-heading"><div><p class="ua-eyebrow">Catálogo de servicios</p><h2 id="pd-catalog-title">Portafolio de planes</h2><p class="ua-description">Revisa los módulos incluidos y las empresas vinculadas a cada plan.</p></div><a class="ua-btn ua-btn--primary" href="{% url 'superadmin_plan_create' %}">+ Crear plan</a></div>
+        <div class="pd-filter-tools" data-plan-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-plan-search aria-label="Buscar planes comerciales" placeholder="Buscar por nombre, código o módulo…" autocomplete="off"></label><div class="pd-status-filter" role="group" aria-label="Filtrar planes por estado"><button type="button" data-plan-filter="" aria-pressed="true">Todos</button><button type="button" data-plan-filter="activo" aria-pressed="false">Activos</button><button type="button" data-plan-filter="inactivo" aria-pressed="false">Inactivos</button></div></div>
+
+        <div class="pd-cards" data-plan-grid>{% for plan in planes %}
+            <article class="pd-card" data-plan-card data-plan-id="{{ plan.id }}" data-plan-state="{{ plan.activo|yesno:'activo,inactivo' }}" data-plan-text="{{ plan.nombre }} {{ plan.codigo }} {{ plan.descripcion|default:'' }} {% for relacion in plan.modulos_catalogo %}{{ relacion.modulo.nombre }} {% endfor %}" aria-labelledby="pd-plan-{{ plan.id }}">
+                <header class="pd-card-heading"><span class="pd-card-icon" aria-hidden="true">P</span><span class="pd-status" data-state="{{ plan.activo|yesno:'activo,inactivo' }}"><i aria-hidden="true"></i>{{ plan.activo|yesno:'Activo,Inactivo' }}</span></header>
+                <div class="pd-plan-copy"><span class="pd-code">{{ plan.codigo }}</span><h3 id="pd-plan-{{ plan.id }}">{{ plan.nombre }}</h3><p>{{ plan.descripcion|default:'Configura los módulos y el precio de este plan para tus empresas.'|linebreaksbr }}</p></div>
+                <div class="pd-price"><span>Precio mensual</span><strong>L. {{ plan.precio_mensual|floatformat:2 }}</strong><small>por mes</small></div>
+                <dl class="pd-metrics"><div><dt>Módulos incluidos</dt><dd>{{ plan.modulos_count }}</dd></div><div><dt>Empresas vinculadas</dt><dd>{{ plan.empresas_count }}</dd></div></dl>
+                {% if plan.modulos_catalogo %}<details class="pd-modules"><summary>Ver módulos incluidos <span>{{ plan.modulos_count }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg><span class="pd-sr-only"> en {{ plan.nombre }}</span></summary><ul>{% for relacion in plan.modulos_catalogo %}<li>{{ relacion.modulo.nombre }}</li>{% endfor %}</ul></details>{% else %}<p class="pd-no-modules">Sin módulos incluidos.</p>{% endif %}
+                <a class="pd-card-action" href="{% url 'superadmin_plan_edit' plan.id %}">Configurar plan<span class="pd-sr-only"> {{ plan.nombre }}</span><span aria-hidden="true">→</span></a>
+            </article>
+        {% empty %}<div class="pd-empty"><span class="pd-empty-icon" aria-hidden="true">P</span><h3>Aún no hay planes comerciales</h3><p>Crea el primero para definir su precio y los servicios que incluirá.</p><a class="ua-btn ua-btn--primary" href="{% url 'superadmin_plan_create' %}">+ Crear primer plan</a></div>{% endfor %}</div>
+
+        <div class="pd-empty pd-no-results" data-plan-empty hidden><h3>No encontramos planes con esos filtros</h3><p>Prueba con otro nombre, código, módulo o estado.</p><button type="button" class="ua-btn ua-btn--quiet" data-plan-reset>Limpiar filtros</button></div>
+        <div class="pd-footer"><p data-plan-results role="status" aria-live="polite">{{ planes|length }} plan{{ planes|length|pluralize:'es' }} en el catálogo.</p><button type="button" data-plan-reset hidden>Limpiar filtros</button></div>
+    </section>
+    <p class="pd-directory-note">Las empresas vinculadas incluyen activas e inactivas. Configurar plan permite ajustar el precio, la disponibilidad y los módulos incluidos.</p>
+</div>
 {% endblock %}
