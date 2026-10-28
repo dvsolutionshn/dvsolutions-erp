@@ -2,7 +2,7 @@
 
 {% block title %}{{ titulo }}{% endblock %}
 {% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Arma perfiles funcionales como cajero, facturador, inventario o gerente comercial con permisos reales de backend.{% endblock %}
+{% block header_description %}Motor granular del ERP general. Las cuatro empresas clínicas conservan su catálogo médico independiente.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'superadmin_roles' %}" class="erp-action-link">Volver a Roles</a>
@@ -10,82 +10,46 @@
 
 {% block content %}
 <style>
-.role-clinical-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.role-permission-feature{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:19px;border:1px solid #cbdbe5;border-radius:15px;background:linear-gradient(145deg,#f9fbfc,#f1f6f8)}.role-permission-feature.primary{border-color:#aac8d5;background:linear-gradient(145deg,#f5fafb,#eaf3f6)}.role-permission-feature h4{margin:0;color:#24374a;font-size:16px}.role-permission-feature p{margin:6px 0 0;color:#697887;font-size:11px;line-height:1.55}.role-permission-toggle label{display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid #b8ced9;border-radius:11px;background:#fff;color:#27394b;font-size:12px;font-weight:900}.role-permission-toggle input[type="checkbox"]{width:20px!important;height:20px;margin:0;padding:0!important;accent-color:#276a7b}.role-section-note{margin:7px 0 17px;color:#728292;font-size:11px}.erp-form-grid .erp-field input[type="checkbox"]{width:18px;height:18px;padding:0;margin-top:5px;accent-color:#2878d0}.role-danger-permission{border-color:#efc7c4!important;background:#fff8f7!important}.role-danger-permission label{color:#9f2720!important}.role-danger-permission::before{content:"Permiso crítico";display:inline-flex;width:max-content;padding:4px 8px;border-radius:999px;background:#fee4e2;color:#a22b24;font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
-@media(max-width:900px){.role-clinical-grid{grid-template-columns:1fr}}@media(max-width:700px){.role-permission-feature{grid-template-columns:1fr}}
+.erp-role-scope{margin-bottom:18px;padding:16px 18px;border:1px solid #bfdae7;border-radius:14px;background:#f2f9fc;color:#37566a;font-size:12px;line-height:1.6}.erp-role-groups{display:grid;gap:18px}.erp-role-group h3{margin-bottom:4px}.erp-role-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.erp-role-option{display:grid;grid-template-columns:auto minmax(0,1fr);gap:11px;align-items:start;padding:14px;border:1px solid #d8e2e8;border-radius:12px;background:#fff}.erp-role-option input{width:19px!important;height:19px;margin:1px 0 0;padding:0!important;accent-color:#2878d0}.erp-role-option strong{display:block;color:#263e50;font-size:12px}.erp-role-option small{display:block;margin-top:4px;color:#70808c;font-size:10px;line-height:1.45}.erp-role-option:has(input:checked){border-color:#83b9d2;background:#f4fbfe}.erp-role-option.critical{border-color:#efc7c4;background:#fff8f7}.erp-role-option.critical strong{color:#9f2720}@media(max-width:800px){.erp-role-options{grid-template-columns:1fr}}
 </style>
 <form method="post" class="erp-form-shell">
     {% csrf_token %}
     <section class="erp-form-card">
-        <h3>Perfil del rol</h3>
+        <h3>Perfil del rol ERP</h3>
         <div class="erp-form-grid">
             {% for field in form %}
                 {% if field.name == 'nombre' or field.name == 'codigo' or field.name == 'descripcion' or field.name == 'activo' %}
                 <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                    {{ field.errors }}
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}{{ field.errors }}
                 </div>
                 {% endif %}
             {% endfor %}
         </div>
     </section>
 
-    <section class="erp-form-card">
-        <h3>Clínica y citas</h3>
-        <p class="role-section-note">Puedes habilitar únicamente el calendario o combinarlo con las funciones clínicas que necesite cada usuario.</p>
-        <div class="role-clinical-grid">
-            <div class="role-permission-feature primary">
-                <div><div class="erp-kpi-label">Módulo médico</div><h4>Clínica</h4><p>Acceso al panel clínico y a la operación de citas clínicas del hospital.</p></div>
-                <div class="role-permission-toggle"><label for="{{ form.puede_clinica.id_for_label }}">{{ form.puede_clinica }} Habilitar Clínica</label>{{ form.puede_clinica.errors }}</div>
+    <div class="erp-role-scope"><strong>Alcance del catálogo:</strong> Facturación, inventario, compras, notas de crédito, proveedores, clientes, configuración fiscal, contabilidad, RR. HH., CRM, agenda y Tecnicentro. No incluye pacientes, expedientes, recetas, tratamientos ni ninguna acción clínica.</div>
+
+    <div class="erp-role-groups">
+        {% for grupo in grupos %}
+        <section class="erp-form-card erp-role-group">
+            <h3>{{ grupo.nombre }}</h3>
+            <p>Si no se selecciona una acción, el usuario no podrá verla ni ejecutarla.</p>
+            <div class="erp-role-options">
+                {% for permiso in grupo.permisos %}
+                <label class="erp-role-option {% if 'eliminar' in permiso.campo or 'anular' in permiso.campo or 'revertir' in permiso.campo %}critical{% endif %}" for="{{ permiso.field.id_for_label }}">
+                    {{ permiso.field }}
+                    <span><strong>{{ permiso.etiqueta }}</strong>{% if permiso.field.help_text %}<small>{{ permiso.field.help_text }}</small>{% endif %}{{ permiso.field.errors }}</span>
+                </label>
+                {% endfor %}
             </div>
-            <div class="role-permission-feature primary">
-                <div><div class="erp-kpi-label">Acceso independiente</div><h4>Solo agenda y gestión de citas</h4><p>Permite agendar citas, crear y editar, ver los calendarios mensual, semanal y diario, cambiar estados y gestionar recordatorios. No concede acceso a expedientes ni al resto de Clínica.</p></div>
-                <div class="role-permission-toggle"><label for="{{ form.puede_citas.id_for_label }}">{{ form.puede_citas }} Habilitar Agenda de Citas</label>{{ form.puede_citas.errors }}</div>
-            </div>
-            <div class="role-permission-feature"><div><h4>Pacientes</h4><p>{{ form.puede_pacientes.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_pacientes.id_for_label }}">{{ form.puede_pacientes }} Habilitar</label>{{ form.puede_pacientes.errors }}</div></div>
-            <div class="role-permission-feature"><div><h4>Expedientes clínicos</h4><p>{{ form.puede_expediente_clinico.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_expediente_clinico.id_for_label }}">{{ form.puede_expediente_clinico }} Habilitar</label>{{ form.puede_expediente_clinico.errors }}</div></div>
-            <div class="role-permission-feature"><div><h4>Tratamientos</h4><p>{{ form.puede_tratamientos_clinicos.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_tratamientos_clinicos.id_for_label }}">{{ form.puede_tratamientos_clinicos }} Habilitar</label>{{ form.puede_tratamientos_clinicos.errors }}</div></div>
-            <div class="role-permission-feature"><div><h4>Configuración clínica</h4><p>{{ form.puede_configuracion_clinica.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_configuracion_clinica.id_for_label }}">{{ form.puede_configuracion_clinica }} Habilitar</label>{{ form.puede_configuracion_clinica.errors }}</div></div>
-        </div>
-    </section>
+        </section>
+        {% endfor %}
+    </div>
 
-    <section class="erp-form-card">
-        <h3>Accesos por area</h3>
-        <p class="role-section-note">Activa únicamente las áreas necesarias para las responsabilidades de este rol.</p>
-        <div class="erp-form-grid">
-            {% for field in form %}
-                {% if field.name != 'nombre' and field.name != 'codigo' and field.name != 'descripcion' and field.name != 'activo' and field.name != 'puede_citas' and field.name != 'puede_clinica' and field.name != 'puede_pacientes' and field.name != 'puede_expediente_clinico' and field.name != 'puede_tratamientos_clinicos' and field.name != 'puede_configuracion_clinica' and field.name != 'puede_crear_facturas' and field.name != 'puede_editar_facturas' and field.name != 'puede_cambiar_fecha_factura' and field.name != 'puede_anular_facturas' and field.name != 'puede_eliminar_borradores' and field.name != 'puede_eliminar_facturas' and field.name != 'puede_registrar_pagos_clientes' and field.name != 'puede_crear_clientes' and field.name != 'puede_editar_clientes' and field.name != 'puede_crear_productos' and field.name != 'puede_editar_productos' and field.name != 'puede_crear_proveedores' and field.name != 'puede_editar_proveedores' and field.name != 'puede_ajustar_inventario' and field.name != 'puede_crear_compras' and field.name != 'puede_editar_compras' and field.name != 'puede_aplicar_compras' and field.name != 'puede_anular_compras' and field.name != 'puede_registrar_pagos_proveedores' and field.name != 'puede_crear_notas_credito' and field.name != 'puede_editar_notas_credito' and field.name != 'puede_anular_notas_credito' and field.name != 'puede_exportar_reportes' %}
-                <div class="erp-field">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                    {{ field.errors }}
-                </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </section>
-
-    <section class="erp-form-card">
-        <h3>Acciones específicas por rol</h3>
-        <p class="role-section-note">Cada casilla funciona de manera independiente. Los permisos críticos aparecen en rojo y deben reservarse para responsables autorizados.</p>
-        <div class="erp-form-grid">
-            {% for field in form %}
-                {% if field.name == 'puede_crear_facturas' or field.name == 'puede_editar_facturas' or field.name == 'puede_cambiar_fecha_factura' or field.name == 'puede_anular_facturas' or field.name == 'puede_eliminar_borradores' or field.name == 'puede_eliminar_facturas' or field.name == 'puede_registrar_pagos_clientes' or field.name == 'puede_crear_clientes' or field.name == 'puede_editar_clientes' or field.name == 'puede_crear_productos' or field.name == 'puede_editar_productos' or field.name == 'puede_crear_proveedores' or field.name == 'puede_editar_proveedores' or field.name == 'puede_ajustar_inventario' or field.name == 'puede_crear_compras' or field.name == 'puede_editar_compras' or field.name == 'puede_aplicar_compras' or field.name == 'puede_anular_compras' or field.name == 'puede_registrar_pagos_proveedores' or field.name == 'puede_crear_notas_credito' or field.name == 'puede_editar_notas_credito' or field.name == 'puede_anular_notas_credito' or field.name == 'puede_exportar_reportes' %}
-                <div class="erp-field {% if field.name == 'puede_anular_facturas' or field.name == 'puede_eliminar_facturas' or field.name == 'puede_anular_compras' or field.name == 'puede_anular_notas_credito' %}role-danger-permission{% endif %}">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                    {{ field.errors }}
-                </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </section>
     <div class="erp-form-actions">
         <a href="{% url 'superadmin_roles' %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Rol</button>
+        <button type="submit" class="erp-btn">Guardar Rol ERP</button>
     </div>
 </form>
 {% endblock %}

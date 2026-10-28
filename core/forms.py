@@ -8,6 +8,13 @@ from django.db.models import Q
 from django.utils.text import slugify
 from django.utils.translation import override as override_language
 
+from .clinical_permissions import (
+    EMPRESAS_CLINICAS_CON_ROLES,
+    PERMISOS_CLINICOS_LEGADOS,
+    PERMISOS_ERP,
+    PERMISOS_SOLO_CLINICA,
+    TODOS_LOS_PERMISOS_ERP,
+)
 from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
 
 
@@ -334,6 +341,9 @@ class UsuarioControlCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["rol_sistema"].label_from_instance = lambda rol: (
+            f"{rol.nombre} — {'Clínica' if rol.es_rol_clinico else 'ERP'}"
+        )
         self.fields["email"].required = True
         textos = {
             "first_name": ("Nombres", ""),
@@ -373,6 +383,10 @@ class UsuarioControlCreateForm(forms.ModelForm):
                 Q(empresa_id__in=empresas_ids) | Q(empresas_acceso__id__in=empresas_ids)
             ).distinct().exists():
                 self.add_error("email", "Ya existe un usuario con este correo en alguna de las empresas permitidas.")
+
+        rol = cleaned_data.get("rol_sistema")
+        if empresa and rol and rol.es_rol_clinico != (empresa.slug in EMPRESAS_CLINICAS_CON_ROLES):
+            self.add_error("rol_sistema", "El rol global debe corresponder al catálogo ERP o Clínica de la empresa principal.")
 
         if cleaned_data.get("modo_creacion") != self.MODO_RAPIDO:
             return cleaned_data
@@ -462,6 +476,9 @@ class UsuarioControlUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["rol_sistema"].label_from_instance = lambda rol: (
+            f"{rol.nombre} — {'Clínica' if rol.es_rol_clinico else 'ERP'}"
+        )
         self.fields["email"].required = True
         if self.instance.pk:
             self.fields["groups"].initial = self.instance.groups.all()
@@ -508,6 +525,9 @@ class UsuarioControlUpdateForm(forms.ModelForm):
                 Q(empresa_id__in=empresas_ids) | Q(empresas_acceso__id__in=empresas_ids)
             ).exclude(pk=self.instance.pk).distinct().exists():
                 self.add_error("email", "Ya existe otro usuario con este correo en alguna de las empresas permitidas.")
+        rol = cleaned_data.get("rol_sistema")
+        if empresa and rol and rol.es_rol_clinico != (empresa.slug in EMPRESAS_CLINICAS_CON_ROLES):
+            self.add_error("rol_sistema", "El rol global debe corresponder al catálogo ERP o Clínica de la empresa principal.")
         password1 = cleaned_data.get("password1") or ""
         password2 = cleaned_data.get("password2") or ""
         if password1 or password2:
@@ -635,9 +655,7 @@ class PlanComercialForm(forms.ModelForm):
 class RolSistemaForm(forms.ModelForm):
     class Meta:
         model = RolSistema
-        # Mantener todas las capacidades del modelo visibles evita que un permiso
-        # nuevo quede implementado en backend pero no pueda asignarse desde Roles.
-        fields = "__all__"
+        fields = ["nombre", "codigo", "descripcion", "activo", *TODOS_LOS_PERMISOS_ERP]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -722,6 +740,22 @@ class RolSistemaForm(forms.ModelForm):
                 self.fields[field_name].label = label
                 if help_text:
                     self.fields[field_name].help_text = help_text
+        for _grupo, permisos in PERMISOS_ERP:
+            for field_name, label in permisos:
+                if field_name in self.fields:
+                    self.fields[field_name].label = label
+
+    def save(self, commit=True):
+        rol = super().save(commit=False)
+        rol.es_rol_clinico = False
+        rol.usa_permisos_clinicos_granulares = False
+        rol.usa_permisos_clinicos_v2 = False
+        rol.usa_permisos_acciones_v3 = True
+        for field_name in (*PERMISOS_SOLO_CLINICA, *PERMISOS_CLINICOS_LEGADOS):
+            setattr(rol, field_name, False)
+        if commit:
+            rol.save()
+        return rol
 
 
 class PagoLicenciaEmpresaForm(forms.ModelForm):

@@ -292,6 +292,41 @@ TODOS_LOS_PERMISOS_CLINICOS = tuple(
     campo for _, permisos in PERMISOS_CLINICOS for campo, _ in permisos
 )
 
+# El motor de acciones es compartido por todo el ERP, pero el catálogo de Mi
+# Control no debe exponer expedientes ni capacidades médicas a empresas
+# comerciales. Las cuatro clínicas conservan el catálogo completo anterior.
+GRUPOS_EXCLUSIVOS_CLINICA = frozenset({
+    "Pacientes", "Historia clínica", "Especialidades clínicas", "Anexos",
+    "Recetas", "Gastos Adicionales", "Plan y tratamiento", "Enfermería",
+    "Terapias", "Cámara hiperbárica", "Postquirúrgicas", "Manuales PDF",
+})
+PERMISOS_EXCLUSIVOS_CLINICA_EN_GRUPOS_ERP = frozenset({
+    "solo_lectura_clinica",
+    "puede_configuracion_clinica",
+    "puede_crear_profesionales_clinicos",
+    "puede_editar_profesionales_clinicos",
+    "puede_crear_servicios_clinicos",
+    "puede_editar_servicios_clinicos",
+    "puede_eliminar_servicios_clinicos",
+})
+PERMISOS_ERP = tuple(
+    (
+        grupo,
+        tuple(
+            (campo, etiqueta)
+            for campo, etiqueta in permisos
+            if campo not in PERMISOS_EXCLUSIVOS_CLINICA_EN_GRUPOS_ERP
+        ),
+    )
+    for grupo, permisos in PERMISOS_CLINICOS
+    if grupo not in GRUPOS_EXCLUSIVOS_CLINICA
+)
+PERMISOS_ERP = tuple((grupo, permisos) for grupo, permisos in PERMISOS_ERP if permisos)
+TODOS_LOS_PERMISOS_ERP = tuple(
+    campo for _, permisos in PERMISOS_ERP for campo, _ in permisos
+)
+PERMISOS_SOLO_CLINICA = frozenset(TODOS_LOS_PERMISOS_CLINICOS) - frozenset(TODOS_LOS_PERMISOS_ERP)
+
 PERMISOS_CLINICOS_LEGADOS = (
     "puede_citas", "puede_clinica", "puede_pacientes",
     "puede_expediente_clinico", "puede_tratamientos_clinicos",
@@ -341,6 +376,14 @@ def rol_clinico_v2(usuario, empresa):
 def rol_clinico_v3(usuario, empresa):
     rol = rol_clinico_v2(usuario, empresa)
     return rol if rol and rol.usa_permisos_acciones_v3 else None
+
+
+def rol_acciones_v3(usuario, empresa):
+    """Rol de acciones exactas para cualquier empresa, clínica o ERP."""
+    if not usuario or not empresa:
+        return None
+    rol = usuario.rol_para_empresa(empresa)
+    return rol if rol and rol.activo and rol.usa_permisos_acciones_v3 else None
 
 
 def rol_clinico_granular(usuario, empresa):

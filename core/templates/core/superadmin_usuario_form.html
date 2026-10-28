@@ -117,11 +117,11 @@
             <div class="company-role-grid">
                 {% for item in empresas_config %}
                 <div class="company-role-card {% if item.seleccionada %}is-visible{% endif %}" data-company-role-card data-company-id="{{ item.empresa.id }}">
-                    <span class="company-role-badge">Empresa permitida</span>
+                    <span class="company-role-badge">Catálogo {{ item.catalogo }}</span>
                     <label for="empresa_rol_{{ item.empresa.id }}">{{ item.empresa.nombre }}</label>
                     <select name="empresa_rol_{{ item.empresa.id }}" id="empresa_rol_{{ item.empresa.id }}">
                         <option value="">Usar rol global del usuario</option>
-                        {% for rol in roles_empresa %}
+                        {% for rol in item.roles %}
                         <option value="{{ rol.id }}" {% if item.rol_id == rol.id %}selected{% endif %}>{{ rol.nombre }}</option>
                         {% endfor %}
                     </select>

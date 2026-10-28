@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from weasyprint import HTML
 
 from core.models import Empresa
-from core.clinical_permissions import rol_clinico_v3
+from core.clinical_permissions import rol_acciones_v3
 from contabilidad.models import AsientoContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_planilla_cerrada, registrar_asiento_planilla_pagada
 from crm.models import ConfiguracionCRM
@@ -48,7 +48,7 @@ def _puede_borrar_rrhh(request):
 
 
 def _puede_editar_planillas(request, empresa):
-    if rol_clinico_v3(request.user, empresa):
+    if rol_acciones_v3(request.user, empresa):
         return request.user.tiene_permiso_erp("puede_editar_planillas", empresa)
     if _puede_borrar_rrhh(request):
         return True
@@ -68,7 +68,7 @@ def _bloquear_si_no_es_dueno_rrhh(request, empresa):
 
 
 def _autoriza_v3_o_dueno(request, empresa, permiso):
-    if rol_clinico_v3(request.user, empresa):
+    if rol_acciones_v3(request.user, empresa):
         return request.user.tiene_permiso_erp(permiso, empresa)
     return _puede_borrar_rrhh(request)
 

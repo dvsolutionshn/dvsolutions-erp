@@ -36,7 +36,7 @@ class RestriccionCitasPermissionRoutingTests(SimpleTestCase):
         ):
             with self.subTest(campo=campo):
                 self.assertIn(campo, TODOS_LOS_PERMISOS_CLINICOS)
-                self.assertIn(campo, formulario.fields)
+                self.assertNotIn(campo, formulario.fields)
                 self.assertIn(campo, DESCRIPCIONES_PERMISOS)
 
 

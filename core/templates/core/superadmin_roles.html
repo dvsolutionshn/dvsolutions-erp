@@ -2,7 +2,7 @@
 
 {% block title %}Roles{% endblock %}
 {% block header_title %}Roles y permisos{% endblock %}
-{% block header_description %}Organiza perfiles operativos claros para asignar capacidades sin configurar cada acceso desde cero.{% endblock %}
+{% block header_description %}Roles granulares para el ERP general. Los roles médicos de las cuatro clínicas se administran dentro de cada clínica.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'superadmin_rol_create' %}" class="erp-action-link">+ Nuevo rol</a>
@@ -10,7 +10,7 @@
 
 {% block content %}
 <section class="control-catalog-intro">
-    <div><span class="control-eyebrow">Gobierno de acceso</span><h3>Perfiles disponibles</h3><p>Lectura inmediata de las áreas habilitadas en cada rol.</p></div>
+    <div><span class="control-eyebrow">Gobierno de acceso ERP</span><h3>Perfiles generales disponibles</h3><p>Facturación, inventario, compras, contabilidad, RR. HH., CRM, agenda y Tecnicentro, sin permisos clínicos.</p></div>
     <span class="control-catalog-count">{{ roles|length }} rol{{ roles|length|pluralize:"es" }}</span>
 </section>
 

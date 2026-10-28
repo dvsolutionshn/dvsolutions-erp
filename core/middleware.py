@@ -25,6 +25,7 @@ from core.clinical_permissions import (
     permisos_gastos_adicionales_desde_ruta,
     permiso_agenda_granular,
     permiso_clinica_granular,
+    rol_acciones_v3,
     rol_clinico_granular,
     rol_clinico_v2,
     rol_clinico_v3,
@@ -94,16 +95,20 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_facturacion_desde_ruta(suffix)
                     rol_granular = rol_clinico_granular(request.user, empresa)
+                    rol_v3 = rol_acciones_v3(request.user, empresa)
                     permiso_accion = (
+                        permiso_facturacion_clinico_granular(suffix, request.method, v3=True)
+                        if rol_v3
+                        else
                         permiso_facturacion_clinico_granular(
-                            suffix, request.method, v3=bool(rol_clinico_v3(request.user, empresa))
+                            suffix, request.method, v3=False
                         )
                         if rol_granular and rol_granular.usa_permisos_clinicos_v2
                         else permiso_facturacion_accion(suffix)
                     )
-                    if rol_clinico_v3(request.user, empresa) and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
+                    if rol_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
                         permiso_accion = "__denegar__"
-                    if permiso_accion == "puede_transferir_inventario" and not rol_clinico_granular(request.user, empresa):
+                    if permiso_accion == "puede_transferir_inventario" and not rol_v3 and not rol_granular:
                         permiso_accion = "puede_inventario"
                     if permiso and not permiso_accion and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
@@ -146,7 +151,7 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_contabilidad_desde_ruta(suffix)
-                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    usa_v3 = bool(rol_acciones_v3(request.user, empresa))
                     permiso_accion = permiso_contabilidad_accion(suffix, request.method, v3=True) if usa_v3 else None
                     if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
                         permiso_accion = "__denegar__"
@@ -190,7 +195,7 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_rrhh_desde_ruta(suffix)
-                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    usa_v3 = bool(rol_acciones_v3(request.user, empresa))
                     permiso_accion = permiso_rrhh_accion(suffix, request.method) if usa_v3 else None
                     if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
                         permiso_accion = "__denegar__"
@@ -229,7 +234,7 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_crm_desde_ruta(suffix)
-                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    usa_v3 = bool(rol_acciones_v3(request.user, empresa))
                     permiso_accion = permiso_crm_accion(suffix, request.method, request.POST) if usa_v3 else None
                     if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
                         permiso_accion = "__denegar__"
@@ -295,6 +300,17 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     rol_granular = rol_clinico_granular(request.user, empresa)
+                    rol_v3 = rol_acciones_v3(request.user, empresa)
+                    if rol_v3:
+                        permiso = permiso_agenda_granular(
+                            suffix, request.method, request.POST, v3=True,
+                        )
+                        if permiso == "__denegar__" or (
+                            permiso and not request.user.tiene_permiso_erp(permiso, empresa)
+                        ):
+                            messages.error(request, "Tu rol no tiene permiso para ejecutar esta acción de agenda.")
+                            return redirect("dashboard", slug=empresa.slug)
+                        return self.get_response(request)
                     if rol_granular:
                         if rol_clinico_v2(request.user, empresa):
                             permiso = permiso_agenda_granular(
@@ -429,7 +445,7 @@ class EmpresaAccessMiddleware:
                     return self.get_response(request)
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_tecnicentro_desde_ruta(suffix)
-                    usa_v3 = bool(rol_clinico_v3(request.user, empresa))
+                    usa_v3 = bool(rol_acciones_v3(request.user, empresa))
                     permiso_accion = permiso_tecnicentro_accion(suffix, request.method, request.POST) if usa_v3 else None
                     if usa_v3 and request.method not in {"GET", "HEAD", "OPTIONS"} and not permiso_accion:
                         permiso_accion = "__denegar__"

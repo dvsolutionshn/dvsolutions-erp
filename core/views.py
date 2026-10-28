@@ -64,6 +64,7 @@ from .models import (
 from .clinical_permissions import (
     EMPRESAS_CLINICAS_CON_ROLES,
     PERMISOS_CLINICOS,
+    PERMISOS_ERP,
     TODOS_LOS_PERMISOS_CLINICOS,
     PERMISOS_CLINICOS_LEGADOS,
 )
@@ -322,7 +323,8 @@ def _usuarios_operativos_de_empresa(empresa):
 
 def _usuario_empresas_config(form, request):
     empresas = list(Empresa.objects.filter(activa=True).order_by("nombre"))
-    roles = list(RolSistema.objects.filter(activo=True).order_by("nombre"))
+    roles_clinicos = list(RolSistema.objects.filter(activo=True, es_rol_clinico=True).order_by("nombre"))
+    roles_erp = list(RolSistema.objects.filter(activo=True, es_rol_clinico=False).order_by("nombre"))
     seleccionadas = set()
     if request.method == "POST":
         seleccionadas.update(int(valor) for valor in request.POST.getlist("empresas_acceso") if valor.isdigit())
@@ -355,8 +357,10 @@ def _usuario_empresas_config(form, request):
             "empresa": empresa,
             "seleccionada": empresa.id in seleccionadas,
             "rol_id": int(posted_role) if posted_role and posted_role.isdigit() else permisos_actuales.get(empresa.id),
+            "roles": roles_clinicos if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES else roles_erp,
+            "catalogo": "Clínica" if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES else "ERP",
         })
-    return {"empresas_config": config, "roles_empresa": roles}
+    return {"empresas_config": config}
 
 
 def _guardar_roles_por_empresa(usuario, post_data):
@@ -365,14 +369,23 @@ def _guardar_roles_por_empresa(usuario, post_data):
         empresas_ids.add(usuario.empresa_id)
 
     UsuarioEmpresaPermiso.objects.filter(usuario=usuario).exclude(empresa_id__in=empresas_ids).delete()
+    empresas = {empresa.id: empresa for empresa in Empresa.objects.filter(id__in=empresas_ids)}
     for empresa_id in empresas_ids:
         rol_id = post_data.get(f"empresa_rol_{empresa_id}")
         if rol_id and str(rol_id).isdigit():
-            UsuarioEmpresaPermiso.objects.update_or_create(
-                usuario=usuario,
-                empresa_id=empresa_id,
-                defaults={"rol_sistema_id": int(rol_id), "activo": True},
-            )
+            empresa = empresas.get(empresa_id)
+            es_clinica = bool(empresa and empresa.slug in EMPRESAS_CLINICAS_CON_ROLES)
+            rol = RolSistema.objects.filter(
+                pk=int(rol_id), activo=True, es_rol_clinico=es_clinica,
+            ).first()
+            if rol:
+                UsuarioEmpresaPermiso.objects.update_or_create(
+                    usuario=usuario,
+                    empresa_id=empresa_id,
+                    defaults={"rol_sistema": rol, "activo": True},
+                )
+            else:
+                UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa_id=empresa_id).delete()
         else:
             UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa_id=empresa_id).delete()
 
@@ -2265,12 +2278,26 @@ def superadmin_plan_edit(request, plan_id):
 
 @superadmin_required
 def superadmin_roles(request):
-    roles = RolSistema.objects.order_by("nombre")
+    roles = RolSistema.objects.filter(es_rol_clinico=False).order_by("nombre")
     context = {
         **_superadmin_base_context(),
         "roles": roles,
     }
     return render(request, "core/superadmin_roles.html", context)
+
+
+def _grupos_permisos_erp_form(form):
+    return [
+        {
+            "nombre": nombre,
+            "permisos": [
+                {"campo": campo, "etiqueta": etiqueta, "field": form[campo]}
+                for campo, etiqueta in permisos
+                if campo in form.fields
+            ],
+        }
+        for nombre, permisos in PERMISOS_ERP
+    ]
 
 
 @superadmin_required
@@ -2377,13 +2404,14 @@ def superadmin_rol_create(request):
     return render(request, "core/superadmin_rol_form.html", {
         **_superadmin_base_context(),
         "form": form,
+        "grupos": _grupos_permisos_erp_form(form),
         "titulo": "Nuevo Rol",
     })
 
 
 @superadmin_required
 def superadmin_rol_edit(request, rol_id):
-    rol = get_object_or_404(RolSistema, id=rol_id)
+    rol = get_object_or_404(RolSistema, id=rol_id, es_rol_clinico=False)
     form = RolSistemaForm(request.POST or None, instance=rol)
     if request.method == "POST" and form.is_valid():
         rol = form.save()
@@ -2393,6 +2421,7 @@ def superadmin_rol_edit(request, rol_id):
     return render(request, "core/superadmin_rol_form.html", {
         **_superadmin_base_context(),
         "form": form,
+        "grupos": _grupos_permisos_erp_form(form),
         "titulo": f"Editar Rol: {rol.nombre}",
     })
 

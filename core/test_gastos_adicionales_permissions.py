@@ -8,7 +8,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from core.access import gastos_adicionales_habilitados
-from core.clinical_permissions import permisos_gastos_adicionales_desde_ruta
+from core.clinical_permissions import TODOS_LOS_PERMISOS_CLINICOS, permisos_gastos_adicionales_desde_ruta
 from core.context_processors import erp_access
 from core.forms import RolSistemaForm
 from core.middleware import EmpresaAccessMiddleware
@@ -200,7 +200,8 @@ class GastosAdicionalesPermissionTests(TestCase):
             "puede_editar_gastos_adicionales", "puede_enviar_gastos_adicionales",
             "puede_convertir_gastos_adicionales_factura",
         ):
-            self.assertIn(field, form.fields)
+            self.assertIn(field, TODOS_LOS_PERMISOS_CLINICOS)
+            self.assertNotIn(field, form.fields)
 
     def test_permission_resolution_uses_explicit_actions(self):
         self.assertEqual(permisos_gastos_adicionales_desde_ruta("gastos-adicionales/7/pdf/"), ("puede_ver_gastos_adicionales",))

@@ -20,6 +20,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionOnix, Consumo
 from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 from core.backup_tokens import hash_token_respaldo
 from core.forms import EmpresaControlForm, RolSistemaForm
+from core.clinical_permissions import TODOS_LOS_PERMISOS_ERP
 from core.access import permiso_facturacion_desde_ruta
 from core.audit_context import audit_scope
 from core.middleware import AuditoriaRequestMiddleware
@@ -382,7 +383,7 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Activa tu acceso", mail.outbox[0].subject)
 
-    def test_control_muestra_permisos_destacados_de_clinica_y_citas(self):
+    def test_control_muestra_catalogo_erp_sin_permisos_clinicos(self):
         self.client.login(username="master", password="pass12345")
 
         response = self.client.get(reverse("superadmin_usuario_create"))
@@ -394,12 +395,12 @@ class SuperAdminControlTests(TestCase):
 
         response = self.client.get(reverse("superadmin_rol_create"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Solo agenda y gestión de citas")
-        self.assertContains(response, "id_puede_citas")
-        self.assertContains(response, "Habilitar Agenda de Citas")
-        self.assertContains(response, "id_puede_clinica")
-        self.assertContains(response, "Habilitar Clínica")
-        self.assertContains(response, "Expedientes clínicos")
+        self.assertContains(response, "Motor granular del ERP general")
+        self.assertContains(response, "id_puede_ver_calendario")
+        self.assertContains(response, "id_puede_reversar_asientos")
+        self.assertContains(response, "No incluye pacientes, expedientes, recetas, tratamientos")
+        self.assertNotContains(response, "id_puede_clinica")
+        self.assertNotContains(response, "id_puede_ver_historia_clinica")
 
     def test_crear_empresa_tecnicentro_activa_perfil_y_modulos_esenciales(self):
         self.client.login(username="master", password="pass12345")
@@ -1965,22 +1966,17 @@ class AuditoriaGlobalTests(TestCase):
 
 
 class RolSistemaPermisosTests(TestCase):
-    def test_formulario_expone_todos_los_permisos_del_modelo(self):
+    def test_formulario_expone_todos_los_permisos_erp_y_omite_clinica(self):
         form = RolSistemaForm()
-        permisos_modelo = {
-            field.name
-            for field in RolSistema._meta.fields
-            if field.name.startswith("puede_")
-        }
-
-        self.assertTrue(permisos_modelo)
-        self.assertEqual(permisos_modelo, permisos_modelo.intersection(form.fields))
+        self.assertTrue(TODOS_LOS_PERMISOS_ERP)
+        self.assertEqual(set(TODOS_LOS_PERMISOS_ERP), set(TODOS_LOS_PERMISOS_ERP).intersection(form.fields))
         self.assertIn("puede_punto_venta", form.fields)
         self.assertIn("puede_configuracion_facturacion", form.fields)
         self.assertIn("puede_cierres_caja", form.fields)
         self.assertIn("puede_crm", form.fields)
-        self.assertIn("puede_citas", form.fields)
-        self.assertIn("puede_clinica", form.fields)
+        self.assertIn("puede_ver_calendario", form.fields)
+        self.assertNotIn("puede_clinica", form.fields)
+        self.assertNotIn("puede_ver_historia_clinica", form.fields)
 
     def test_ruta_pos_exige_permiso_explicito(self):
         self.assertEqual(
