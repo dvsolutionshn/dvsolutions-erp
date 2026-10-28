@@ -792,7 +792,7 @@ class PagoLicenciaEmpresaForm(forms.ModelForm):
         self.empresa = empresa
         super().__init__(*args, **kwargs)
         if "fecha_pago" in self.fields:
-            self.fields["fecha_pago"].widget = forms.DateInput(attrs={"type": "date"})
+            self.fields["fecha_pago"].widget = forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
         if empresa:
             self.fields["plan_comercial"].initial = empresa.plan_comercial
         textos = {

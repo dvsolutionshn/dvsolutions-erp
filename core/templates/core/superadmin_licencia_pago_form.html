@@ -1,51 +1,56 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}{{ titulo }}{% endblock %}
-{% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Registra un pago comercial y deja que el sistema extienda automaticamente la licencia de la empresa.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'superadmin_empresa_detail' empresa_obj.id %}" class="erp-action-link">Volver a Empresa</a>
+{% block body_class %}user-form-page license-renewal-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
+{% block header_title %}Renovar licencia{% endblock %}
+{% block header_description %}Registra el pago y actualiza la vigencia del servicio de esta empresa.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/license-renewal.css' %}">
+<script src="{% static 'core/license-renewal.js' %}" defer></script>
 {% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_empresa_detail' empresa_obj.id %}" class="ua-btn">Volver a empresa</a>{% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Empresa</div>
-        <p class="erp-stat-value" style="font-size:24px;">{{ empresa_obj.nombre }}</p>
-        <p class="erp-card-muted">Plan actual: {{ empresa_obj.plan_comercial.nombre|default:"Sin plan" }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Estado actual</div>
-        <p class="erp-stat-value" style="font-size:24px;">{{ empresa_obj.estado_licencia_resuelto|capfirst }}</p>
-        <p class="erp-card-muted">Vence: {{ empresa_obj.fecha_vencimiento_plan|date:"F j, Y"|default:"Sin fecha" }}</p>
-    </article>
-</section>
+<form method="post" class="user-form license-renewal" id="licenseRenewalForm" data-license-renewal data-current-expiry="{{ empresa_obj.fecha_vencimiento_plan|date:'Y-m-d' }}" data-current-plan="{{ empresa_obj.plan_comercial.nombre|default:'Sin plan asignado' }}">
+    {% csrf_token %}{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 2 2 5-5"/></svg></span><div><p class="ua-eyebrow">Continuidad del servicio</p><h1>Renovar licencia</h1><p class="ua-description">{{ empresa_obj.nombre }} · Registra los datos de esta renovación.</p></div></div><span class="ua-mode">Pago de licencia</span></header>
 
-<form method="post" class="erp-form-shell">
-    {% csrf_token %}
-    {% if form.non_field_errors %}
-    <div class="erp-field-errors">{{ form.non_field_errors }}</div>
-    {% endif %}
-
-    <section class="erp-form-card">
-        <h3>Pago de licencia</h3>
-        <p>Si registras un pago, la empresa pasa a estado activo y el sistema extiende su vencimiento automaticamente.</p>
-        <div class="erp-form-grid">
-            {% for field in form %}
-            <div class="erp-field {% if field.name == 'observacion' %}erp-field-span-full{% endif %}">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                {{ field.errors }}
-            </div>
-            {% endfor %}
-        </div>
+    <section class="lr-current" aria-label="Servicio actual de la empresa">
+        <article><span class="lr-current-icon" aria-hidden="true">P</span><div><p>Plan actual</p><strong>{{ empresa_obj.plan_comercial.nombre|default:'Sin plan asignado' }}</strong></div></article>
+        <article data-tone="blue"><span class="lr-current-icon" aria-hidden="true">L</span><div><p>Licencia actual</p><strong>{{ empresa_obj.estado_licencia_resuelto|capfirst }}</strong></div></article>
+        <article data-tone="amber"><span class="lr-current-icon" aria-hidden="true">V</span><div><p>Vencimiento actual</p><strong>{{ empresa_obj.fecha_vencimiento_plan|date:'d/m/Y'|default:'Sin fecha' }}</strong></div></article>
     </section>
 
-    <div class="erp-form-actions">
-        <a href="{% url 'superadmin_empresa_detail' empresa_obj.id %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Pago</button>
+    {% if form.errors %}<section class="ua-errors" role="alert" tabindex="-1" data-renewal-errors><h2>Revisa los datos del pago</h2><p>Conservamos la información para que puedas corregir los campos señalados.</p>{{ form.non_field_errors }}<div class="ua-error-links">{% for field in form.visible_fields %}{% if field.errors %}<a href="#{{ field.id_for_label }}">Revisar {{ field.label|lower }}</a>{% endif %}{% endfor %}</div>{% for field in form.hidden_fields %}{{ field.errors }}{% endfor %}</section>{% endif %}
+
+    <div class="ua-layout">
+        <div class="ua-main">
+            <section class="ua-panel" aria-labelledby="lr-period-title"><div class="ua-panel-head"><span class="ua-section-number">01</span><div><h2 id="lr-period-title">Plan y período de renovación</h2><p>Confirma el plan cobrado, la fecha del pago y los meses pagados.</p></div></div>
+                <div class="ua-fields">
+                    {% include 'core/includes/company_form_field.html' with field=form.plan_comercial full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.fecha_pago only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.cantidad_meses only %}
+                </div><div class="lr-period-note"><span aria-hidden="true">↗</span><p>La renovación se suma al vencimiento actual o a la fecha del pago, la que sea posterior. Se añaden meses calendario.</p></div>
+            </section>
+
+            <section class="ua-panel" aria-labelledby="lr-payment-title"><div class="ua-panel-head"><span class="ua-section-number" data-tone="teal">02</span><div><h2 id="lr-payment-title">Datos del pago</h2><p>Registra el monto recibido y la información del comprobante.</p></div></div>
+                <div class="ua-fields">
+                    {% include 'core/includes/company_form_field.html' with field=form.monto label='Monto recibido (L.)' only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.metodo label='Método de pago' only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.referencia full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.observacion label='Observación' full=True only %}
+                </div>
+            </section>
+        </div>
+
+        <aside class="ua-sidebar" aria-label="Resumen de la renovación"><section class="ua-panel lr-review"><div class="ua-review-header"><span class="ua-eyebrow">Antes de guardar</span><span class="ua-review-dot" aria-hidden="true"></span></div><h2>Resumen de renovación</h2><p class="lr-company-name">{{ empresa_obj.nombre }}</p>
+            <div data-renewal-preview hidden><div class="lr-amount"><span>Monto recibido</span><strong data-preview-amount>L. 0.00</strong></div><dl class="ua-review-data"><div><dt>Plan al guardar</dt><dd data-preview-plan>{{ empresa_obj.plan_comercial.nombre|default:'Sin plan asignado' }}</dd></div><div><dt>Período pagado</dt><dd data-preview-months>1 mes</dd></div><div><dt>Fecha del pago</dt><dd data-preview-payment-date>Por indicar</dd></div><div><dt>Método</dt><dd data-preview-method>Por seleccionar</dd></div></dl><div class="lr-expiry"><span>Vencimiento estimado</span><strong data-preview-expiry>Completa la fecha y los meses</strong></div></div>
+            <noscript><p class="ua-note">El sistema calculará el nuevo vencimiento al registrar el pago.</p></noscript><div class="ua-review-note"><span aria-hidden="true">✓</span><p>Al guardar el pago, la empresa y su licencia pasan a estado activo.</p></div><button type="submit" class="ua-btn ua-btn--primary ua-summary-submit"><span>Registrar pago y renovar</span><span aria-hidden="true">→</span></button><p class="ua-summary-footnote">El vencimiento se confirma al guardar.</p>
+        </section></aside>
     </div>
+    <footer class="ua-actions-bar"><p><span class="ua-save-icon" aria-hidden="true">✓</span>Revisa el monto, el plan y los meses antes de registrar el pago.</p><div><a href="{% url 'superadmin_empresa_detail' empresa_obj.id %}" class="ua-btn ua-btn--quiet">Cancelar</a><button type="submit" class="ua-btn ua-btn--primary">Registrar pago y renovar</button></div></footer>
 </form>
 {% endblock %}

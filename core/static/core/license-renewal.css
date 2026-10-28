@@ -1,0 +1,24 @@
+.user-form.license-renewal { max-width: 1600px; }
+.license-renewal .lr-current { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.license-renewal .lr-current article { align-items: flex-start; background: #fff; border: 1px solid var(--ua-line); border-radius: 12px; display: flex; gap: 12px; min-width: 0; padding: 19px; }
+.license-renewal .lr-current article > div { min-width: 0; }
+.license-renewal .lr-current-icon { align-items: center; background: #efedfb; border-radius: 10px; color: #7063bd; display: flex; flex: 0 0 36px; font-size: 14px; font-weight: 650; height: 36px; justify-content: center; }
+.license-renewal .lr-current [data-tone="blue"] .lr-current-icon { background: #ebf2fb; color: #4f78b0; }
+.license-renewal .lr-current [data-tone="amber"] .lr-current-icon { background: #fbf3e5; color: #96752f; }
+.license-renewal .lr-current p { color: #64748b; font-size: 11px; line-height: 1.6; }
+.license-renewal .lr-current strong { color: #425670; display: block; font-size: 16px; font-weight: 650; letter-spacing: -.025em; line-height: 1.6; margin-top: 4px; overflow-wrap: anywhere; }
+.license-renewal .lr-period-note { align-items: flex-start; background: #f5f3fc; border: 1px solid #e8e3f7; border-radius: 9px; color: #70628f; display: flex; font-size: 11px; gap: 9px; line-height: 1.8; margin-top: 19px; padding: 13px; }
+.license-renewal .lr-period-note > span { color: #8a76b7; font-size: 15px; }
+.license-renewal .ua-field textarea { background: #fcfdff; border: 1px solid #d9e3ed; border-radius: 9px; color: var(--ua-ink); font-family: inherit; font-size: 13px; height: 106px; line-height: 1.7; min-height: 90px; padding: 11px 12px; resize: vertical; width: 100%; }
+.license-renewal .ua-field textarea:focus { background: #fff; border-color: #9691de; box-shadow: 0 0 0 3px #efedfb; outline: none; }
+.license-renewal .ua-field.has-error textarea { border-color: #db9696; }
+.license-renewal .lr-company-name { color: #64748b; font-size: 11px; line-height: 1.8; margin-top: 7px; overflow-wrap: anywhere; }
+.license-renewal .lr-amount { background: #f7f6fd; border: 1px solid #eae6f8; border-radius: 10px; margin-top: 21px; padding: 15px; }
+.license-renewal .lr-amount > span { color: #71668f; display: block; font-size: 10px; line-height: 1.7; }
+.license-renewal .lr-amount strong { color: #6454a3; display: block; font-size: 27px; font-weight: 700; letter-spacing: -.04em; line-height: 1.5; margin-top: 4px; overflow-wrap: anywhere; }
+.license-renewal .lr-expiry { background: #f1f8f5; border: 1px solid #e0eee7; border-radius: 9px; padding: 13px; }
+.license-renewal .lr-expiry > span { color: #4d7664; display: block; font-size: 10px; line-height: 1.7; }
+.license-renewal .lr-expiry strong { color: #397b64; display: block; font-size: 18px; font-weight: 650; letter-spacing: -.025em; line-height: 1.6; margin-top: 4px; overflow-wrap: anywhere; }
+.license-renewal .ua-review-note { margin-top: 16px; }
+@media (max-width: 1100px) { .license-renewal .lr-review { column-gap: 25px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .license-renewal .lr-review .ua-review-header, .license-renewal .lr-review h2, .license-renewal .lr-review .lr-company-name, .license-renewal .lr-review .ua-summary-footnote { grid-column: 1 / -1; } .license-renewal .lr-review [data-renewal-preview] { grid-row: span 2; } .license-renewal .lr-review .ua-review-note { align-self: start; margin-top: 21px; } .license-renewal .lr-review .ua-summary-submit { align-self: end; } }
+@media (max-width: 720px) { .license-renewal .lr-current { grid-template-columns: minmax(0, 1fr); gap: 10px; } .license-renewal .lr-current article { align-items: center; padding: 14px; } .license-renewal .lr-current strong { font-size: 14px; } .license-renewal .lr-review { display: block; } }
