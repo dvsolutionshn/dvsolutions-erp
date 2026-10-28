@@ -672,8 +672,8 @@ class RolSistemaForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         textos = {
             "nombre": ("Nombre del rol", ""),
-            "codigo": ("Codigo interno", "Identificador tecnico del rol, por ejemplo solo-facturas."),
-            "descripcion": ("Descripcion", ""),
+            "codigo": ("Código interno", "Identificador del rol, por ejemplo solo-facturas."),
+            "descripcion": ("Descripción", ""),
             "activo": ("Rol activo", ""),
             "puede_punto_venta": ("Puede entrar a Punto de Venta", "Autoriza el acceso operativo a caja y venta directa."),
             "puede_configuracion_facturacion": ("Puede configurar Facturacion", "Autoriza plantillas, identidad documental y reglas comerciales."),
@@ -755,6 +755,12 @@ class RolSistemaForm(forms.ModelForm):
             for field_name, label in permisos:
                 if field_name in self.fields:
                     self.fields[field_name].label = label
+        self.fields["nombre"].error_messages["required"] = "Escribe un nombre para este rol."
+        self.fields["codigo"].error_messages.update({
+            "required": "Escribe el código interno del rol.",
+            "invalid": "Usa letras, números, guiones o guiones bajos, sin espacios.",
+            "unique": "Ya existe un rol con este código. Elige otro.",
+        })
 
     def save(self, commit=True):
         rol = super().save(commit=False)

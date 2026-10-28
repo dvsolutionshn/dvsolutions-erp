@@ -395,7 +395,7 @@ class SuperAdminControlTests(TestCase):
 
         response = self.client.get(reverse("superadmin_rol_create"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Motor granular del ERP general")
+        self.assertContains(response, "Permisos para el ERP general")
         self.assertContains(response, "id_puede_ver_calendario")
         self.assertContains(response, "id_puede_reversar_asientos")
         self.assertContains(response, "No incluye pacientes, expedientes, recetas, tratamientos")

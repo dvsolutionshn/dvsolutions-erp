@@ -112,6 +112,24 @@ class GeneralErpRoleControlIsolationTests(TestCase):
             404,
         )
 
+    def test_listado_refleja_solo_lectura_y_seleccion_sin_modificar_roles(self):
+        self.erp.solo_lectura_contabilidad = True
+        self.erp.puede_reversar_asientos = True
+        self.erp.activo = False
+        self.erp.save()
+        antes = list(RolSistema.objects.order_by("pk").values())
+        roles_erp = [rol for rol in antes if not rol["es_rol_clinico"]]
+        response = self.client.get(reverse("superadmin_roles"))
+        item = next(item for item in response.context["roles_items"] if item["rol"].pk == self.erp.pk)
+        self.assertEqual(item["total_permisos"], 2)
+        self.assertEqual(item["solo_lectura_count"], 1)
+        self.assertEqual(item["modulos_count"], 2)
+        self.assertIn("Sólo ver Contabilidad", [etiqueta for grupo in item["grupos"] for etiqueta in grupo["permisos"]])
+        self.assertEqual(response.context["resumen_roles"]["permisos_disponibles"], len(TODOS_LOS_PERMISOS_ERP))
+        self.assertEqual(response.context["resumen_roles"]["activos"], sum(rol["activo"] for rol in roles_erp))
+        self.assertEqual(response.context["resumen_roles"]["inactivos"], sum(not rol["activo"] for rol in roles_erp))
+        self.assertEqual(list(RolSistema.objects.order_by("pk").values()), antes)
+
 
 class GeneralErpMiddlewareV3Tests(TestCase):
     def setUp(self):

@@ -1,34 +1,50 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
-{% block title %}Roles{% endblock %}
+{% block title %}Roles y permisos{% endblock %}
+{% block body_class %}user-form-page roles-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
 {% block header_title %}Roles y permisos{% endblock %}
-{% block header_description %}Roles granulares para el ERP general. Los roles médicos de las cuatro clínicas se administran dentro de cada clínica.{% endblock %}
+{% block header_description %}Organiza perfiles de acceso para las personas que utilizan tu ERP.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/roles.css' %}">
+<script src="{% static 'core/roles.js' %}" defer></script>
+{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'superadmin_rol_create' %}" class="erp-action-link">+ Nuevo rol</a>
+<a href="{% url 'superadmin_rol_create' %}" class="ua-btn">+ Nuevo rol</a>
 {% endblock %}
 
 {% block content %}
-<section class="control-catalog-intro">
-    <div><span class="control-eyebrow">Gobierno de acceso ERP</span><h3>Perfiles generales disponibles</h3><p>Facturación, inventario, compras, contabilidad, RR. HH., CRM, agenda y Tecnicentro, sin permisos clínicos.</p></div>
-    <span class="control-catalog-count">{{ roles|length }} rol{{ roles|length|pluralize:"es" }}</span>
-</section>
-
-<section class="control-entity-grid">
-    {% for rol in roles %}
-    <article class="control-entity-card">
-        <header><span class="control-entity-icon role">R</span><span class="erp-badge {% if rol.activo %}success{% else %}danger{% endif %}">{% if rol.activo %}Activo{% else %}Inactivo{% endif %}</span></header>
-        <div class="control-entity-copy"><small>{{ rol.codigo }}</small><h3>{{ rol.nombre }}</h3><p>Perfil reutilizable para usuarios y empresas.</p></div>
-        <div class="control-capability-list">
-            <span class="{% if rol.puede_facturas %}on{% endif %}"><i>F</i>Facturación</span>
-            <span class="{% if rol.puede_inventario or rol.puede_compras %}on{% endif %}"><i>I</i>Inventario</span>
-            <span class="{% if rol.puede_recibos or rol.puede_cxc %}on{% endif %}"><i>C</i>Cobranza</span>
-            <span class="{% if rol.puede_egresos or rol.puede_cxp %}on{% endif %}"><i>P</i>Pagos</span>
+<div class="user-form roles-catalog" data-role-catalog>
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6z"/><path d="m8.5 11.5 2.5 2.5 4.5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><p class="ua-eyebrow">Accesos bien organizados</p><h1>Un rol para cada responsabilidad.</h1><p class="ua-description">Define permisos una vez y reutiliza el perfil donde lo necesites.</p></div></div><span class="ua-mode">ERP general</span></header>
+    <section class="rp-stats" aria-label="Resumen de roles">
+        <article class="rp-stat"><span class="rp-stat-icon" aria-hidden="true">R</span><div><p>Roles en tu catálogo</p><strong>{{ resumen_roles.total }}</strong></div></article>
+        <article class="rp-stat" data-tone="teal"><span class="rp-stat-icon" aria-hidden="true">✓</span><div><p>Roles activos</p><strong>{{ resumen_roles.activos }}</strong></div></article>
+        <article class="rp-stat" data-tone="slate"><span class="rp-stat-icon" aria-hidden="true">Ⅱ</span><div><p>Roles inactivos</p><strong>{{ resumen_roles.inactivos }}</strong></div></article>
+    </section>
+    <section class="ua-panel rp-catalog-panel" aria-labelledby="rp-catalog-title">
+        <div class="rp-catalog-heading"><div><p class="ua-eyebrow">Perfiles reutilizables</p><h2 id="rp-catalog-title">Tu catálogo de roles</h2><p class="ua-description">Consulta los permisos seleccionados y ajusta cada perfil.</p></div><a href="{% url 'superadmin_rol_create' %}" class="ua-btn ua-btn--primary">+ Crear rol</a></div>
+        <div class="rp-catalog-tools" data-role-catalog-tools hidden>
+            <label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" placeholder="Buscar por nombre, código o permiso..." aria-label="Buscar roles" data-role-search autocomplete="off"></label>
+            <div class="rp-status-filter" role="group" aria-label="Filtrar por estado"><button type="button" data-role-state="all" aria-pressed="true">Todos</button><button type="button" data-role-state="active" aria-pressed="false">Activos</button><button type="button" data-role-state="inactive" aria-pressed="false">Inactivos</button></div>
         </div>
-        <a class="control-entity-action" href="{% url 'superadmin_rol_edit' rol.id %}"><span>Editar permisos</span><b>→</b></a>
-    </article>
-    {% empty %}
-    <div class="control-empty-state"><span>R</span><h3>Aún no hay roles definidos</h3><p>Crea perfiles para controlar el acceso de forma ordenada.</p></div>
-    {% endfor %}
-</section>
+        <div class="rp-cards">
+            {% for item in roles_items %}
+            <article class="rp-card" data-role-card data-role-active="{{ item.rol.activo|yesno:'active,inactive' }}">
+                <div class="rp-card-head"><span class="rp-card-icon" aria-hidden="true">{{ item.rol.nombre|first|upper }}</span><span class="rp-status{% if not item.rol.activo %} is-inactive{% endif %}"><i aria-hidden="true"></i>{{ item.rol.activo|yesno:'Activo,Inactivo' }}</span></div>
+                <div class="rp-card-copy"><span class="rp-code">{{ item.rol.codigo }}</span><h3>{{ item.rol.nombre }}</h3><p>{{ item.rol.descripcion|default:'Perfil reutilizable para usuarios y empresas.' }}</p></div>
+                <div class="rp-card-metrics"><span><strong>{{ item.total_permisos }}</strong> permiso{{ item.total_permisos|pluralize }} seleccionado{{ item.total_permisos|pluralize }}</span><span><strong>{{ item.modulos_count }}</strong> grupo{{ item.modulos_count|pluralize }}</span></div>
+                <div class="rp-card-modules" aria-label="Grupos con selección">{% for grupo in item.grupos|slice:':3' %}<span>{{ grupo.nombre }}</span>{% empty %}<span>Sin permisos seleccionados</span>{% endfor %}{% if item.modulos_count > 3 %}<span>+{{ item.modulos_count|add:'-3' }}</span>{% endif %}</div>
+                {% if item.grupos %}<details class="rp-card-detail"><summary>Ver permisos seleccionados <svg class="ua-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary><div>{% for grupo in item.grupos %}<section><h4>{{ grupo.nombre }}</h4><ul>{% for permiso in grupo.permisos %}<li>{{ permiso }}</li>{% endfor %}</ul></section>{% endfor %}</div></details>{% endif %}
+                <a class="rp-card-action" href="{% url 'superadmin_rol_edit' item.rol.id %}">Editar rol y permisos <span aria-hidden="true">→</span></a>
+            </article>
+            {% empty %}<div class="ua-empty rp-empty"><span class="rp-empty-icon" aria-hidden="true">R</span><h3>Tu primer rol empieza aquí</h3><p>Crea un perfil y selecciona las acciones que podrá realizar tu equipo.</p><a href="{% url 'superadmin_rol_create' %}" class="ua-btn ua-btn--primary">+ Crear primer rol</a></div>{% endfor %}
+        </div>
+        <div class="ua-empty" data-role-no-results hidden><h3>No encontramos ese rol</h3><p>Prueba con otro nombre o cambia el filtro de estado.</p><button type="button" class="ua-btn ua-btn--quiet" data-role-reset>Mostrar todos</button></div>
+        <p class="rp-results" role="status" aria-live="polite" data-role-results>{{ roles_items|length }} roles en el catálogo.</p>
+    </section>
+    <p class="rp-scope-note">Catálogo del ERP general. Los roles clínicos se administran en Configuración de cada clínica. La asignación de acceso a cada usuario se mantiene por empresa.</p>
+</div>
 {% endblock %}

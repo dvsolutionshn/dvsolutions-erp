@@ -2326,9 +2326,42 @@ def superadmin_plan_edit(request, plan_id):
 @superadmin_required
 def superadmin_roles(request):
     roles = RolSistema.objects.filter(es_rol_clinico=False).order_by("nombre")
+    roles_items = []
+    for rol in roles:
+        grupos = []
+        solo_lectura_count = 0
+        for nombre, permisos in PERMISOS_ERP:
+            seleccionados = []
+            for campo, etiqueta in permisos:
+                if bool(getattr(rol, campo, False)):
+                    seleccionados.append(etiqueta)
+                    if campo.startswith("solo_lectura_"):
+                        solo_lectura_count += 1
+            if seleccionados:
+                grupos.append({
+                    "nombre": nombre,
+                    "permisos": seleccionados,
+                    "cantidad": len(seleccionados),
+                })
+        roles_items.append({
+            "rol": rol,
+            "total_permisos": sum(grupo["cantidad"] for grupo in grupos),
+            "grupos": grupos,
+            "modulos_count": len(grupos),
+            "solo_lectura_count": solo_lectura_count,
+        })
+    total = len(roles_items)
+    activos = sum(1 for item in roles_items if item["rol"].activo)
     context = {
         **_superadmin_base_context(),
         "roles": roles,
+        "roles_items": roles_items,
+        "resumen_roles": {
+            "total": total,
+            "activos": activos,
+            "inactivos": total - activos,
+            "permisos_disponibles": sum(len(permisos) for _, permisos in PERMISOS_ERP),
+        },
     }
     return render(request, "core/superadmin_roles.html", context)
 

@@ -1,55 +1,60 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}{{ titulo }}{% endblock %}
-{% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Motor granular del ERP general. Las cuatro empresas clínicas conservan su catálogo médico independiente.{% endblock %}
+{% block body_class %}user-form-page roles-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
+{% block header_title %}Roles y permisos{% endblock %}
+{% block header_description %}Configura los permisos del ERP general y reutiliza el perfil en tus empresas.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/roles.css' %}">
+<script src="{% static 'core/roles.js' %}" defer></script>
+{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'superadmin_roles' %}" class="erp-action-link">Volver a Roles</a>
+<a href="{% url 'superadmin_roles' %}" class="ua-btn">Volver a roles</a>
 {% endblock %}
 
 {% block content %}
-<style>
-.erp-role-scope{margin-bottom:18px;padding:16px 18px;border:1px solid #bfdae7;border-radius:14px;background:#f2f9fc;color:#37566a;font-size:12px;line-height:1.6}.erp-role-groups{display:grid;gap:18px}.erp-role-group h3{margin-bottom:4px}.erp-role-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.erp-role-option{display:grid;grid-template-columns:auto minmax(0,1fr);gap:11px;align-items:start;padding:14px;border:1px solid #d8e2e8;border-radius:12px;background:#fff}.erp-role-option input{width:19px!important;height:19px;margin:1px 0 0;padding:0!important;accent-color:#2878d0}.erp-role-option strong{display:block;color:#263e50;font-size:12px}.erp-role-option small{display:block;margin-top:4px;color:#70808c;font-size:10px;line-height:1.45}.erp-role-option:has(input:checked){border-color:#83b9d2;background:#f4fbfe}.erp-role-option.critical{border-color:#efc7c4;background:#fff8f7}.erp-role-option.critical strong{color:#9f2720}@media(max-width:800px){.erp-role-options{grid-template-columns:1fr}}
-</style>
-<form method="post" class="erp-form-shell">
+<form method="post" class="user-form roles-editor" data-role-editor>
     {% csrf_token %}
-    <section class="erp-form-card">
-        <h3>Perfil del rol ERP</h3>
-        <div class="erp-form-grid">
-            {% for field in form %}
-                {% if field.name == 'nombre' or field.name == 'codigo' or field.name == 'descripcion' or field.name == 'activo' %}
-                <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}{{ field.errors }}
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6z"/><path d="m8.5 11.5 2.5 2.5 4.5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><p class="ua-eyebrow">Permisos para el ERP general</p><h1>{% if form.instance.pk %}Editar rol{% else %}Nuevo rol{% endif %}</h1><p class="ua-description">Selecciona las acciones que corresponden a esta responsabilidad.</p></div></div><span class="ua-mode">{% if form.instance.pk %}Editando perfil{% else %}Nuevo perfil{% endif %}</span></header>
+    {% if form.errors %}<section class="ua-errors" role="alert" tabindex="-1" data-role-errors><h2>Revisa los campos señalados</h2><p>Conservamos la selección de permisos para que puedas corregirla.</p>{{ form.non_field_errors }}<div class="ua-error-links">{% for field in form.visible_fields %}{% if field.errors %}<a href="#{{ field.id_for_label }}">Revisar {{ field.label|lower }}</a>{% endif %}{% endfor %}</div>{% for field in form.hidden_fields %}{{ field.errors }}{% endfor %}</section>{% endif %}
+    <div class="ua-layout">
+        <div class="ua-main">
+            <section class="ua-panel" aria-labelledby="rp-profile-title"><div class="ua-panel-head"><span class="ua-section-number">01</span><div><h2 id="rp-profile-title">Datos del rol</h2><p>Un nombre claro ayuda a elegir el perfil correcto.</p></div></div><div class="ua-fields">
+                {% include 'core/includes/user_form_field.html' with field=form.nombre only %}
+                {% include 'core/includes/user_form_field.html' with field=form.codigo only %}
+                {% include 'core/includes/user_form_field.html' with field=form.descripcion full=True only %}
+            </div></section>
+            <section class="ua-panel rp-permissions" aria-labelledby="rp-permissions-title">
+                <div class="ua-panel-head"><span class="ua-section-number" data-tone="teal">02</span><div><h2 id="rp-permissions-title">¿Qué puede hacer este rol?</h2><p>Cada casilla es independiente. Las acciones sin marcar quedan sin autorización.</p></div></div>
+                <div class="rp-readonly-note"><span aria-hidden="true">✓</span><div><strong>También puedes dar acceso de sólo lectura</strong><p>“Sólo ver” permite consultar y bloquea los cambios en ese módulo, aunque marques una acción de escritura.</p></div></div>
+                <div class="rp-permission-tools" data-role-permission-tools hidden>
+                    <label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" placeholder="Buscar módulo o acción..." aria-label="Buscar permisos del rol" data-role-permission-search autocomplete="off"></label>
+                    <label class="rp-module-select"><span class="rp-sr-only">Filtrar por módulo</span><select aria-label="Filtrar permisos por módulo" data-role-module-filter><option value="">Todos los módulos</option>{% for grupo in grupos %}<option value="{{ forloop.counter0 }}">{{ grupo.nombre }}</option>{% endfor %}</select></label>
                 </div>
-                {% endif %}
-            {% endfor %}
+                <div class="rp-permission-groups">
+                    {% for grupo in grupos %}<details class="rp-permission-group" data-role-group="{{ forloop.counter0 }}" id="rp-module-{{ forloop.counter0 }}" {% if forloop.first %}open{% endif %}>
+                        <summary><span data-role-group-name>{{ grupo.nombre }}</span><span class="ua-module-count" data-role-group-count>0/{{ grupo.permisos|length }}</span><svg class="ua-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary>
+                        <div class="rp-permission-grid">{% for permiso in grupo.permisos %}<label class="rp-permission-option{% if 'eliminar' in permiso.campo or 'anular' in permiso.campo or 'revertir' in permiso.campo or 'reversar' in permiso.campo %} is-critical{% endif %}" for="{{ permiso.field.id_for_label }}" data-role-permission>{{ permiso.field }}<span><strong>{{ permiso.etiqueta }}</strong>{% if permiso.field.help_text %}<small>{{ permiso.field.help_text }}</small>{% endif %}{{ permiso.field.errors }}</span></label>{% endfor %}</div>
+                    </details>{% endfor %}
+                </div>
+                <div class="ua-empty" data-role-permission-empty hidden>No encontramos acciones con ese filtro.<button type="button" class="ua-btn ua-btn--quiet" data-role-permission-reset>Mostrar todos los permisos</button></div>
+                <p class="rp-results" role="status" aria-live="polite" data-role-permission-results>Los filtros sólo cambian lo que ves; la selección se conserva.</p>
+            </section>
+            <p class="rp-scope-note">Este catálogo incluye las acciones del ERP general. No incluye pacientes, expedientes, recetas, tratamientos ni ninguna acción clínica.</p>
         </div>
-    </section>
-
-    <div class="erp-role-scope"><strong>Alcance del catálogo:</strong> Facturación, inventario, compras, notas de crédito, proveedores, clientes, configuración fiscal, contabilidad, RR. HH., CRM, agenda y Tecnicentro. No incluye pacientes, expedientes, recetas, tratamientos ni ninguna acción clínica.</div>
-
-    <div class="erp-role-groups">
-        {% for grupo in grupos %}
-        <section class="erp-form-card erp-role-group">
-            <h3>{{ grupo.nombre }}</h3>
-            <p>Si no se selecciona una acción, el usuario no podrá verla ni ejecutarla.</p>
-            <div class="erp-role-options">
-                {% for permiso in grupo.permisos %}
-                <label class="erp-role-option {% if 'eliminar' in permiso.campo or 'anular' in permiso.campo or 'revertir' in permiso.campo %}critical{% endif %}" for="{{ permiso.field.id_for_label }}">
-                    {{ permiso.field }}
-                    <span><strong>{{ permiso.etiqueta }}</strong>{% if permiso.field.help_text %}<small>{{ permiso.field.help_text }}</small>{% endif %}{{ permiso.field.errors }}</span>
-                </label>
-                {% endfor %}
-            </div>
-        </section>
-        {% endfor %}
+        <aside class="ua-sidebar" aria-label="Resumen del rol"><section class="ua-panel rp-role-review"><p class="ua-eyebrow">Antes de guardar</p><h2>Así quedará este perfil</h2><div class="rp-review-identity"><span class="rp-card-icon" aria-hidden="true">R</span><div><strong data-role-name-preview>{{ form.nombre.value|default:'Nuevo rol' }}</strong><span data-role-code-preview>{{ form.codigo.value|default:'Código por definir' }}</span></div></div>
+            <div class="ua-toggle-item rp-active-toggle"><label for="{{ form.activo.id_for_label }}">{{ form.activo }}<span><strong>{{ form.activo.label }}</strong><small data-role-state-note>Habilita el perfil para las personas que lo tengan asignado.</small></span></label>{{ form.activo.errors }}</div>
+            <div class="rp-selected-total"><strong data-role-selected-total>0</strong><span data-role-selected-caption>permisos seleccionados</span><small>de <span data-role-available-total>0</span> disponibles</small></div>
+            <div class="rp-review-modules"><p class="ua-review-label">Grupos con selección <span data-role-selected-groups>0</span></p><ul>{% for grupo in grupos %}<li data-role-summary-group="{{ forloop.counter0 }}" hidden><button type="button" data-role-open-group="{{ forloop.counter0 }}"><span>{{ grupo.nombre }}</span><b data-role-summary-count>0</b></button></li>{% endfor %}</ul><p class="ua-note" data-role-selection-empty>Aún no has seleccionado permisos.</p></div>
+            <div class="rp-shared-note"><strong>{% if form.instance.pk %}Un perfil compartido{% else %}Listo para reutilizar{% endif %}</strong><p>{% if form.instance.pk %}Los cambios se aplicarán a quienes tengan asignado este rol. Los permisos personalizados se conservan por separado.{% else %}Después de guardarlo, podrás asignarlo a usuarios en las empresas correspondientes.{% endif %}</p></div>
+            <button type="submit" class="ua-btn ua-btn--primary ua-summary-submit">{% if form.instance.pk %}Guardar cambios{% else %}Crear rol{% endif %}<span aria-hidden="true">→</span></button>
+        </section></aside>
     </div>
-
-    <div class="erp-form-actions">
-        <a href="{% url 'superadmin_roles' %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Rol ERP</button>
-    </div>
+    <footer class="ua-actions-bar"><p><span class="ua-save-icon" aria-hidden="true">✓</span>Revisa las acciones seleccionadas antes de guardar.</p><div><a href="{% url 'superadmin_roles' %}" class="ua-btn ua-btn--quiet">Cancelar</a><button type="submit" class="ua-btn ua-btn--primary">{% if form.instance.pk %}Guardar cambios{% else %}Crear rol{% endif %}<span aria-hidden="true">→</span></button></div></footer>
 </form>
 {% endblock %}
