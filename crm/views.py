@@ -26,7 +26,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 
 from core.access import interfaz_clinica_activa
 from core.models import Empresa
-from core.clinical_permissions import rol_clinico_v2
+from core.clinical_permissions import rol_acciones_v3, rol_clinico_v2
 from contabilidad.models import CuentaFinanciera
 from contabilidad.services import asegurar_cuentas_financieras_base_honduras
 from facturacion.models import (
@@ -151,7 +151,7 @@ def _profesional_pertenece_agenda_espejo(profesional, empresa):
 
 
 def _puede_gestionar_bloqueos_otros(user, empresa):
-    rol_v2 = rol_clinico_v2(user, empresa)
+    rol_v2 = rol_clinico_v2(user, empresa) or rol_acciones_v3(user, empresa)
     return bool(
         user.is_authenticated
         and user.puede_acceder_empresa(empresa)
@@ -187,7 +187,7 @@ def _puede_gestionar_bloqueo(user, empresa, profesional):
 
 def _limitar_campos_especiales_cita(request, empresa, form):
     """Impide alterar pago/cortesía incluso mediante un POST construido a mano."""
-    if not rol_clinico_v2(request.user, empresa):
+    if not (rol_clinico_v2(request.user, empresa) or rol_acciones_v3(request.user, empresa)):
         return
     for campo, permiso in (
         ("pagada", "puede_marcar_citas_pagadas"),
@@ -212,6 +212,7 @@ def _proteger_agenda_mobile(request, empresa):
         return HttpResponse("Acceso no autorizado.", status=403)
     tiene_acceso_app = (
         request.user.tiene_permiso_erp("puede_citas", empresa)
+        or (rol_acciones_v3(request.user, empresa) and request.user.tiene_permiso_erp("puede_ver_calendario", empresa))
         or request.user.tiene_alguna_permision_facturacion_empresa(empresa)
         or request.user.tiene_alguna_permision_clinica_empresa(empresa)
     )
@@ -591,7 +592,7 @@ def _contexto_calendario(
         bloqueos_qs = bloqueos_qs.filter(profesional_id=int(filtro_profesional))
     bloqueos = list(bloqueos_qs)
     puede_gestionar_otros_bloqueos = _puede_gestionar_bloqueos_otros(request.user, empresa_agenda)
-    rol_v2 = rol_clinico_v2(request.user, empresa)
+    rol_v2 = rol_clinico_v2(request.user, empresa) or rol_acciones_v3(request.user, empresa)
     puede_crear_bloqueos = bool(
         not rol_v2 or request.user.tiene_permiso_erp("puede_crear_bloqueos_agenda", empresa)
     )
@@ -2121,6 +2122,7 @@ def agenda_mobile(request, empresa_slug):
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto, usuario=request.user)
+    _limitar_campos_especiales_cita(request, empresa, form)
     if request.method == "POST" and form.is_valid():
         try:
             cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)

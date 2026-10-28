@@ -77,6 +77,10 @@ def _estado(usuario, empresa, *, bloquear=False):
     if bloquear:
         asignaciones = asignaciones.select_for_update()
     asignacion = asignaciones.first()
+    if asignacion and asignacion.activo and asignacion.permisos_personalizados is not None:
+        from .user_permissions import rol_desde_permisos_personalizados
+
+        return asignacion, rol_desde_permisos_personalizados(empresa, asignacion.permisos_personalizados)
     rol_id = asignacion.rol_sistema_id if asignacion and asignacion.activo else usuario.rol_sistema_id
     roles = RolSistema.objects.select_for_update() if bloquear else RolSistema.objects.all()
     rol = get_object_or_404(roles, pk=rol_id) if rol_id else None
@@ -97,6 +101,7 @@ def _digest(actor, empresa, usuario, asignacion, rol):
         },
         "asignacion": None if asignacion is None else {
             "id": asignacion.pk, "rol": asignacion.rol_sistema_id, "activo": asignacion.activo,
+            "permisos_personalizados": asignacion.permisos_personalizados,
             "fecha": asignacion.fecha_actualizacion.isoformat(),
         },
         "rol": None if rol is None else {
@@ -250,7 +255,8 @@ def gestionar_permisos_usuario_app(request, empresa, usuario_id):
                 else:
                     asignacion.rol_sistema = copia
                     asignacion.activo = True
-                    asignacion.save(update_fields=["rol_sistema", "activo", "fecha_actualizacion"])
+                    asignacion.permisos_personalizados = None
+                    asignacion.save(update_fields=["rol_sistema", "activo", "permisos_personalizados", "fecha_actualizacion"])
                 _registrar_cambio_permisos(request, empresa_actual, usuario, asignacion, rol, copia, anteriores, nuevos)
             else:
                 messages.info(request, "Los permisos ya coincidían; no se realizaron cambios.")

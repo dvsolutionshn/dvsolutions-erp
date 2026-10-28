@@ -68,6 +68,7 @@ from .clinical_permissions import (
     TODOS_LOS_PERMISOS_CLINICOS,
     PERMISOS_CLINICOS_LEGADOS,
 )
+from .user_permissions import catalogo_permisos_empresa, seleccion_permisos_empresa
 
 
 HOST_LOCAL_PATTERNS = {
@@ -346,31 +347,71 @@ def _usuario_empresas_config(form, request):
     usuario = getattr(form, "instance", None)
     if usuario and usuario.pk:
         permisos_actuales = {
-            permiso.empresa_id: permiso.rol_sistema_id
-            for permiso in usuario.permisos_por_empresa.filter(activo=True)
+            permiso.empresa_id: permiso
+            for permiso in usuario.permisos_por_empresa.filter(activo=True).select_related("rol_sistema")
         }
 
     config = []
     for empresa in empresas:
         posted_role = request.POST.get(f"empresa_rol_{empresa.id}") if request.method == "POST" else None
+        asignacion = permisos_actuales.get(empresa.id)
+        personalizado = bool(asignacion and asignacion.permisos_personalizados is not None)
+        modo_inicial = "personalizado" if personalizado or not usuario.pk else "rol"
+        modo = request.POST.get(f"empresa_modo_permisos_{empresa.pk}", modo_inicial) if request.method == "POST" else modo_inicial
+        if request.method == "POST":
+            seleccion = set(seleccion_permisos_empresa(request.POST, empresa.pk))
+        elif personalizado:
+            valores = asignacion.permisos_personalizados
+            seleccion = {campo for campo, activo in valores.items() if activo is True} if isinstance(valores, dict) else set()
+        else:
+            rol = asignacion.rol_sistema if asignacion else usuario.rol_sistema
+            seleccion = {
+                campo for _, permisos in catalogo_permisos_empresa(empresa)
+                for campo, _ in permisos if rol and getattr(rol, campo, False)
+            }
         config.append({
             "empresa": empresa,
             "seleccionada": empresa.id in seleccionadas,
-            "rol_id": int(posted_role) if posted_role and posted_role.isdigit() else permisos_actuales.get(empresa.id),
+            "rol_id": int(posted_role) if posted_role and posted_role.isdigit() else (asignacion.rol_sistema_id if asignacion else None),
             "roles": roles_clinicos if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES else roles_erp,
             "catalogo": "Clínica" if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES else "ERP",
+            "modo_permisos": modo,
+            "grupos_permisos": [
+                {"nombre": nombre, "permisos": [
+                    {"campo": campo, "etiqueta": etiqueta, "activo": campo in seleccion}
+                    for campo, etiqueta in permisos
+                ]}
+                for nombre, permisos in catalogo_permisos_empresa(empresa)
+            ],
         })
     return {"empresas_config": config}
 
 
 def _guardar_roles_por_empresa(usuario, post_data):
-    empresas_ids = {int(valor) for valor in post_data.getlist("empresas_acceso") if valor.isdigit()}
+    empresas_ids = set(usuario.empresas_acceso.values_list("id", flat=True))
     if usuario.empresa_id:
         empresas_ids.add(usuario.empresa_id)
 
     UsuarioEmpresaPermiso.objects.filter(usuario=usuario).exclude(empresa_id__in=empresas_ids).delete()
     empresas = {empresa.id: empresa for empresa in Empresa.objects.filter(id__in=empresas_ids)}
     for empresa_id in empresas_ids:
+        modo = post_data.get(f"empresa_modo_permisos_{empresa_id}")
+        if modo == "personalizado":
+            permitidos = {campo for _, grupo in catalogo_permisos_empresa(empresas[empresa_id]) for campo, _ in grupo}
+            seleccion = set(seleccion_permisos_empresa(post_data, empresa_id))
+            if seleccion - permitidos:
+                raise ValidationError("El catálogo no admite los permisos seleccionados.")
+            UsuarioEmpresaPermiso.objects.update_or_create(
+                usuario=usuario, empresa_id=empresa_id,
+                defaults={"rol_sistema": None, "activo": True,
+                          "permisos_personalizados": {campo: True for campo in sorted(seleccion)}},
+            )
+            continue
+        if modo is not None and modo != "rol":
+            raise ValidationError("Modo de permisos no válido.")
+        if modo is None and f"empresa_rol_{empresa_id}" not in post_data:
+            # Un cliente anterior que no envía esta sección no borra la selección individual.
+            continue
         rol_id = post_data.get(f"empresa_rol_{empresa_id}")
         if rol_id and str(rol_id).isdigit():
             empresa = empresas.get(empresa_id)
@@ -382,7 +423,7 @@ def _guardar_roles_por_empresa(usuario, post_data):
                 UsuarioEmpresaPermiso.objects.update_or_create(
                     usuario=usuario,
                     empresa_id=empresa_id,
-                    defaults={"rol_sistema": rol, "activo": True},
+                    defaults={"rol_sistema": rol, "activo": True, "permisos_personalizados": None},
                 )
             else:
                 UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa_id=empresa_id).delete()
@@ -1614,8 +1655,7 @@ def usuario_clinico_permisos(request, slug, usuario_id):
     usuario = get_object_or_404(_usuarios_operativos_de_empresa(empresa), pk=usuario_id)
     if modo_app:
         validar_usuarios_app(empresa, usuario_id)
-    asignacion = UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa=empresa).first()
-    rol_actual = asignacion.rol_sistema if asignacion and asignacion.activo else usuario.rol_para_empresa(empresa)
+    rol_actual = usuario.rol_para_empresa(empresa)
     roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
 
     if request.method == "POST":
@@ -1624,7 +1664,7 @@ def usuario_clinico_permisos(request, slug, usuario_id):
         UsuarioEmpresaPermiso.objects.update_or_create(
             usuario=usuario,
             empresa=empresa,
-            defaults={"rol_sistema": rol, "activo": True},
+            defaults={"rol_sistema": rol, "activo": True, "permisos_personalizados": None},
         )
         nombre_usuario = usuario.get_full_name().strip() or usuario.username
         messages.success(
@@ -2201,6 +2241,13 @@ def superadmin_usuarios(request):
         "groups",
         "empresas_acceso",
         Prefetch(
+            "permisos_por_empresa",
+            queryset=UsuarioEmpresaPermiso.objects.filter(
+                activo=True, permisos_personalizados__isnull=False,
+            ).select_related("empresa"),
+            to_attr="permisos_individuales_empresas",
+        ),
+        Prefetch(
             "tokens_acceso",
             queryset=TokenAccesoUsuario.objects.filter(
                 tipo=TokenAccesoUsuario.TIPO_INVITACION
@@ -2430,8 +2477,9 @@ def superadmin_rol_edit(request, rol_id):
 def superadmin_usuario_create(request):
     form = UsuarioControlCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        usuario = form.save()
-        _guardar_roles_por_empresa(usuario, request.POST)
+        with transaction.atomic():
+            usuario = form.save()
+            _guardar_roles_por_empresa(usuario, request.POST)
         if form.cleaned_data["modo_creacion"] == UsuarioControlCreateForm.MODO_RAPIDO:
             messages.success(
                 request,

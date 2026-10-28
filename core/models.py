@@ -703,10 +703,16 @@ class Usuario(AbstractUser):
         permiso_empresa = (
             self.permisos_por_empresa
             .filter(empresa_id=empresa_id, activo=True)
-            .select_related("rol_sistema")
+            .select_related("rol_sistema", "empresa")
             .first()
         )
         if permiso_empresa:
+            if permiso_empresa.permisos_personalizados is not None:
+                from .user_permissions import rol_desde_permisos_personalizados
+
+                return rol_desde_permisos_personalizados(
+                    permiso_empresa.empresa, permiso_empresa.permisos_personalizados,
+                )
             return permiso_empresa.rol_sistema
         return self.rol_sistema
 
@@ -792,6 +798,7 @@ class UsuarioEmpresaPermiso(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="permisos_por_empresa")
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="permisos_usuarios")
     rol_sistema = models.ForeignKey(RolSistema, on_delete=models.PROTECT, related_name="permisos_empresa_usuario", null=True, blank=True)
+    permisos_personalizados = models.JSONField(null=True, blank=True, default=None)
     activo = models.BooleanField(default=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -802,7 +809,9 @@ class UsuarioEmpresaPermiso(models.Model):
         verbose_name_plural = "Permisos de usuarios por empresa"
 
     def __str__(self):
-        rol = self.rol_sistema.nombre if self.rol_sistema else "Sin rol"
+        rol = "Permisos personalizados" if self.permisos_personalizados is not None else (
+            self.rol_sistema.nombre if self.rol_sistema else "Sin rol"
+        )
         return f"{self.usuario.email or self.usuario.username} - {self.empresa.nombre}: {rol}"
 
 

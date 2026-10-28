@@ -209,6 +209,7 @@ def render_usuario_permisos_app(request, empresa, contexto):
         "app_user_permissions_back_url": url_usuarios_app("usuarios_clinicos", empresa),
         "mobile_user_role_in_choices": actual_en_catalogo,
         "mobile_user_role_requires_selection": bool(rol_actual is not None and not actual_en_catalogo),
+        "mobile_user_role_is_personalized": bool(rol_actual is not None and rol_actual.pk is None),
         "can_edit_user_clinical_permissions": permisos_usuario_editables_app(request, empresa, rol_actual),
         "app_user_permissions_edit_url": (
             url_editar_permisos_usuario_app(empresa, usuario)

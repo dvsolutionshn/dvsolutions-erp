@@ -45,6 +45,6 @@ class Command(BaseCommand):
                 defaults={'nombre': f'Permisos de {usuario.username} - {empresa.nombre}'[:120], 'activo': True, **valores},
             )
             UsuarioEmpresaPermiso.objects.update_or_create(
-                usuario=usuario, empresa=empresa, defaults={'rol_sistema': rol, 'activo': True},
+                usuario=usuario, empresa=empresa, defaults={'rol_sistema': rol, 'activo': True, 'permisos_personalizados': None},
             )
             self.stdout.write(self.style.SUCCESS(f'Permisos habilitados: usuario {usuario.pk}, empresa {empresa.pk}'))

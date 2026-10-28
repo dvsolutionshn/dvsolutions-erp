@@ -16,6 +16,7 @@ from .clinical_permissions import (
     TODOS_LOS_PERMISOS_ERP,
 )
 from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
+from .user_permissions import validar_permisos_usuario
 
 
 class SuperAdminLoginForm(forms.Form):
@@ -351,7 +352,7 @@ class UsuarioControlCreateForm(forms.ModelForm):
             "email": ("Correo electronico", "La invitacion y el acceso al ERP se realizaran con este correo."),
             "empresa": ("Empresa principal", "Empresa principal del usuario; tambien se agregara a sus empresas permitidas."),
             "empresas_acceso": ("Empresas permitidas", "Selecciona las empresas adicionales donde podra ingresar con la misma cuenta."),
-            "rol_sistema": ("Rol del sistema", "Perfil funcional que define a que areas del ERP podra entrar."),
+            "rol_sistema": ("Rol global opcional", "Se usa en las empresas que elijan usar el rol global. Puedes dejarlo vacío y configurar las casillas de cada empresa abajo."),
             "es_administrador_empresa": ("Es administrador de empresa", "Activalo solo si esta persona puede ver todo dentro de su empresa."),
             "modo_clinico_simple": ("Modo clinico simple", "Oculta los modulos administrativos y deja una bienvenida directa a Clinica y Facturacion."),
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si realmente quieres permitir acceso al admin tecnico."),
@@ -385,9 +386,14 @@ class UsuarioControlCreateForm(forms.ModelForm):
                 self.add_error("email", "Ya existe un usuario con este correo en alguna de las empresas permitidas.")
 
         rol = cleaned_data.get("rol_sistema")
-        if empresa and rol and rol.es_rol_clinico != (empresa.slug in EMPRESAS_CLINICAS_CON_ROLES):
+        if (
+            empresa and rol
+            and self.data.get(f"empresa_modo_permisos_{empresa.pk}") != "personalizado"
+            and rol.es_rol_clinico != (empresa.slug in EMPRESAS_CLINICAS_CON_ROLES)
+        ):
             self.add_error("rol_sistema", "El rol global debe corresponder al catálogo ERP o Clínica de la empresa principal.")
 
+        validar_permisos_usuario(self, cleaned_data)
         if cleaned_data.get("modo_creacion") != self.MODO_RAPIDO:
             return cleaned_data
 
@@ -493,7 +499,7 @@ class UsuarioControlUpdateForm(forms.ModelForm):
             "email": ("Correo electronico", ""),
             "empresa": ("Empresa principal", "Empresa principal del usuario; tambien se mantiene entre sus empresas permitidas."),
             "empresas_acceso": ("Empresas permitidas", "Selecciona las empresas adicionales donde podra ingresar con la misma cuenta."),
-            "rol_sistema": ("Rol del sistema", "Perfil funcional que determina a que secciones puede entrar."),
+            "rol_sistema": ("Rol global opcional", "Se usa en las empresas que elijan usar el rol global. Las casillas personalizadas reemplazan ese rol únicamente en su empresa."),
             "es_administrador_empresa": ("Es administrador de empresa", "Si esta activo, el usuario podra operar toda su empresa."),
             "modo_clinico_simple": ("Modo clinico simple", "Ideal para doctoras: muestra solo Clinica, pacientes y Facturacion en la pantalla principal."),
             "is_active": ("Usuario activo", "Si lo desactivas, la cuenta queda bloqueada sin borrar el historial."),
@@ -526,8 +532,13 @@ class UsuarioControlUpdateForm(forms.ModelForm):
             ).exclude(pk=self.instance.pk).distinct().exists():
                 self.add_error("email", "Ya existe otro usuario con este correo en alguna de las empresas permitidas.")
         rol = cleaned_data.get("rol_sistema")
-        if empresa and rol and rol.es_rol_clinico != (empresa.slug in EMPRESAS_CLINICAS_CON_ROLES):
+        if (
+            empresa and rol
+            and self.data.get(f"empresa_modo_permisos_{empresa.pk}") != "personalizado"
+            and rol.es_rol_clinico != (empresa.slug in EMPRESAS_CLINICAS_CON_ROLES)
+        ):
             self.add_error("rol_sistema", "El rol global debe corresponder al catálogo ERP o Clínica de la empresa principal.")
+        validar_permisos_usuario(self, cleaned_data)
         password1 = cleaned_data.get("password1") or ""
         password2 = cleaned_data.get("password2") or ""
         if password1 or password2:
