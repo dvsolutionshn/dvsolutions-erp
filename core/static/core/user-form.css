@@ -1,0 +1,184 @@
+/* Shared visual language with the accounting forms, scoped to user editing. */
+body.user-form-page { background: #f5f7fb; overflow-x: clip; overflow-y: visible; }
+.user-form-page .erp-shell, .user-form-page .erp-main { background: #f5f7fb; overflow: visible; }
+.user-form-page .erp-main { min-width: 0; padding: 24px; }
+.user-form-page .erp-content { background: transparent; min-width: 0; animation: none; }
+.user-form-page .erp-topbar { align-items: center; background: #fff; border: 1px solid #e4ebf2; border-radius: 15px; box-shadow: none; backdrop-filter: none; margin-bottom: 24px; padding: 16px 21px; }
+.user-form-page .erp-topbar::before { display: none; }
+.user-form-page .erp-topbar-kicker { color: #77869b; font-size: 10px; letter-spacing: .11em; }
+.user-form-page .erp-topbar h2 { color: #253a52; font-size: 19px; letter-spacing: -.035em; }
+.user-form-page .erp-topbar p { color: #718299; font-size: 12px; line-height: 1.5; }
+.user-form-page .erp-user-chip { background: #f7f9fc; border: 1px solid #e4ebf2; border-radius: 9px; color: #60748b; font-size: 11px; box-shadow: none; }
+.user-form { --ua-ink: #253a52; --ua-muted: #617187; --ua-line: #e4ebf2; --ua-purple: #6461ce; color: var(--ua-ink); display: grid; gap: 20px; margin: 0 auto; max-width: 1600px; min-width: 0; width: 100%; }
+.user-form *, .user-form *::before, .user-form *::after { box-sizing: border-box; }
+.user-form [hidden] { display: none !important; }
+.user-form :is(h1, h2, h3, p) { margin: 0; }
+.user-form :is(input, select, button, summary) { font-family: inherit; }
+.user-form a { text-decoration: none; }
+.user-form :is(a, button, input, select, summary):focus-visible, .user-form-page .ua-btn:focus-visible { outline: 3px solid #aaa7e8; outline-offset: 3px; }
+.user-form .ua-intro { align-items: center; display: flex; gap: 18px; justify-content: space-between; padding: 7px 0 2px; }
+.user-form .ua-intro-main { align-items: center; display: flex; gap: 15px; min-width: 0; }
+.user-form .ua-hero-icon { align-items: center; background: #eeedfc; border: 1px solid #e0ddf8; border-radius: 15px; color: var(--ua-purple); display: flex; flex: 0 0 54px; height: 54px; justify-content: center; }
+.user-form .ua-hero-icon svg { width: 29px; height: 29px; }
+.user-form .ua-eyebrow { color: #7c8a9e; font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.user-form h1 { color: #22374f; font-size: clamp(26px, 2.1vw, 33px); font-weight: 750; letter-spacing: -.045em; line-height: 1.3; margin: 3px 0; }
+.user-form .ua-description { color: var(--ua-muted); font-size: 13px; line-height: 1.65; }
+.user-form .ua-mode { background: #eef7f4; border: 1px solid #d5eae1; border-radius: 22px; color: #358471; flex-shrink: 0; font-size: 11px; font-weight: 650; padding: 8px 12px; }
+.user-form .ua-steps { display: flex; flex-wrap: wrap; gap: 9px; padding-bottom: 1px; }
+.user-form .ua-steps a { align-items: center; background: #fff; border: 1px solid var(--ua-line); border-radius: 9px; color: #63768d; display: inline-flex; font-size: 12px; gap: 8px; padding: 9px 12px; }
+.user-form .ua-steps a:hover { border-color: #c6c2ec; color: var(--ua-purple); }
+.user-form .ua-steps a span { align-items: center; background: #f0effa; border-radius: 6px; color: var(--ua-purple); display: inline-flex; font-size: 10px; font-weight: 750; height: 21px; justify-content: center; width: 21px; }
+.user-form .ua-layout { align-items: start; display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr) 296px; min-width: 0; }
+.user-form .ua-main { display: grid; gap: 19px; min-width: 0; }
+.user-form .ua-panel { background: #fff; border: 1px solid var(--ua-line); border-radius: 15px; min-width: 0; padding: 23px; scroll-margin-top: 20px; }
+.user-form .ua-panel-head { align-items: flex-start; display: flex; gap: 11px; margin-bottom: 21px; }
+.user-form .ua-panel-head > div { flex: 1; min-width: 0; }
+.user-form .ua-panel h2 { font-size: 16px; font-weight: 700; letter-spacing: -.025em; line-height: 1.45; }
+.user-form .ua-panel-head p { color: var(--ua-muted); font-size: 12px; line-height: 1.65; margin-top: 3px; }
+.user-form .ua-section-number { align-items: center; background: #f0eefc; border-radius: 10px; color: var(--ua-purple); display: flex; flex: 0 0 36px; font-size: 12px; font-weight: 750; height: 36px; justify-content: center; }
+.user-form .ua-section-number[data-tone="teal"] { background: #e8f6f2; color: #168a7d; }
+.user-form .ua-section-number[data-tone="blue"] { background: #eaf2fd; color: #3976bd; }
+.user-form .ua-fields { display: grid; gap: 17px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.user-form .ua-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.user-form .ua-field--full { grid-column: 1 / -1; }
+.user-form .ua-field > label, .user-form .ua-field-label { color: #42556e; display: block; font-size: 12px; font-weight: 650; line-height: 1.5; }
+.user-form .ua-field-label { margin-bottom: 8px; }
+.user-form .ua-required { color: var(--ua-purple); }
+.user-form .ua-field :is(input, select), .user-form .company-role-card select { background: #fcfdff; border: 1px solid #d9e3ed; border-radius: 9px; color: var(--ua-ink); font-size: 13px; height: 44px; min-width: 0; padding: 0 12px; width: 100%; }
+.user-form .ua-field :is(input, select):focus, .user-form .company-role-card select:focus { background: #fff; border-color: #9691de; box-shadow: 0 0 0 3px #efedfb; outline: none; }
+.user-form .ua-field-help, .user-form .ua-note { color: #76869b; font-size: 11px; font-weight: 400; line-height: 1.65; }
+.user-form .ua-note { margin-top: 10px; }
+.user-form .ua-field.has-error :is(input, select) { border-color: #db9696; }
+.user-form .errorlist { color: #b34949; font-size: 12px; line-height: 1.6; list-style: none; margin: 4px 0 0; padding: 0; }
+.user-form .ua-errors { background: #fff7f6; border: 1px solid #efd0cd; border-radius: 12px; padding: 17px 20px; }
+.user-form .ua-errors h2 { color: #a74943; font-size: 15px; }
+.user-form .ua-errors p { color: #9c6c68; font-size: 12px; margin-top: 5px; }
+.user-form .ua-error-links { display: flex; flex-wrap: wrap; gap: 8px 15px; margin-top: 10px; }
+.user-form .ua-error-links a { color: #a74943; font-size: 12px; text-decoration: underline; }
+.user-form .access-mode-options { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.user-form .access-mode-card { align-items: flex-start; background: #fff; border: 1px solid var(--ua-line); border-radius: 11px; cursor: pointer; display: flex; gap: 10px; padding: 15px; }
+.user-form .access-mode-card.is-selected { background: #f8f7ff; border-color: #b3ade7; }
+.user-form .access-mode-card input { accent-color: var(--ua-purple); flex: 0 0 17px; height: 17px; margin: 2px 0 0; width: 17px; }
+.user-form .access-mode-copy { min-width: 0; }
+.user-form .access-mode-copy strong { color: #3f4d68; display: flex; flex-wrap: wrap; font-size: 12px; gap: 6px; line-height: 1.6; }
+.user-form .access-mode-copy strong small { background: #edeafa; border-radius: 4px; color: #7770be; font-size: 8px; font-weight: 600; padding: 2px 5px; }
+.user-form .access-mode-copy > span { color: #79869a; display: block; font-size: 11px; line-height: 1.7; margin-top: 5px; }
+.user-form .ua-password-fields:has(> :not([hidden])) { margin-top: 18px; }
+.user-form .password-input-wrap { position: relative; }
+.user-form .password-input-wrap input { padding-right: 77px; }
+.user-form .password-eye { background: #f1effa; border: 0; border-radius: 6px; color: #7065b4; cursor: pointer; font-size: 10px; font-weight: 650; padding: 7px 9px; position: absolute; right: 8px; top: 9px; }
+.user-form .ua-inline-note { align-items: center; color: #69877e; display: flex; font-size: 11px; gap: 7px; line-height: 1.6; margin-top: 15px; }
+.user-form .ua-security-action { align-items: center; background: #f8fafc; border: 1px solid #edf1f5; border-radius: 10px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin-top: 19px; padding: 14px; }
+.user-form .ua-security-action strong { font-size: 12px; }
+.user-form .ua-security-action p { color: var(--ua-muted); font-size: 11px; line-height: 1.6; margin-top: 4px; }
+.user-form .ua-count { align-self: center; background: #f5f6fa; border: 1px solid #e9ecf3; border-radius: 6px; color: #7e879b; flex-shrink: 0; font-size: 10px; font-weight: 400; padding: 6px 8px; white-space: nowrap; }
+.user-form .ua-count b { color: #5a588f; font-weight: 700; }
+.user-form .company-access-shell { margin-top: 17px; }
+.user-form .ua-search { align-items: center; background: #fafbfe; border: 1px solid #e1e7ef; border-radius: 9px; display: flex; gap: 9px; min-width: 0; padding: 0 11px; }
+.user-form .ua-search svg { fill: none; flex: 0 0 16px; height: 16px; stroke: #9aa6b7; stroke-width: 1.7; width: 16px; }
+.user-form .ua-search input { background: transparent; border: 0; border-radius: 8px; color: #42556e; font-size: 12px; height: 40px; min-width: 0; padding: 0; width: 100%; }
+.user-form .ua-search input:focus { box-shadow: none; }
+.user-form .ua-search:focus-within { border-color: #b0a9e5; outline: 2px solid #efedfb; }
+.user-form .company-access-grid { display: grid; gap: 9px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 13px; max-height: 276px; overflow: auto; padding: 2px; }
+.user-form .company-access-card { align-items: center; background: #fff; border: 1px solid #e2e8ef; border-radius: 10px; cursor: pointer; display: flex; gap: 10px; min-height: 67px; min-width: 0; padding: 12px; }
+.user-form .company-access-card:is(.is-selected, .is-principal) { background: #f8f7fd; border-color: #c6c1ed; }
+.user-form .company-access-card input, .user-form .personal-permission-option input, .user-form .ua-toggle-item input { accent-color: var(--ua-purple); flex: 0 0 17px; height: 17px; margin: 1px 0 0; padding: 0; width: 17px; }
+.user-form .company-access-copy { flex: 1; min-width: 0; }
+.user-form .company-access-copy strong { color: #475b73; display: block; font-size: 12px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+.user-form .company-access-copy small { color: #8b96a8; display: block; font-size: 10px; margin-top: 3px; }
+.user-form .company-access-pill { align-items: center; background: #e9e6f8; border-radius: 50%; color: #7c72bd; display: none; flex: 0 0 19px; font-size: 10px; height: 19px; justify-content: center; }
+.user-form .company-access-card:is(.is-selected, .is-principal) .company-access-pill { display: flex; }
+.user-form .ua-company-tabs { border-bottom: 1px solid #e9edf4; display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 19px; padding-bottom: 13px; }
+.user-form .ua-company-tab { background: #f7f8fc; border: 1px solid transparent; border-radius: 7px; color: #7d8b9f; cursor: pointer; font-size: 11px; font-weight: 600; line-height: 1.4; max-width: 100%; overflow-wrap: anywhere; padding: 9px 11px; text-align: left; }
+.user-form .ua-company-tab[aria-pressed="true"] { background: #eeecfb; border-color: #dedaf5; color: #7061b9; }
+.user-form .company-role-card { display: none; min-width: 0; }
+.user-form .company-role-card.is-visible { display: block; }
+.user-form .ua-company-heading { align-items: center; display: flex; gap: 9px; justify-content: space-between; margin-bottom: 17px; }
+.user-form .ua-company-heading h3 { color: #42556e; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.user-form .ua-catalog { background: #eaf6f2; border: 1px solid #dceee7; border-radius: 5px; color: #598d7e; font-size: 9px; padding: 4px 7px; }
+.user-form .ua-role-choice { background: #fafbfe; border: 1px solid #edf0f5; border-radius: 10px; margin-top: 14px; padding: 15px; }
+.user-form .ua-permission-toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.user-form .ua-permission-toolbar .ua-search { flex: 1 1 170px; }
+.user-form .personal-permission-groups { display: grid; gap: 8px; margin-top: 15px; }
+.user-form .personal-permission-group { background: #fff; border: 1px solid #e5eaf1; border-radius: 10px; }
+.user-form .personal-permission-group > summary { align-items: center; border-radius: 10px; color: #52637c; cursor: pointer; display: flex; font-size: 12px; font-weight: 650; gap: 10px; list-style: none; min-height: 46px; padding: 12px 14px; }
+.user-form summary::-webkit-details-marker { display: none; }
+.user-form .personal-permission-group[open] > summary { background: #fafaff; border-bottom: 1px solid #efeff7; border-radius: 10px 10px 0 0; color: #6962a9; }
+.user-form .ua-module-count { background: #f1f2f8; border-radius: 5px; color: #8991a6; font-size: 10px; font-weight: 500; margin-left: auto; padding: 3px 7px; white-space: nowrap; }
+.user-form .ua-module-count.has-selection { background: #eeebfa; color: #7a6cc4; }
+.user-form .ua-chevron { fill: none; flex: 0 0 17px; height: 17px; stroke: currentColor; stroke-width: 1.7; width: 17px; }
+.user-form details[open] > summary > .ua-chevron { transform: rotate(180deg); }
+.user-form .personal-permission-options { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+.user-form .personal-permission-option { align-items: flex-start; background: #fff; border: 1px solid #e9edf4; border-radius: 8px; color: #6b7b91; cursor: pointer; display: flex; font-size: 11px; gap: 8px; line-height: 1.5; min-width: 0; padding: 10px; }
+.user-form .personal-permission-option:has(input:checked) { background: #f8f7ff; border-color: #d9d2f3; color: #6b5fa4; }
+.user-form .personal-permission-group:first-child[open] { border-color: #d7eae3; }
+.user-form .personal-permission-group:first-child[open] > summary { background: #f2faf7; color: #508b7b; }
+.user-form .ua-empty { background: #fafbfe; border: 1px dashed #dce3ed; border-radius: 10px; color: #8390a2; font-size: 12px; line-height: 1.8; margin-top: 13px; padding: 20px; text-align: center; }
+.user-form .ua-empty--permissions { padding: 35px 20px; }
+.user-form .ua-empty a { color: var(--ua-purple); display: block; font-size: 11px; font-weight: 650; margin-top: 9px; }
+.user-form .ua-advanced { padding: 0; }
+.user-form .ua-advanced > summary { align-items: center; cursor: pointer; display: flex; gap: 12px; list-style: none; padding: 19px 23px; }
+.user-form .ua-advanced > summary > span:nth-child(2) { flex: 1; min-width: 0; }
+.user-form .ua-advanced > summary strong { color: #607089; display: block; font-size: 13px; font-weight: 650; }
+.user-form .ua-advanced > summary small { color: #93a0b0; display: block; font-size: 11px; line-height: 1.6; margin-top: 3px; }
+.user-form .ua-advanced-icon { color: #8c98aa; font-size: 23px; }
+.user-form .ua-advanced-body { border-top: 1px solid #edf0f5; padding: 21px 23px; }
+.user-form .ua-admin-note { background: #fffbf2; border: 1px solid #f0e5cc; border-radius: 9px; margin-top: 20px; padding: 13px; }
+.user-form .ua-admin-note strong { color: #ad8b45; font-size: 12px; }
+.user-form .ua-admin-note p { color: #a59370; font-size: 11px; line-height: 1.7; margin-top: 3px; }
+.user-form .ua-toggle-list { margin-top: 15px; }
+.user-form .ua-toggle-item { border-bottom: 1px solid #eff2f6; padding: 12px 0; }
+.user-form .ua-toggle-item label { align-items: flex-start; cursor: pointer; display: flex; gap: 10px; }
+.user-form .ua-toggle-item strong { color: #596a82; display: block; font-size: 12px; font-weight: 600; }
+.user-form .ua-toggle-item small { color: #8c99aa; display: block; font-size: 11px; line-height: 1.65; margin-top: 4px; }
+.user-form .ua-technical-groups { margin-top: 20px; }
+.user-form .ua-technical-groups h3 { color: #68778e; font-size: 12px; }
+.user-form .ua-technical-groups > div { display: grid; font-size: 12px; gap: 8px; margin-top: 12px; }
+.user-form .ua-technical-groups input { accent-color: var(--ua-purple); }
+.user-form .ua-sidebar { position: sticky; top: 22px; min-width: 0; }
+.user-form .ua-review { padding: 21px; }
+.user-form .ua-review-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 8px; }
+.user-form .ua-review .ua-eyebrow { font-size: 9px; }
+.user-form .ua-review-dot { background: #8bbbaa; border: 3px solid #ebf6f1; border-radius: 50%; box-sizing: content-box; height: 5px; width: 5px; }
+.user-form .ua-review h2 { font-size: 16px; letter-spacing: -.03em; }
+.user-form .ua-person-preview { align-items: center; border-bottom: 1px solid #edf0f5; display: flex; gap: 11px; margin-top: 20px; padding-bottom: 20px; }
+.user-form .ua-person-preview > div { min-width: 0; }
+.user-form .ua-avatar { align-items: center; background: #eeecfa; border-radius: 12px; color: #8574c0; display: flex; flex: 0 0 42px; font-size: 14px; font-weight: 650; height: 42px; justify-content: center; }
+.user-form .ua-person-preview strong { color: #52617a; display: block; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.user-form .ua-person-preview div > span { color: #9aa5b5; display: block; font-size: 10px; line-height: 1.6; margin-top: 2px; overflow-wrap: anywhere; }
+.user-form .ua-review-data { display: grid; gap: 15px; margin: 19px 0; }
+.user-form .ua-review-data dt { color: #94a0b1; font-size: 10px; }
+.user-form .ua-review-data dd { color: #66768c; font-size: 12px; line-height: 1.6; margin: 3px 0 0; overflow-wrap: anywhere; }
+.user-form .ua-company-review { border-top: 1px solid #edf0f5; padding-top: 17px; }
+.user-form .ua-review-label { align-items: center; color: #728197; display: flex; font-size: 11px; font-weight: 600; justify-content: space-between; }
+.user-form .ua-review-label span { background: #f0eefb; border-radius: 5px; color: #8e7dc3; font-size: 10px; padding: 3px 6px; }
+.user-form .ua-company-review ul { display: grid; gap: 11px; list-style: none; margin: 15px 0 0; max-height: 220px; overflow-y: auto; padding: 0; }
+.user-form .ua-company-review li { border-left: 2px solid #dcd5f4; padding-left: 9px; }
+.user-form .ua-company-review li strong { color: #78869b; display: block; font-size: 11px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.user-form .ua-company-review li span { color: #a0aabc; display: block; font-size: 10px; line-height: 1.6; margin-top: 2px; }
+.user-form .ua-review-note { align-items: flex-start; background: #f2f9f6; border: 1px solid #e2efe9; border-radius: 9px; color: #83a696; display: flex; font-size: 11px; gap: 8px; line-height: 1.7; margin-top: 23px; padding: 12px; }
+.user-form .ua-review-note > span { color: #71a08c; }
+.user-form .ua-review-warning { background: #fffbf2; border: 1px solid #f0e5cc; border-radius: 9px; color: #a28b5b; font-size: 11px; line-height: 1.7; margin-top: 13px; padding: 12px; }
+.user-form .ua-review-warning a { color: #997c43; display: block; margin-top: 6px; text-decoration: underline; }
+.user-form .ua-summary-footnote { color: #a6aebd; font-size: 10px; line-height: 1.7; margin-top: 11px; text-align: center; }
+.user-form .ua-btn, .user-form-page .erp-topbar .ua-btn { align-items: center; background: #fff; border: 1px solid #dfe6ef; border-radius: 9px; color: #66778f; cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 650; gap: 10px; justify-content: center; line-height: 1.5; min-height: 41px; padding: 10px 15px; text-decoration: none; }
+.user-form .ua-btn:hover { background: #f8f9fc; border-color: #cfc9eb; }
+.user-form .ua-btn--primary { background: var(--ua-purple); border-color: var(--ua-purple); color: #fff; }
+.user-form .ua-btn--primary:hover { background: #5551bc; border-color: #5551bc; }
+.user-form .ua-summary-submit { justify-content: space-between; margin-top: 20px; padding: 12px 14px; width: 100%; }
+.user-form .ua-summary-submit [data-submit-label] { text-align: left; }
+.user-form .ua-btn--quiet { background: transparent; border-color: transparent; }
+.user-form .ua-actions-bar { align-items: center; background: #fff; border: 1px solid var(--ua-line); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; padding: 15px 18px; }
+.user-form .ua-actions-bar > p { align-items: center; color: #8b99ac; display: flex; font-size: 11px; gap: 8px; line-height: 1.65; }
+.user-form .ua-actions-bar > div { display: flex; flex-wrap: wrap; gap: 9px; }
+.user-form .ua-save-icon { color: #8eb29f; }
+.user-form .ua-eyebrow, .user-form .ua-field-help, .user-form .ua-note, .user-form .access-mode-copy > span,
+.user-form .company-access-copy small, .user-form .ua-count, .user-form .ua-module-count,
+.user-form .ua-person-preview div > span, .user-form .ua-review-data dt, .user-form .ua-company-review li span,
+.user-form .ua-summary-footnote, .user-form .ua-advanced > summary small, .user-form .ua-toggle-item small,
+.user-form .ua-actions-bar > p, .user-form .ua-company-tab, .user-form .ua-empty { color: #64748b; }
+.user-form .ua-review-note { color: #4d7664; }
+.user-form .ua-admin-note strong, .user-form .ua-admin-note p, .user-form .ua-review-warning { color: #886425; }
+.user-form .ua-catalog { color: #3f7565; }
+@media (max-width: 1100px) { .user-form .ua-layout { grid-template-columns: minmax(0, 1fr); } .user-form .ua-sidebar { position: static; } .user-form .ua-review { display: grid; gap: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 25px; } .user-form .ua-review-header, .user-form .ua-review h2, .user-form .ua-summary-footnote, .user-form .ua-review-warning { grid-column: 1 / -1; } .user-form .ua-review-note { align-self: start; } .user-form .ua-summary-submit { align-self: end; } }
+@media (max-width: 720px) { .user-form-page .erp-main { padding: 15px; } .user-form-page .erp-topbar { align-items: flex-start; padding: 15px; } .user-form-page .erp-topbar p { display: none; } .user-form .ua-panel { padding: 18px; } .user-form .ua-intro { align-items: flex-start; } .user-form .ua-mode { display: none; } .user-form .ua-description { font-size: 12px; } .user-form .ua-hero-icon { flex-basis: 44px; height: 44px; } .user-form .ua-fields, .user-form .access-mode-options, .user-form .company-access-grid, .user-form .personal-permission-options { grid-template-columns: minmax(0, 1fr); } .user-form .ua-steps { display: grid; grid-template-columns: 1fr 1fr; } .user-form .ua-steps a { font-size: 11px; padding: 8px; } .user-form .ua-panel-head { flex-wrap: wrap; } .user-form .ua-panel-head > .ua-count { margin-left: 47px; } .user-form .ua-advanced { padding: 0; } .user-form .ua-advanced > summary, .user-form .ua-advanced-body { padding: 18px; } .user-form .ua-review { display: block; } .user-form .ua-actions-bar > div { width: 100%; } .user-form .ua-actions-bar .ua-btn--primary { flex: 1; } }

@@ -1,0 +1,5 @@
+<div class="ua-field{% if full %} ua-field--full{% endif %}{% if field.errors %} has-error{% endif %}" {% if quick %}data-quick-password-field{% endif %}>
+    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="ua-required" aria-hidden="true"> *</span>{% endif %}</label>
+    {% if password %}<div class="password-input-wrap">{{ field }}<button type="button" class="password-eye" data-password-eye aria-controls="{{ field.id_for_label }}" aria-pressed="false">Mostrar</button></div>{% else %}{{ field }}{% endif %}
+    {% if field.help_text %}<p class="ua-field-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}{{ field.errors }}
+</div>

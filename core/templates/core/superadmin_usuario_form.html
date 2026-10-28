@@ -1,305 +1,123 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}{{ titulo }}{% endblock %}
-{% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Crea o actualiza usuarios internos, define su empresa principal y marca en que empresas puede ingresar con la misma cuenta.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'superadmin_usuarios' %}" class="erp-action-link">Volver a Usuarios</a>
+{% block body_class %}user-form-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
+{% block header_title %}Usuarios y accesos{% endblock %}
+{% block header_description %}Un espacio para organizar las personas, sus empresas y sus permisos.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<script src="{% static 'core/user-form.js' %}" defer></script>
 {% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_usuarios' %}" class="ua-btn">Volver a usuarios</a>{% endblock %}
 
 {% block content %}
-<style>
-.access-mode-panel{margin-bottom:22px;padding:18px;border:1px solid #d8e2ec;border-radius:15px;background:linear-gradient(145deg,#f8fafc,#f2f6f9)}.access-mode-heading{margin-bottom:13px}.access-mode-heading strong{display:block;color:#183047;font-size:12px;text-transform:uppercase;letter-spacing:.1em}.access-mode-heading span{display:block;margin-top:4px;color:#6d7f90;font-size:11px}.access-mode-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.access-mode-card{position:relative;display:flex;align-items:flex-start;gap:13px;min-height:92px;padding:16px;border:1px solid #cfdae5;border-radius:13px;background:#fff;cursor:pointer;transition:border-color .18s,box-shadow .18s,transform .18s}.access-mode-card:hover{transform:translateY(-1px);border-color:#91a9bf}.access-mode-card.is-selected{border-color:#2878d0;box-shadow:0 0 0 3px rgba(40,120,208,.09)}.access-mode-card input[type="radio"]{appearance:none;flex:0 0 20px;width:20px!important;height:20px;margin:2px 0 0;border:1.5px solid #92a3b4;border-radius:50%;background:#fff;padding:0!important}.access-mode-card input[type="radio"]:checked{border:6px solid #2878d0}.access-mode-copy strong{display:block;color:#162a3d;font-size:13px}.access-mode-copy span{display:block;margin-top:5px;color:#6b7d8d;font-size:11px;line-height:1.5}.user-access-note{display:flex;align-items:flex-start;gap:11px;margin-top:15px;padding:12px 14px;border-left:3px solid #b89755;border-radius:7px;background:#faf7ef;color:#5f6871;font-size:11px;line-height:1.5}.user-access-note strong{color:#273849}
-.company-access-shell{grid-column:1/-1;padding:18px;border:1px solid rgba(36,111,176,.18);border-radius:20px;background:linear-gradient(145deg,#f8fbff,#eef7fb);box-shadow:inset 0 1px 0 rgba(255,255,255,.82)}.company-access-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.company-access-kicker{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#2878d0}.company-access-title{margin:4px 0 0;color:#10233a;font-size:16px;font-weight:900}.company-access-summary{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:8px 12px;border:1px solid rgba(40,120,208,.18);border-radius:999px;background:#fff;color:#1f5f9f;font-size:11px;font-weight:800}.company-access-summary span{display:grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:linear-gradient(135deg,#18b7c6,#2477f2);color:#fff}.company-access-search{position:relative;margin-bottom:14px}.company-access-search input{width:100%;padding:13px 15px 13px 42px;border:1px solid #cbd9e6;border-radius:14px;background:#fff;color:#193047;font-weight:700}.company-access-search::before{content:"⌕";position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#6e8194;font-size:17px}.company-access-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;max-height:430px;overflow:auto;padding:2px 4px 4px 2px}.company-access-card{position:relative;display:flex;align-items:center;gap:13px;padding:14px 15px;border:1px solid #d7e3ee;border-radius:16px;background:rgba(255,255,255,.86);cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease}.company-access-card:hover{transform:translateY(-1px);border-color:#89b7de;box-shadow:0 12px 26px rgba(24,48,71,.08)}.company-access-card.is-selected{border-color:#18b7c6;background:linear-gradient(145deg,#eefcff,#f6fbff);box-shadow:0 14px 32px rgba(24,183,198,.16)}.company-access-card input[type="checkbox"]{appearance:none;display:grid;place-items:center;flex:0 0 24px;width:24px!important;height:24px!important;margin:0;border:1.7px solid #9fb0c0;border-radius:8px;background:#fff;padding:0!important;transition:border-color .16s,background .16s,box-shadow .16s}.company-access-card input[type="checkbox"]::after{content:"";width:7px;height:12px;border:solid #fff;border-width:0 3px 3px 0;transform:rotate(45deg) scale(0);transition:transform .16s}.company-access-card input[type="checkbox"]:checked{border-color:#1677f2;background:linear-gradient(135deg,#19bfd0,#1677f2);box-shadow:0 6px 14px rgba(22,119,242,.25)}.company-access-card input[type="checkbox"]:checked::after{transform:rotate(45deg) scale(1)}.company-access-copy{min-width:0}.company-access-copy strong{display:block;color:#14283d;font-size:12px;line-height:1.35}.company-access-copy span{display:block;margin-top:4px;color:#728395;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.company-access-pill{margin-left:auto;display:none;padding:5px 8px;border-radius:999px;background:#dff8ef;color:#087454;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.09em}.company-access-card.is-selected .company-access-pill{display:inline-flex}.company-access-empty{display:none;padding:16px;border:1px dashed #bfd0df;border-radius:14px;background:#fff;color:#64788b;font-size:12px}.company-access-errors{margin-top:10px}.company-access-help{margin-top:10px;color:#6b7d8d;font-size:11px;line-height:1.45}
-@media(max-width:700px){.access-mode-options,.company-access-grid{grid-template-columns:1fr}.company-access-head{flex-direction:column}.company-access-summary{white-space:normal}}
-.security-control-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;margin:0 0 22px;padding:18px;border:1px solid rgba(184,151,85,.28);border-radius:18px;background:linear-gradient(145deg,#fffaf0,#f7fbff);box-shadow:0 16px 34px rgba(24,48,71,.06)}.security-control-panel h4{margin:0;color:#14283d;font-size:15px}.security-control-panel p{margin:6px 0 0;color:#64788b;font-size:11px;line-height:1.55}.security-control-panel form{margin:0}.security-control-panel .erp-btn-secondary{white-space:nowrap}.security-lock{display:inline-flex;align-items:center;gap:8px;margin-bottom:7px;color:#9a6b16;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.password-input-wrap{position:relative}.password-input-wrap input{padding-right:92px!important}.password-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;border-radius:999px;background:#eef6fb;color:#1769d2;font-size:10px;font-weight:900;padding:8px 10px;cursor:pointer}.user-permission-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:14px}.user-permission-card{padding:12px;border:1px solid #d6e3ed;border-radius:14px;background:#fff}.user-permission-card strong{display:block;color:#14283d;font-size:12px}.user-permission-card span{display:block;margin-top:4px;color:#6b7d8d;font-size:10px;line-height:1.4}.is-danger-note{border-left:3px solid #d92d20;background:#fff7f7;color:#9f2720}
-.company-role-shell{grid-column:1/-1;margin-top:16px;padding:18px;border:1px solid rgba(25,165,143,.2);border-radius:20px;background:linear-gradient(145deg,#ffffff,#f2fbfa)}.company-role-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}.company-role-head strong{display:block;color:#10233a;font-size:16px}.company-role-head span{display:block;margin-top:4px;color:#66798b;font-size:11px}.company-role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.company-role-card{display:none;padding:14px;border:1px solid #d7e6ec;border-radius:16px;background:#fff;box-shadow:0 12px 28px rgba(20,45,70,.05)}.company-role-card.is-visible{display:block}.company-role-card label{display:block;margin-bottom:8px;color:#14283d;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.company-role-card select{width:100%;min-height:42px;border:1px solid #c6d7e4;border-radius:12px;background:#fff;padding:0 12px;color:#172c42;font-weight:800}.company-role-card p{margin:8px 0 0;color:#6f8193;font-size:10px;line-height:1.45}.company-role-badge{display:inline-flex;margin-bottom:9px;padding:5px 9px;border-radius:999px;background:#e8f7f4;color:#08766f;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.company-role-empty{padding:14px;border:1px dashed #bfd0df;border-radius:14px;background:#fff;color:#64788b;font-size:12px}
-@media(max-width:800px){.security-control-panel{grid-template-columns:1fr}}
-.company-role-grid{grid-template-columns:minmax(0,1fr)}.company-role-mode{margin-bottom:12px}.personal-permissions-note{margin:12px 0!important;font-size:12px!important;line-height:1.6!important}.personal-permission-groups{display:grid;gap:10px;margin-top:14px}.personal-permission-group{border:1px solid #d7e6ec;border-radius:12px;background:#fbfdff}.personal-permission-group summary{padding:13px 15px;cursor:pointer;font-weight:800;color:#183047;font-size:13px}.personal-permission-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:0 13px 13px}.company-role-card label.personal-permission-option{display:flex;align-items:flex-start;gap:10px;margin:0;padding:11px;border:1px solid #dfe8ef;border-radius:9px;background:#fff;font-size:12px;font-weight:600;letter-spacing:normal;text-transform:none;line-height:1.45;cursor:pointer}.personal-permission-option input{flex:0 0 18px;width:18px!important;height:18px!important;margin:1px 0 0;padding:0!important;accent-color:#2878d0}.personal-permissions [hidden],[data-company-role-choice][hidden]{display:none!important}@media(max-width:700px){.personal-permission-options{grid-template-columns:1fr}}
-</style>
-<form method="post" class="erp-form-shell">
+<form method="post" class="user-form" id="userAccessForm" data-user-form data-editing="{% if form.instance.pk %}true{% else %}false{% endif %}">
     {% csrf_token %}
-    {% if form.non_field_errors %}
-    <div class="erp-field-errors">{{ form.non_field_errors }}</div>
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    <header class="ua-intro">
+        <div class="ua-intro-main">
+            <span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 9h6m-3-3v6" stroke-linecap="round"/></svg></span>
+            <div><p class="ua-eyebrow">Tu equipo, conectado</p><h1>{% if form.instance.pk %}Editar usuario{% else %}Nuevo usuario{% endif %}</h1><p class="ua-description">{% if form.instance.pk %}Actualiza sus datos y revisa el acceso en cada empresa.{% else %}Dale a cada persona el acceso que necesita, desde el primer día.{% endif %}</p></div>
+        </div>
+        <span class="ua-mode">{% if form.instance.pk %}Editando cuenta{% else %}Nuevo acceso{% endif %}</span>
+    </header>
+    <nav class="ua-steps" aria-label="Secciones del usuario">
+        <a href="#ua-person"><span>1</span> Datos personales</a><a href="#ua-access"><span>2</span> Forma de acceso</a><a href="#ua-companies"><span>3</span> Empresas</a><a href="#ua-permissions"><span>4</span> Permisos</a>
+    </nav>
+    {% if form.errors %}
+    <section class="ua-errors" role="alert" tabindex="-1" data-error-summary>
+        <h2>Revisa los campos señalados</h2><p>Los datos y permisos que elegiste se conservan para que puedas corregirlos.</p>{{ form.non_field_errors }}
+        <div class="ua-error-links">{% for field in form.visible_fields %}{% if field.errors %}<a href="#{% if field.name == 'groups' %}ua-advanced{% else %}{{ field.id_for_label }}{% endif %}">Revisar {{ field.label|lower }}</a>{% endif %}{% endfor %}</div>{% for field in form.hidden_fields %}{{ field.errors }}{% endfor %}
+    </section>
     {% endif %}
-
-    <section class="erp-form-card">
-        <h3>Cuenta y acceso</h3>
-        {% if form.instance.pk %}
-        <div class="security-control-panel">
-            <div>
-                <div class="security-lock">Seguridad de acceso</div>
-                <h4>No se puede ver la contrasena actual; solo reemplazarla.</h4>
-                <p>Las contrasenas actuales estan protegidas con hash irreversible. Para administrar accesos, genera una contrasena temporal, copiala en ese momento y entregala al usuario.</p>
-            </div>
-            {% if form.instance.id != request.user.id %}
-            <button type="submit" class="erp-btn-secondary" form="tempPasswordForm">Generar contrasena temporal</button>
-            {% else %}
-            <span class="erp-badge neutral">Tu propia sesion</span>
-            {% endif %}
-        </div>
-        <p>Actualiza la empresa principal, las empresas permitidas, el rol, el estado operativo o asigna una nueva contraseña. Si dejas las casillas de contraseña vacías, conservará la actual.</p>
-        {% else %}
-        <p>Elige si el usuario creara su propia contrasena por correo o si necesitas habilitarlo inmediatamente. Un mismo usuario puede tener acceso a varias empresas sin duplicarlo.</p>
-        <div class="access-mode-panel">
-            <div class="access-mode-heading"><strong>{{ form.modo_creacion.label }}</strong><span>{{ form.modo_creacion.help_text }}</span></div>
-            <div class="access-mode-options">
-                {% for opcion in form.modo_creacion %}
-                <label class="access-mode-card">
-                    {{ opcion.tag }}
-                    <span class="access-mode-copy"><strong>{{ opcion.choice_label }}</strong><span>{% if opcion.data.value == 'rapido' %}Define una contraseña inicial y habilita la cuenta inmediatamente.{% else %}Envía un enlace seguro para que la persona cree su propia contraseña.{% endif %}</span></span>
-                </label>
-                {% endfor %}
-            </div>
-            {{ form.modo_creacion.errors }}
-        </div>
-        {% endif %}
-        <div class="erp-form-grid">
-            {% for field in form %}
-                {% if field.name != 'groups' and field.name != 'modo_creacion' %}
-                {% if field.name == 'empresas_acceso' %}
-                <div class="company-access-shell" data-company-access>
-                    <div class="company-access-head">
-                        <div>
-                            <div class="company-access-kicker">{{ field.label }}</div>
-                            <div class="company-access-title">Selecciona las empresas donde puede ingresar</div>
-                        </div>
-                        <div class="company-access-summary"><span data-company-count>0</span> seleccionadas</div>
-                    </div>
-                    <div class="company-access-search">
-                        <input type="search" placeholder="Buscar empresa por nombre o RTN..." data-company-search autocomplete="off">
-                    </div>
-                    <div class="company-access-grid">
-                        {% for opcion in field %}
-                        <label class="company-access-card" data-company-card data-company-text="{{ opcion.choice_label|lower }}">
-                            {{ opcion.tag }}
-                            <span class="company-access-copy">
-                                <strong>{{ opcion.choice_label }}</strong>
-                                <span>Acceso autorizado</span>
-                            </span>
-                            <span class="company-access-pill">Activo</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="company-access-empty" data-company-empty>No encontramos empresas con ese filtro.</div>
-                    {% if field.help_text %}<div class="company-access-help">{{ field.help_text }}</div>{% endif %}
-                    <div class="company-access-errors">{{ field.errors }}</div>
+    <div class="ua-layout">
+        <div class="ua-main">
+            <section class="ua-panel" id="ua-person" aria-labelledby="ua-person-title">
+                <div class="ua-panel-head"><span class="ua-section-number">01</span><div><h2 id="ua-person-title">Datos personales</h2><p>Identifica a la persona que usará esta cuenta.</p></div></div>
+                <div class="ua-fields">
+                    {% include 'core/includes/user_form_field.html' with field=form.first_name only %}
+                    {% include 'core/includes/user_form_field.html' with field=form.last_name only %}
+                    {% include 'core/includes/user_form_field.html' with field=form.email full=True only %}
                 </div>
+            </section>
+            <section class="ua-panel" id="ua-access" aria-labelledby="ua-access-title">
+                <div class="ua-panel-head"><span class="ua-section-number" data-tone="teal">02</span><div><h2 id="ua-access-title">{% if form.instance.pk %}Seguridad de acceso{% else %}¿Cómo empezará a usar su cuenta?{% endif %}</h2><p>{% if form.instance.pk %}Administra su contraseña sin cambiar sus permisos.{% else %}Elige cómo entregar el acceso a esta persona.{% endif %}</p></div></div>
+                {% if form.instance.pk %}
+                <p class="ua-note">Si dejas los campos vacíos, conservará su contraseña actual.</p>
+                <div class="ua-fields ua-password-fields">
+                    {% include 'core/includes/user_form_field.html' with field=form.password1 password=True only %}
+                    {% include 'core/includes/user_form_field.html' with field=form.password2 password=True only %}
+                </div>
+                {% if form.instance.id != request.user.id %}<div class="ua-security-action"><div><strong>¿Necesita recuperar su acceso?</strong><p>Genera una contraseña temporal y entrégala a la persona.</p></div><button type="submit" class="ua-btn" form="tempPasswordForm">Generar contraseña temporal</button></div>{% endif %}
                 {% else %}
-                <div
-                    class="erp-field {% if field.name == 'username' or field.name == 'email' or field.name == 'empresas_acceso' %}erp-field-span-full{% endif %}"
-                    {% if field.name == 'password1' or field.name == 'password2' %}data-quick-password-field{% endif %}
-                >
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {% if field.name == 'password1' or field.name == 'password2' %}
-                    <div class="password-input-wrap">
-                        {{ field }}
-                        <button type="button" class="password-eye" data-password-eye>Mostrar</button>
-                    </div>
-                    {% else %}
-                    {{ field }}
-                    {% endif %}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                    {{ field.errors }}
+                <div class="access-mode-options">
+                    {% for opcion in form.modo_creacion %}<label class="access-mode-card">{{ opcion.tag }}<span class="access-mode-copy"><strong>{% if opcion.data.value == 'rapido' %}Contraseña inicial{% else %}Invitación por correo <small>Recomendado</small>{% endif %}</strong><span>{% if opcion.data.value == 'rapido' %}Define una contraseña inicial y habilita la cuenta inmediatamente.{% else %}Envía un enlace seguro para que la persona cree su propia contraseña.{% endif %}</span></span></label>{% endfor %}
+                </div>{{ form.modo_creacion.errors }}
+                <div class="ua-fields ua-password-fields">
+                    {% include 'core/includes/user_form_field.html' with field=form.password1 password=True quick=True only %}
+                    {% include 'core/includes/user_form_field.html' with field=form.password2 password=True quick=True only %}
                 </div>
+                <p class="ua-inline-note"><span aria-hidden="true">✓</span> Los permisos quedan guardados antes de enviar la invitación.</p>
                 {% endif %}
-                {% endif %}
-            {% endfor %}
-        </div>
-        <div class="company-role-shell" data-company-roles>
-            <div class="company-role-head">
-                <div>
-                    <strong>Permisos por empresa</strong>
-                    <span>Configura las casillas aquí mismo o elige un rol existente para cada empresa.</span>
-                </div>
-                <span class="company-access-summary">Control independiente</span>
-            </div>
-            <div class="company-role-grid">
-                {% for item in empresas_config %}
-                <div class="company-role-card {% if item.seleccionada %}is-visible{% endif %}" data-company-role-card data-company-id="{{ item.empresa.id }}">
-                    <span class="company-role-badge">Catálogo {{ item.catalogo }}</span>
-                    <label for="empresa_modo_permisos_{{ item.empresa.id }}">{{ item.empresa.nombre }}</label>
-                    <select class="company-role-mode" name="empresa_modo_permisos_{{ item.empresa.id }}" id="empresa_modo_permisos_{{ item.empresa.id }}" data-permission-mode>
-                        <option value="personalizado" {% if item.modo_permisos == 'personalizado' %}selected{% endif %}>Elegir permisos para este usuario</option>
-                        <option value="rol" {% if item.modo_permisos == 'rol' %}selected{% endif %}>Usar un rol existente</option>
-                    </select>
-                    <div data-company-role-choice {% if item.modo_permisos != 'rol' %}hidden{% endif %}>
-                    <label for="empresa_rol_{{ item.empresa.id }}">Rol para esta empresa</label>
-                    <select name="empresa_rol_{{ item.empresa.id }}" id="empresa_rol_{{ item.empresa.id }}">
-                        <option value="">Usar rol global del usuario</option>
-                        {% for rol in item.roles %}
-                        <option value="{{ rol.id }}" {% if item.rol_id == rol.id %}selected{% endif %}>{{ rol.nombre }}</option>
-                        {% endfor %}
-                    </select>
-                    <p>El rol elegido se aplica únicamente en esta empresa.</p>
+            </section>
+            <section class="ua-panel" id="ua-companies" aria-labelledby="ua-companies-title">
+                <div class="ua-panel-head"><span class="ua-section-number" data-tone="blue">03</span><div><h2 id="ua-companies-title">Empresas donde puede ingresar</h2><p>Una misma cuenta puede tener permisos diferentes en cada empresa.</p></div><span class="ua-count"><b data-company-count>0</b> <span data-company-count-caption>empresas</span></span></div>
+                {% include 'core/includes/user_form_field.html' with field=form.empresa only %}
+                <div class="company-access-shell" data-company-access>
+                    <label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" placeholder="Buscar empresa por nombre o RTN..." aria-label="Buscar empresas" data-company-search autocomplete="off"></label>
+                    <div class="company-access-grid">
+                        {% for opcion in form.empresas_acceso %}<label class="company-access-card" data-company-card data-company-text="{{ opcion.choice_label|lower }}">{{ opcion.tag }}<span class="company-access-copy"><strong>{{ opcion.choice_label }}</strong><small data-company-card-caption>Acceso adicional</small></span><span class="company-access-pill" aria-hidden="true">✓</span></label>{% endfor %}
                     </div>
-                    <div class="personal-permissions" data-personal-permissions {% if item.modo_permisos != 'personalizado' %}hidden{% endif %}>
-                        <p class="personal-permissions-note">Marca las acciones que podrá realizar en <strong>{{ item.empresa.nombre }}</strong>. Las casillas sin marcar quedan sin autorización. Los permisos se guardan antes de enviar la invitación.</p>
-                        <div class="personal-permission-groups">
-                            {% for grupo in item.grupos_permisos %}
-                            <details class="personal-permission-group" {% if forloop.first %}open{% endif %}>
-                                <summary>{{ grupo.nombre }}</summary>
-                                <div class="personal-permission-options">
-                                    {% for permiso in grupo.permisos %}
-                                    <label class="personal-permission-option" for="empresa_{{ item.empresa.id }}_{{ permiso.campo }}">
-                                        <input type="checkbox" name="empresa_permisos_{{ item.empresa.id }}" id="empresa_{{ item.empresa.id }}_{{ permiso.campo }}" value="{{ permiso.campo }}" {% if permiso.activo %}checked{% endif %}>
-                                        <span>{{ permiso.etiqueta }}</span>
-                                    </label>
-                                    {% endfor %}
-                                </div>
-                            </details>
-                            {% endfor %}
+                    <div class="ua-empty" data-company-empty hidden>No encontramos empresas con esa búsqueda.</div><p class="ua-note">La empresa principal se incluye automáticamente. Marca las empresas adicionales que necesite.</p>{{ form.empresas_acceso.errors }}
+                </div>
+            </section>
+            <section class="ua-panel ua-permissions-panel" id="ua-permissions" aria-labelledby="ua-permissions-title" data-company-roles>
+                <div class="ua-panel-head"><span class="ua-section-number">04</span><div><h2 id="ua-permissions-title">Permisos por empresa</h2><p>Elige las acciones que puede realizar o utiliza un rol existente.</p></div></div>
+                <div class="ua-company-tabs" aria-label="Elegir empresa para configurar permisos" data-company-tabs hidden>{% for item in empresas_config %}<button type="button" class="ua-company-tab" data-company-tab="{{ item.empresa.id }}" {% if not item.seleccionada %}hidden{% endif %} aria-pressed="false">{{ item.empresa.nombre }}</button>{% endfor %}</div>
+                <div class="company-role-grid">
+                    {% for item in empresas_config %}
+                    <div class="company-role-card {% if item.seleccionada %}is-visible{% endif %}" data-company-role-card data-company-id="{{ item.empresa.id }}" data-company-name="{{ item.empresa.nombre }}">
+                        <div class="ua-company-heading"><h3>{{ item.empresa.nombre }}</h3><span class="ua-catalog">{{ item.catalogo }}</span></div>
+                        <label class="ua-field-label" for="empresa_modo_permisos_{{ item.empresa.id }}">¿Cómo definir sus permisos?</label>
+                        <select class="company-role-mode" name="empresa_modo_permisos_{{ item.empresa.id }}" id="empresa_modo_permisos_{{ item.empresa.id }}" data-permission-mode><option value="personalizado" {% if item.modo_permisos == 'personalizado' %}selected{% endif %}>Elegir permisos para este usuario</option><option value="rol" {% if item.modo_permisos == 'rol' %}selected{% endif %}>Usar un rol existente</option></select>
+                        <div class="ua-role-choice" data-company-role-choice {% if item.modo_permisos != 'rol' %}hidden{% endif %}>
+                            <label class="ua-field-label" for="empresa_rol_{{ item.empresa.id }}">Rol para esta empresa</label><select name="empresa_rol_{{ item.empresa.id }}" id="empresa_rol_{{ item.empresa.id }}" data-company-role-select><option value="">Usar rol global del usuario</option>{% for rol in item.roles %}<option value="{{ rol.id }}" {% if item.rol_id == rol.id %}selected{% endif %}>{{ rol.nombre }}</option>{% endfor %}</select><p class="ua-note">El rol elegido se aplica únicamente en esta empresa. Puedes definir el rol global en Opciones avanzadas.</p>
+                        </div>
+                        <div class="personal-permissions" data-personal-permissions {% if item.modo_permisos != 'personalizado' %}hidden{% endif %}>
+                            <div class="ua-permission-toolbar"><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" placeholder="Buscar módulo o permiso..." aria-label="Buscar permisos en {{ item.empresa.nombre }}" data-permission-search autocomplete="off"></label><span class="ua-count"><b data-permission-count>0</b> <span data-permission-count-caption>seleccionados</span></span></div>
+                            <p class="ua-note">Las casillas sin marcar quedan sin autorización. “Sólo ver” permite consultar y bloquea los cambios de ese módulo.</p>
+                            <div class="personal-permission-groups">
+                                {% for grupo in item.grupos_permisos %}<details class="personal-permission-group" {% if forloop.first %}open{% endif %}><summary><span data-permission-group-title>{{ grupo.nombre }}</span><span class="ua-module-count" data-module-count>0</span><svg class="ua-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary><div class="personal-permission-options">{% for permiso in grupo.permisos %}<label class="personal-permission-option" for="empresa_{{ item.empresa.id }}_{{ permiso.campo }}"><input type="checkbox" name="empresa_permisos_{{ item.empresa.id }}" id="empresa_{{ item.empresa.id }}_{{ permiso.campo }}" value="{{ permiso.campo }}" {% if permiso.activo %}checked{% endif %}><span>{{ permiso.etiqueta }}</span></label>{% endfor %}</div></details>{% endfor %}
+                            </div><div class="ua-empty" data-permission-empty hidden>No encontramos permisos con esa búsqueda.</div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
-            <div class="company-role-empty" data-company-role-empty>Selecciona al menos una empresa para configurar sus permisos.</div>
+                <div class="ua-empty ua-empty--permissions" data-company-role-empty>Selecciona una empresa para configurar sus permisos.<a href="#ua-companies">Elegir empresas <span aria-hidden="true">→</span></a></div>
+            </section>
+            <details class="ua-panel ua-advanced" id="ua-advanced" {% if form.username.errors or form.rol_sistema.errors or form.groups.errors or form.es_administrador_empresa.errors or form.is_superuser.errors or form.is_staff.errors or form.modo_clinico_simple.errors or form.is_active.errors or form.is_superuser.value or form.es_administrador_empresa.value %}open{% endif %}>
+                <summary><span class="ua-advanced-icon" aria-hidden="true">⚙</span><span><strong>Opciones avanzadas</strong><small>Rol global, administración y ajustes técnicos de la cuenta</small></span><svg class="ua-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary>
+                <div class="ua-advanced-body"><div class="ua-fields">{% if form.username %}{% include 'core/includes/user_form_field.html' with field=form.username full=True only %}{% endif %}{% include 'core/includes/user_form_field.html' with field=form.rol_sistema full=True only %}</div>
+                    <div class="ua-admin-note"><strong>Acceso completo</strong><p>Administrador de empresa y superadministrador conceden acceso completo. Déjalos desmarcados para aplicar las casillas de permisos personalizados.</p></div>
+                    <div class="ua-toggle-list">{% for field in form %}{% if field.name == 'es_administrador_empresa' or field.name == 'is_superuser' or field.name == 'is_staff' or field.name == 'modo_clinico_simple' or field.name == 'is_active' %}<div class="ua-toggle-item"><label for="{{ field.id_for_label }}">{{ field }}<span><strong>{{ field.label }}</strong>{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</span></label>{{ field.errors }}</div>{% endif %}{% endfor %}</div>
+                    <div class="ua-technical-groups"><h3>Grupos complementarios</h3><p class="ua-note">Opcionales. Se reservan para integraciones técnicas; el acceso principal se configura en Permisos por empresa.</p>{{ form.groups }}{{ form.groups.errors }}</div>
+                </div>
+            </details>
         </div>
-        <div class="user-access-note"><span>◆</span><div><strong>Los permisos personalizados pertenecen únicamente a este usuario y esta empresa.</strong><br>Para restringir el acceso con estas casillas, deja desmarcadas las opciones de administrador de empresa y superadministrador, que conceden acceso completo.</div></div>
-    </section>
-
-    <section class="erp-form-card">
-        <h3>Permisos complementarios</h3>
-        <p>El acceso principal se define arriba en <strong>Permisos por empresa</strong>. Estos grupos son opcionales y se reservan para integraciones técnicas de Django.</p>
-        <div class="erp-soft-panel">
-            {{ form.groups }}
-            {{ form.groups.errors }}
-        </div>
-    </section>
-
-    <div class="erp-form-actions">
-        <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn" id="usuarioSubmitButton">{% if form.instance.pk %}Guardar Usuario{% else %}Crear y enviar invitacion{% endif %}</button>
+        <aside class="ua-sidebar" aria-label="Resumen del acceso">
+            <section class="ua-panel ua-review"><div class="ua-review-header"><span class="ua-eyebrow">Antes de guardar</span><span class="ua-review-dot" aria-hidden="true"></span></div><h2>Así quedará su acceso</h2>
+                <div class="ua-person-preview"><span class="ua-avatar" data-preview-initials aria-hidden="true">NU</span><div><strong data-preview-name>Nuevo usuario</strong><span data-preview-email>Agrega su correo electrónico</span></div></div>
+                <dl class="ua-review-data"><div><dt>Forma de acceso</dt><dd data-preview-access>{% if form.instance.pk %}Cuenta existente{% else %}Invitación por correo{% endif %}</dd></div><div><dt>Empresa principal</dt><dd data-preview-primary>Por seleccionar</dd></div></dl>
+                <div class="ua-company-review"><p class="ua-review-label">Acceso por empresa <span data-preview-company-count>0</span></p><ul data-preview-companies></ul><p class="ua-note" data-preview-empty>Selecciona dónde podrá ingresar.</p></div>
+                <div class="ua-review-note" data-preview-note><span aria-hidden="true">✓</span><p>{% if form.instance.pk %}Los cambios se aplicarán al guardar.{% else %}Primero guardamos sus permisos. Después enviamos la invitación.{% endif %}</p></div>
+                <div class="ua-review-warning" data-preview-admin hidden><strong>Esta cuenta tendrá acceso completo</strong><p>Revisa las opciones de administración antes de guardar.</p><a href="#ua-advanced">Revisar opciones avanzadas</a></div>
+                <button type="submit" class="ua-btn ua-btn--primary ua-summary-submit" data-user-submit><span data-submit-label>{% if form.instance.pk %}Guardar cambios{% else %}Crear y enviar invitación{% endif %}</span><span aria-hidden="true">→</span></button><p class="ua-summary-footnote">Los permisos se administran de forma independiente en cada empresa.</p>
+            </section>
+        </aside>
     </div>
+    <footer class="ua-actions-bar"><p><span class="ua-save-icon" aria-hidden="true">✓</span>{% if form.instance.pk %}Revisa los cambios antes de guardar.{% else %}Todo listo para sumar a alguien a tu equipo.{% endif %}</p><div><a href="{% url 'superadmin_usuarios' %}" class="ua-btn ua-btn--quiet">Cancelar</a><button type="submit" class="ua-btn ua-btn--primary" id="usuarioSubmitButton" data-user-submit><span data-submit-label>{% if form.instance.pk %}Guardar cambios{% else %}Crear y enviar invitación{% endif %}</span><span aria-hidden="true">→</span></button></div></footer>
 </form>
-{% if form.instance.pk and form.instance.id != request.user.id %}
-<form id="tempPasswordForm" method="post" action="{% url 'superadmin_usuario_reset_password_temporal' form.instance.id %}" data-temp-password-form style="display:none;">
-    {% csrf_token %}
-</form>
-{% endif %}
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const modeInputs = document.querySelectorAll('input[name="modo_creacion"]');
-    const passwordFields = document.querySelectorAll("[data-quick-password-field]");
-    const submitButton = document.getElementById("usuarioSubmitButton");
-
-    function updateCreationMode() {
-        if (!modeInputs.length || !submitButton) { return; }
-        const selected = document.querySelector('input[name="modo_creacion"]:checked');
-        const quickMode = selected && selected.value === "rapido";
-        passwordFields.forEach(function (field) {
-            field.hidden = !quickMode;
-            field.querySelectorAll("input").forEach(function (input) {
-                input.disabled = !quickMode;
-            });
-        });
-        submitButton.textContent = quickMode ? "Crear usuario rapido" : "Crear y enviar invitacion";
-        document.querySelectorAll(".access-mode-card").forEach(function (card) {
-            const radio = card.querySelector('input[type="radio"]');
-            card.classList.toggle("is-selected", Boolean(radio && radio.checked));
-        });
-    }
-
-    modeInputs.forEach(function (input) {
-        input.addEventListener("change", updateCreationMode);
-    });
-    updateCreationMode();
-
-    document.querySelectorAll("[data-password-eye]").forEach(function(button){
-        button.addEventListener("click", function(){
-            const input = button.closest(".password-input-wrap").querySelector("input");
-            if(!input){ return; }
-            const showing = input.type === "text";
-            input.type = showing ? "password" : "text";
-            button.textContent = showing ? "Mostrar" : "Ocultar";
-        });
-    });
-
-    document.querySelectorAll("[data-temp-password-form]").forEach(function(form){
-        form.addEventListener("submit", function(event){
-            if(!confirm("Esto reemplazara la contrasena actual y mostrara una temporal una sola vez. Deseas continuar?")){
-                event.preventDefault();
-            }
-        });
-    });
-
-    const accessShell = document.querySelector("[data-company-access]");
-    if (accessShell) {
-        const cards = Array.from(accessShell.querySelectorAll("[data-company-card]"));
-        const search = accessShell.querySelector("[data-company-search]");
-        const count = accessShell.querySelector("[data-company-count]");
-        const empty = accessShell.querySelector("[data-company-empty]");
-
-        function updateCompanyCards() {
-            let selected = 0;
-            let visible = 0;
-            const term = (search ? search.value : "").trim().toLowerCase();
-            cards.forEach(function (card) {
-                const checkbox = card.querySelector('input[type="checkbox"]');
-                const matches = !term || (card.dataset.companyText || "").includes(term);
-                card.hidden = !matches;
-                if (matches) { visible += 1; }
-                if (checkbox && checkbox.checked) {
-                    selected += 1;
-                    card.classList.add("is-selected");
-                } else {
-                    card.classList.remove("is-selected");
-                }
-            });
-            if (count) { count.textContent = selected; }
-            if (empty) { empty.style.display = visible ? "none" : "block"; }
-            updateCompanyRoleCards();
-        }
-
-        cards.forEach(function (card) {
-            const checkbox = card.querySelector('input[type="checkbox"]');
-            if (checkbox) {
-                checkbox.addEventListener("change", updateCompanyCards);
-            }
-        });
-        if (search) {
-            search.addEventListener("input", updateCompanyCards);
-        }
-        updateCompanyCards();
-    }
-
-    function updateCompanyRoleCards() {
-        const roleShell = document.querySelector("[data-company-roles]");
-        if(!roleShell){ return; }
-        let visibleRoles = 0;
-        const primaryCompany = document.getElementById("id_empresa");
-        roleShell.querySelectorAll("[data-company-role-card]").forEach(function(card){
-            const companyId = card.dataset.companyId;
-            const checkbox = document.querySelector('input[name="empresas_acceso"][value="' + companyId + '"]');
-            const visible = Boolean((checkbox && checkbox.checked) || (primaryCompany && primaryCompany.value === companyId));
-            card.classList.toggle("is-visible", visible);
-            const mode = card.querySelector("[data-permission-mode]");
-            const personal = card.querySelector("[data-personal-permissions]");
-            const role = card.querySelector("[data-company-role-choice]");
-            const custom = mode && mode.value === "personalizado";
-            if(mode){ mode.disabled = !visible; }
-            if(personal){
-                personal.hidden = !custom;
-                personal.querySelectorAll("input").forEach(function(input){ input.disabled = !visible || !custom; });
-            }
-            if(role){
-                role.hidden = custom;
-                role.querySelectorAll("select").forEach(function(select){ select.disabled = !visible || custom; });
-            }
-            if(visible){ visibleRoles += 1; }
-        });
-        const emptyRoles = roleShell.querySelector("[data-company-role-empty]");
-        if(emptyRoles){ emptyRoles.style.display = visibleRoles ? "none" : "block"; }
-    }
-    document.querySelectorAll("[data-permission-mode]").forEach(function(mode){
-        mode.addEventListener("change", updateCompanyRoleCards);
-    });
-    const primaryCompany = document.getElementById("id_empresa");
-    if(primaryCompany){ primaryCompany.addEventListener("change", updateCompanyRoleCards); }
-    updateCompanyRoleCards();
-});
-</script>
+{% if form.instance.pk and form.instance.id != request.user.id %}<form id="tempPasswordForm" method="post" action="{% url 'superadmin_usuario_reset_password_temporal' form.instance.id %}" data-temp-password-form hidden>{% csrf_token %}</form>{% endif %}
 {% endblock %}

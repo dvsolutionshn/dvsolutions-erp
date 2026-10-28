@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="{% static 'core/control-maestro.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="control-master-body">
+<body class="control-master-body {% block body_class %}{% endblock %}">
 <div class="erp-shell">
     <aside class="erp-sidebar">
         <div class="erp-brand">
