@@ -156,7 +156,9 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "control-company-grid")
         self.assertContains(response, empresa.nombre)
-        self.assertContains(response, "selecciona una tarjeta para abrir su ficha")
+        self.assertContains(response, "Directorio de empresas")
+        self.assertContains(response, "data-company-card")
+        self.assertContains(response, "<details")
 
     def test_solo_superadmin_puede_generar_respaldo(self):
         empresa = Empresa.objects.create(nombre="Empresa Protegida", slug="empresa-protegida", rtn="08011999000055")

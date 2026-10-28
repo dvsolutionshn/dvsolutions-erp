@@ -1,75 +1,73 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}Empresas{% endblock %}
+{% block body_class %}user-form-page companies-directory-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
 {% block header_title %}Empresas{% endblock %}
-{% block header_description %}Una vista limpia de toda la cartera. Selecciona una empresa para consultar su información y administrarla.{% endblock %}
-
-{% block topbar_actions %}<a href="{% url 'superadmin_empresa_create' %}" class="erp-action-link">+ Nueva empresa</a>{% endblock %}
+{% block header_description %}Consulta tus empresas, sus planes y el estado de cada licencia.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/companies-directory.css' %}">
+<script src="{% static 'core/companies-directory.js' %}" defer></script>
+{% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_empresa_create' %}" class="ua-btn">+ Nueva empresa</a>{% endblock %}
 
 {% block content %}
-<section class="control-summary-strip" aria-label="Resumen de empresas">
-    <article class="control-summary-item"><span>Total</span><strong>{{ resumen.total }}</strong></article>
-    <article class="control-summary-item"><span>Activas</span><strong>{{ resumen.activas }}</strong></article>
-    <article class="control-summary-item"><span>Inactivas</span><strong>{{ resumen.inactivas }}</strong></article>
-    <article class="control-summary-item"><span>Módulos activos</span><strong>{{ resumen.modulos }}</strong></article>
-    <article class="control-summary-item"><span>En prueba</span><strong>{{ resumen.prueba }}</strong></article>
-    <article class="control-summary-item"><span>Vencidas</span><strong>{{ resumen.vencidas }}</strong></article>
-</section>
+<div class="user-form companies-directory" data-companies-directory>
+    <header class="ua-intro">
+        <div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h3a1 1 0 0 1 1 1v11M2 21h20M8 7h4M8 11h4M8 15h4M9 21v-2h2v2"/></svg></span><div><p class="ua-eyebrow">Empresas y licencias</p><h1>Tu organización, de un vistazo.</h1><p class="ua-description">Revisa cada empresa y encuentra lo que necesitas para administrarla.</p></div></div>
+        <span class="ua-mode">Administración de empresas</span>
+    </header>
 
-<section class="control-company-toolbar">
-    <label class="control-company-search"><span class="sr-only">Buscar empresa</span><input id="control-company-search" type="search" placeholder="Buscar por empresa, identificador o RTN" autocomplete="off"></label>
-    <p><strong id="control-company-visible">{{ resumen.total }}</strong> empresas visibles · selecciona una tarjeta para abrir su ficha</p>
-</section>
+    <section class="cd-stats" aria-label="Resumen de empresas">
+        <article class="cd-stat"><span class="cd-stat-icon" aria-hidden="true">E</span><div><p>Total de empresas</p><strong>{{ resumen.total }}</strong></div></article>
+        <article class="cd-stat" data-tone="teal"><span class="cd-stat-icon" aria-hidden="true">✓</span><div><p>Empresas activas</p><strong>{{ resumen.activas }}</strong></div></article>
+        <article class="cd-stat" data-tone="slate"><span class="cd-stat-icon" aria-hidden="true">—</span><div><p>Empresas inactivas</p><strong>{{ resumen.inactivas }}</strong></div></article>
+        <article class="cd-stat" data-tone="blue"><span class="cd-stat-icon" aria-hidden="true">P</span><div><p>Licencias en prueba</p><strong>{{ resumen.prueba }}</strong></div></article>
+        <article class="cd-stat" data-tone="amber"><span class="cd-stat-icon" aria-hidden="true">!</span><div><p>Licencias vencidas</p><strong>{{ resumen.vencidas }}</strong></div></article>
+        <article class="cd-stat" data-tone="teal"><span class="cd-stat-icon" aria-hidden="true">M</span><div><p>Módulos manuales</p><strong>{{ resumen.modulos }}</strong><small>Asignaciones activas</small></div></article>
+    </section>
 
-<section class="control-company-grid" id="control-company-grid">
-    {% for empresa in empresas %}
-    <details class="control-company-card" data-company-search="{{ empresa.nombre|lower }} {{ empresa.slug|lower }} {{ empresa.rtn|lower }}">
-        <summary>
-            <span class="control-company-logo">{% if empresa.logo %}<img src="{{ empresa.logo.url }}" alt="Logo de {{ empresa.nombre }}">{% else %}{{ empresa.nombre|first|upper }}{% endif %}</span>
-            <span class="control-company-title"><strong>{{ empresa.nombre }}</strong><small>{{ empresa.slug }}</small></span>
-            <span class="control-company-status{% if not empresa.activa %} off{% endif %}">{% if empresa.activa %}Operativa{% else %}Inactiva{% endif %}</span>
-        </summary>
-        <div class="control-company-detail">
-            <div class="control-company-facts">
-                <div class="control-company-fact"><span>Plan</span><strong>{{ empresa.plan_comercial.nombre|default:"Sin plan asignado" }}</strong></div>
-                <div class="control-company-fact"><span>Licencia</span><strong>{{ empresa.estado_licencia_resuelto|capfirst }}</strong></div>
-                <div class="control-company-fact"><span>Vencimiento</span><strong>{{ empresa.fecha_vencimiento_plan|date:"d/m/Y"|default:"Sin límite" }}</strong></div>
-            </div>
-            <div class="control-company-meta">
-                <div><h4>Usuarios · {{ empresa.usuarios_total }}</h4>{% for usuario in empresa.usuarios_preview %}<p>{{ usuario.username }}{% if usuario.rol_sistema %} · {{ usuario.rol_sistema.nombre }}{% endif %}</p>{% empty %}<p>Sin usuarios asignados.</p>{% endfor %}</div>
-                <div><h4>Módulos · {{ empresa.modulos_habilitados_total }}</h4><div class="control-company-modules">{% for modulo in empresa.modulos_habilitados_preview %}<span>{{ modulo.nombre }}</span>{% empty %}<span>Sin módulos</span>{% endfor %}</div></div>
-            </div>
-            <div class="control-company-actions">
-                <a class="primary" href="{% url 'superadmin_empresa_detail' empresa.id %}">Abrir empresa</a>
-                <a href="{% url 'superadmin_empresa_edit' empresa.id %}">Editar</a>
-                <a href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa.id %}">Renovar licencia</a>
-                {% if empresa.estado_licencia_resuelto != 'suspendida' %}<form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa.id %}">{% csrf_token %}<button type="submit">Suspender</button></form>{% else %}<form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa.id %}">{% csrf_token %}<button type="submit">Activar</button></form>{% endif %}
-            </div>
+    <section class="ua-panel cd-directory-panel" aria-labelledby="cd-directory-title">
+        <div class="cd-panel-heading"><div><p class="ua-eyebrow">Empresas de tu organización</p><h2 id="cd-directory-title">Directorio de empresas</h2><p class="ua-description">Abre una ficha para consultar su información y administrar sus servicios.</p></div><a href="{% url 'superadmin_empresa_create' %}" class="ua-btn ua-btn--primary">+ Crear empresa</a></div>
+        <div class="cd-filter-tools" data-company-filter-tools hidden>
+            <label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="control-company-search" type="search" placeholder="Buscar por empresa, identificador o RTN…" aria-label="Buscar empresas" data-company-search autocomplete="off"></label>
+            <label class="cd-filter"><span class="cd-sr-only">Estado de empresa</span><select aria-label="Filtrar por estado de empresa" data-company-state-filter><option value="">Todas las empresas</option><option value="activa">Activas</option><option value="inactiva">Inactivas</option></select></label>
+            <label class="cd-filter"><span class="cd-sr-only">Estado de licencia</span><select aria-label="Filtrar por licencia" data-company-license-filter><option value="">Todas las licencias</option><option value="activa">Activas</option><option value="prueba">En prueba</option><option value="vencida">Vencidas</option><option value="suspendida">Suspendidas</option></select></label>
+            <label class="cd-filter"><span class="cd-sr-only">Tipo de sistema</span><select aria-label="Filtrar por tipo de sistema" data-company-type-filter><option value="">Todos los sistemas</option><option value="erp">ERP empresarial</option><option value="clinica">Clínica y centro médico</option><option value="tecnicentro">Tecnicentro vehicular</option></select></label>
         </div>
-    </details>
-    {% empty %}<div class="erp-empty">Aún no hay empresas registradas.</div>{% endfor %}
-</section>
-<div class="control-empty-filter" id="control-company-empty">No encontramos empresas con ese criterio.</div>
-
-<script>
-(() => {
-    const input = document.getElementById('control-company-search');
-    const cards = [...document.querySelectorAll('.control-company-card')];
-    const counter = document.getElementById('control-company-visible');
-    const empty = document.getElementById('control-company-empty');
-    if (!input) return;
-    const normalize = value => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    input.addEventListener('input', () => {
-        const query = normalize(input.value.trim());
-        let visible = 0;
-        cards.forEach(card => {
-            const match = !query || normalize(card.dataset.companySearch).includes(query);
-            card.hidden = !match;
-            if (match) visible += 1;
-        });
-        counter.textContent = visible;
-        empty.style.display = visible ? 'none' : 'block';
-    });
-})();
-</script>
+        <div class="cd-company-grid" id="control-company-grid">
+            {% for empresa in empresas %}
+            <article class="cd-card" data-company-card data-company-id="{{ empresa.id }}" data-company-search="{{ empresa.nombre }} {{ empresa.slug }} {{ empresa.rtn }}" data-company-state="{{ empresa.activa|yesno:'activa,inactiva' }}" data-company-license="{{ empresa.estado_licencia_resuelto }}" data-company-type="{{ empresa.tipo_solucion }}" aria-labelledby="cd-company-{{ empresa.id }}">
+                <div class="cd-card-heading">
+                    <span class="cd-logo" aria-hidden="true">{% if empresa.logo %}<img src="{{ empresa.logo.url }}" alt="" loading="lazy">{% else %}{{ empresa.nombre|first|upper }}{% endif %}</span>
+                    <div class="cd-company-name"><h3 id="cd-company-{{ empresa.id }}"><a href="{% url 'superadmin_empresa_detail' empresa.id %}">{{ empresa.nombre }}</a></h3><p>{{ empresa.slug }}</p></div>
+                    <span class="cd-status" data-tone="{{ empresa.activa|yesno:'success,neutral' }}"><i aria-hidden="true"></i>{{ empresa.activa|yesno:'Activa,Inactiva' }}</span>
+                </div>
+                <div class="cd-identifiers"><span class="cd-type">{{ empresa.get_tipo_solucion_display }}</span><span>RTN {{ empresa.rtn|default:'Sin registrar' }}</span></div>
+                <dl class="cd-facts">
+                    <div><dt>Plan comercial</dt><dd>{{ empresa.plan_comercial.nombre|default:'Sin plan asignado' }}</dd></div>
+                    <div><dt>Licencia</dt><dd><span class="cd-status" data-tone="{% if empresa.estado_licencia_resuelto == 'activa' %}success{% elif empresa.estado_licencia_resuelto == 'prueba' %}info{% else %}warning{% endif %}"><i aria-hidden="true"></i>{{ empresa.estado_licencia_resuelto|capfirst }}</span></dd></div>
+                    <div><dt>Vencimiento</dt><dd>{{ empresa.fecha_vencimiento_plan|date:'d/m/Y'|default:'Sin límite' }}</dd></div>
+                </dl>
+                <details class="cd-resources">
+                    <summary><span><span class="cd-resource-count"><b>{{ empresa.usuarios_total }}</b> usuario{{ empresa.usuarios_total|pluralize }}</span><span class="cd-resource-count"><b>{{ empresa.modulos_habilitados_total }}</b> módulo{{ empresa.modulos_habilitados_total|pluralize }}</span></span><span class="cd-resources-label">Ver detalle <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></span><span class="cd-sr-only"> de {{ empresa.nombre }}</span></summary>
+                    <div class="cd-resources-body">
+                        <div><h4>Usuarios asignados</h4><ul class="cd-user-preview">{% for usuario in empresa.usuarios_preview %}<li><strong>{{ usuario.username }}</strong>{% if usuario.rol_sistema %}<span>Rol global: {{ usuario.rol_sistema.nombre }}</span>{% endif %}</li>{% empty %}<li class="cd-muted">Sin usuarios asignados.</li>{% endfor %}</ul>{% if empresa.usuarios_total > 4 %}<p class="cd-preview-note">Mostrando 4 de {{ empresa.usuarios_total }} usuarios.</p>{% endif %}</div>
+                        <div><h4>Módulos habilitados</h4><div class="cd-modules">{% for modulo in empresa.modulos_habilitados_preview %}<span>{{ modulo.nombre }}</span>{% empty %}<span>Sin módulos</span>{% endfor %}</div>{% if empresa.modulos_habilitados_total > 4 %}<p class="cd-preview-note">Mostrando 4 de {{ empresa.modulos_habilitados_total }} módulos.</p>{% endif %}</div>
+                    </div>
+                </details>
+                <div class="cd-actions">
+                    <div class="cd-primary-actions"><a class="cd-action cd-action--primary" href="{% url 'superadmin_empresa_detail' empresa.id %}">Abrir empresa<span aria-hidden="true">↗</span><span class="cd-sr-only"> {{ empresa.nombre }}</span></a><a class="cd-action" href="{% url 'superadmin_empresa_edit' empresa.id %}">Editar<span class="cd-sr-only"> {{ empresa.nombre }}</span></a></div>
+                    <div class="cd-license-actions"><a class="cd-action" href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa.id %}">Renovar licencia<span class="cd-sr-only"> de {{ empresa.nombre }}</span></a>{% if empresa.estado_licencia_resuelto != 'suspendida' %}<form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa.id %}">{% csrf_token %}<button class="cd-action cd-action--danger" type="submit">Suspender licencia<span class="cd-sr-only"> de {{ empresa.nombre }}</span></button></form>{% else %}<form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa.id %}">{% csrf_token %}<button class="cd-action cd-action--success" type="submit">Activar licencia<span class="cd-sr-only"> de {{ empresa.nombre }}</span></button></form>{% endif %}</div>
+                </div>
+            </article>
+            {% empty %}<div class="cd-empty"><span class="cd-empty-icon" aria-hidden="true">E</span><h3>Tu primera empresa empieza aquí</h3><p>Aún no hay empresas registradas. Crea una para configurar su información, plan y módulos.</p><a class="ua-btn ua-btn--primary" href="{% url 'superadmin_empresa_create' %}">+ Crear primera empresa</a></div>{% endfor %}
+        </div>
+        <div class="cd-empty cd-no-results" data-company-empty hidden><h3>No encontramos empresas con esos filtros</h3><p>Prueba con otro nombre, estado de licencia o tipo de sistema.</p><button class="ua-btn ua-btn--quiet" type="button" data-company-reset>Limpiar filtros</button></div>
+        <div class="cd-directory-footer"><p role="status" aria-live="polite" data-company-results>{{ resumen.total }} empresas en el directorio.</p><button type="button" data-company-reset hidden>Limpiar filtros</button></div>
+    </section>
+    <p class="cd-directory-note">El estado de la empresa y el de su licencia se muestran por separado. Consulta la ficha para revisar todos sus usuarios, módulos y pagos.</p>
+</div>
 {% endblock %}
