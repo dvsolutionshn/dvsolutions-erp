@@ -1,373 +1,97 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}{{ empresa_obj.nombre }}{% endblock %}
-{% block header_title %}{{ empresa_obj.nombre }}{% endblock %}
-{% block header_description %}Ficha ejecutiva de la empresa para revisar plan, modulos, usuarios y estado operativo sin saltar entre varias pantallas.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'superadmin_empresas' %}" class="erp-action-link">Volver a Empresas</a>
-<a href="{% url 'superadmin_empresa_edit' empresa_obj.id %}" class="erp-action-link">Editar Empresa</a>
-{% if empresa_obj.estado_licencia_resuelto != 'suspendida' %}
-<form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa_obj.id %}" style="display:inline;">
-    {% csrf_token %}
-    <button type="submit" class="erp-action-link">Suspender</button>
-</form>
-{% endif %}
-{% if empresa_obj.estado_licencia_resuelto == 'suspendida' %}
-<form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa_obj.id %}" style="display:inline;">
-    {% csrf_token %}
-    <button type="submit" class="erp-action-link">Activar</button>
-</form>
-{% endif %}
-<a href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa_obj.id %}" class="erp-action-link">Renovar</a>
-<form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa_obj.id %}" style="display:inline;">
-    {% csrf_token %}
-    <button type="submit" class="erp-action-link">Generar respaldo</button>
-</form>
+{% block body_class %}user-form-page company-detail-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
+{% block header_title %}Ficha de empresa{% endblock %}
+{% block header_description %}Información, servicios y seguimiento de esta empresa en un solo lugar.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/company-detail.css' %}">
+<script src="{% static 'core/company-detail.js' %}" defer></script>
 {% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_empresas' %}" class="ua-btn">Volver a empresas</a><a href="{% url 'superadmin_empresa_edit' empresa_obj.id %}" class="ua-btn">Editar empresa</a>{% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        {% if empresa_obj.logo %}
-        <img src="{{ empresa_obj.logo.url }}" alt="{{ empresa_obj.nombre }}" style="width:86px;height:86px;object-fit:contain;border-radius:20px;border:1px solid var(--line);background:#fff;padding:8px;margin-bottom:12px;">
-        {% endif %}
-        <div class="erp-kpi-label">Empresa</div>
-        <p class="erp-stat-value" style="font-size:26px;">{{ empresa_obj.nombre }}</p>
-        <p class="erp-card-muted">RTN {{ empresa_obj.rtn }}</p>
-        <span class="erp-badge {% if empresa_obj.tipo_solucion == 'tecnicentro' %}warning{% elif empresa_obj.tipo_solucion == 'clinica' %}info{% else %}neutral{% endif %}">{{ empresa_obj.get_tipo_solucion_display }}</span>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Plan Comercial</div>
-        <p class="erp-stat-value" style="font-size:26px;">{{ empresa_obj.plan_comercial.nombre|default:"Sin plan" }}</p>
-        <p class="erp-card-muted">Precio mensual: {% if empresa_obj.plan_comercial %}L. {{ empresa_obj.plan_comercial.precio_mensual }}{% else %}No definido{% endif %}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Licencia</div>
-        <p class="erp-stat-value" style="font-size:26px;">{{ empresa_obj.estado_licencia_resuelto|capfirst }}</p>
-        <p class="erp-card-muted">Estado configurado para el servicio comercial de esta empresa.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Modulos</div>
-        <p class="erp-stat-value">{{ modulos_empresa|length }}</p>
-        <p class="erp-card-muted">Cantidad total de modulos actualmente habilitados.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Usuarios</div>
-        <p class="erp-stat-value">{{ usuarios_empresa|length }}</p>
-        <p class="erp-card-muted">Usuarios operativos vinculados a esta empresa.</p>
-    </article>
-</section>
+<div class="user-form company-detail" data-company-detail>
+    <header class="ua-panel ed-hero">
+        <div class="ed-identity"><span class="ed-logo" aria-hidden="true">{% if empresa_obj.logo %}<img src="{{ empresa_obj.logo.url }}" alt="">{% else %}{{ empresa_obj.nombre|first|upper }}{% endif %}</span><div><p class="ua-eyebrow">Empresa y servicios</p><h1>{{ empresa_obj.nombre }}</h1><div class="ed-identity-meta"><span>{{ empresa_obj.get_tipo_solucion_display }}</span><span>RTN {{ empresa_obj.rtn }}</span><span>{{ empresa_obj.slug }}</span></div></div></div>
+        <div class="ed-operational"><span class="ed-badge" data-tone="{% if empresa_obj.licencia_operativa_flag %}success{% else %}danger{% endif %}"><i aria-hidden="true"></i>{% if empresa_obj.licencia_operativa_flag %}Operativa{% else %}Bloqueada{% endif %}</span><p>{% if not empresa_obj.activa %}La empresa está inactiva.{% elif empresa_obj.estado_licencia_resuelto == 'suspendida' %}La licencia está suspendida.{% elif empresa_obj.estado_licencia_resuelto == 'vencida' %}La licencia está vencida.{% elif empresa_obj.licencia_operativa_flag %}Servicio habilitado para operar.{% else %}Revisa la configuración del servicio.{% endif %}</p></div>
+    </header>
 
-<section class="erp-info-grid">
-    <article class="erp-info-item">
-        <div class="erp-info-label">Estado</div>
-        <div class="erp-info-value">{% if empresa_obj.activa %}Activa{% else %}Inactiva{% endif %}</div>
-    </article>
-    <article class="erp-info-item">
-        <div class="erp-info-label">Correo</div>
-        <div class="erp-info-value">{{ empresa_obj.correo|default:"No definido" }}</div>
-    </article>
-    <article class="erp-info-item">
-        <div class="erp-info-label">Telefono</div>
-        <div class="erp-info-value">{{ empresa_obj.telefono|default:"No definido" }}</div>
-    </article>
-    <article class="erp-info-item">
-        <div class="erp-info-label">Ubicacion</div>
-        <div class="erp-info-value">{{ empresa_obj.ciudad|default:"-" }}, {{ empresa_obj.departamento|default:"-" }}</div>
-    </article>
-    <article class="erp-info-item">
-        <div class="erp-info-label">Inicio del servicio</div>
-        <div class="erp-info-value">{{ empresa_obj.fecha_inicio_plan|date:"F j, Y"|default:"No definido" }}</div>
-    </article>
-    <article class="erp-info-item">
-        <div class="erp-info-label">Vencimiento del servicio</div>
-        <div class="erp-info-value">{{ empresa_obj.fecha_vencimiento_plan|date:"F j, Y"|default:"No definido" }}</div>
-    </article>
-    <article class="erp-info-item">
-        <div class="erp-info-label">Estado operativo real</div>
-        <div class="erp-info-value">
-            {% if empresa_obj.licencia_operativa_flag %}
-                <span class="erp-badge success">Operativa</span>
-            {% else %}
-                <span class="erp-badge danger">Bloqueada</span>
-            {% endif %}
-        </div>
-    </article>
-    <article class="erp-info-item">
-        <div class="erp-info-label">Dias al vencimiento</div>
-        <div class="erp-info-value">
-            {% if empresa_obj.dias_restantes_plan is None %}
-                Sin fecha
-            {% else %}
-                {{ empresa_obj.dias_restantes_plan }}
-            {% endif %}
-        </div>
-    </article>
-</section>
+    <section class="ed-stats" aria-label="Resumen de la empresa">
+        <article class="ed-stat"><span class="ed-stat-icon" aria-hidden="true">P</span><div><p>Plan comercial</p><strong class="ed-stat-name">{{ empresa_obj.plan_comercial.nombre|default:'Sin plan' }}</strong><small>{% if empresa_obj.plan_comercial %}L. {{ empresa_obj.plan_comercial.precio_mensual }} / mes{% else %}Precio mensual no definido{% endif %}</small></div></article>
+        <article class="ed-stat" data-tone="blue"><span class="ed-stat-icon" aria-hidden="true">L</span><div><p>Licencia actual</p><strong class="ed-stat-name">{{ empresa_obj.estado_licencia_resuelto|capfirst }}</strong><small>{% if empresa_obj.dias_restantes_plan is None %}Sin fecha de vencimiento{% elif empresa_obj.dias_restantes_plan < 0 %}Venció el {{ empresa_obj.fecha_vencimiento_plan|date:'d/m/Y' }}{% elif empresa_obj.dias_restantes_plan == 0 %}Vence hoy{% else %}{{ empresa_obj.dias_restantes_plan }} día{{ empresa_obj.dias_restantes_plan|pluralize }} al vencimiento{% endif %}</small></div></article>
+        <article class="ed-stat" data-tone="teal"><span class="ed-stat-icon" aria-hidden="true">M</span><div><p>Módulos habilitados</p><strong>{{ modulos_empresa|length }}</strong><small>Incluidos por plan o ajuste manual</small></div></article>
+        <article class="ed-stat" data-tone="amber"><span class="ed-stat-icon" aria-hidden="true">U</span><div><p>Usuarios vinculados</p><strong>{{ usuarios_empresa|length }}</strong><small>Empresa principal y accesos adicionales</small></div></article>
+    </section>
 
-{% if empresa_obj.observaciones_comerciales %}
-<section class="erp-card">
-    <h3 class="erp-panel-title">Observaciones comerciales</h3>
-    <p class="erp-card-muted">{{ empresa_obj.observaciones_comerciales }}</p>
-</section>
-{% endif %}
+    <nav class="ed-nav" aria-label="Secciones de la ficha"><a href="#ed-information">Información</a><a href="#ed-users">Usuarios</a><a href="#ed-modules">Módulos</a><a href="#ed-license">Licencia y pagos</a><a href="#ed-backups">Respaldos</a></nav>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Proteccion de datos</h3>
-            <p class="erp-card-muted">Genera un ZIP privado con registros, relaciones, usuarios de la empresa, archivos subidos, manifiesto y hashes de integridad.</p>
-        </div>
-        <form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa_obj.id %}">
-            {% csrf_token %}
-            <button type="submit" class="erp-btn">Generar y descargar respaldo</button>
-        </form>
+    <div class="ed-overview">
+        <section class="ua-panel" id="ed-information" aria-labelledby="ed-information-title"><div class="ed-panel-heading"><div><p class="ua-eyebrow">Perfil empresarial</p><h2 id="ed-information-title">Información de la empresa</h2><p class="ua-description">Datos generales y contacto.</p></div></div>
+            <dl class="ed-facts">
+                <div><dt>Estado de la empresa</dt><dd><span class="ed-badge" data-tone="{{ empresa_obj.activa|yesno:'success,neutral' }}">{{ empresa_obj.activa|yesno:'Activa,Inactiva' }}</span></dd></div>
+                <div><dt>Correo</dt><dd>{{ empresa_obj.correo|default:'No definido' }}</dd></div>
+                <div><dt>Teléfono</dt><dd>{{ empresa_obj.telefono|default:'No definido' }}</dd></div>
+                <div><dt>Ubicación</dt><dd>{{ empresa_obj.ciudad|default:'-' }}, {{ empresa_obj.departamento|default:'-' }}{% if empresa_obj.pais %} · {{ empresa_obj.pais }}{% endif %}</dd></div>
+                <div><dt>Inicio del servicio</dt><dd>{{ empresa_obj.fecha_inicio_plan|date:'d/m/Y'|default:'No definido' }}</dd></div>
+                <div><dt>Vencimiento del servicio</dt><dd>{{ empresa_obj.fecha_vencimiento_plan|date:'d/m/Y'|default:'No definido' }}</dd></div>
+                {% if empresa_obj.direccion %}<div class="ed-fact-full"><dt>Dirección</dt><dd>{{ empresa_obj.direccion|linebreaksbr }}</dd></div>{% endif %}
+            </dl>
+            {% if empresa_obj.observaciones_comerciales %}<div class="ed-observations"><h3>Observaciones comerciales</h3><p>{{ empresa_obj.observaciones_comerciales|linebreaksbr }}</p></div>{% endif %}
+        </section>
+        <aside class="ua-panel ed-manage" aria-labelledby="ed-manage-title"><p class="ua-eyebrow">Acciones de administración</p><h2 id="ed-manage-title">Administrar empresa</h2><p class="ua-description">Actualiza sus datos o gestiona la continuidad del servicio.</p><a class="ua-btn ua-btn--primary" href="{% url 'superadmin_empresa_edit' empresa_obj.id %}">Editar empresa <span aria-hidden="true">→</span></a><a class="ua-btn" href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa_obj.id %}">Renovar licencia</a>
+            {% if empresa_obj.estado_licencia_resuelto != 'suspendida' %}<form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa_obj.id %}">{% csrf_token %}<button class="ua-btn ed-btn-danger" type="submit">Suspender licencia</button></form>{% else %}<form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa_obj.id %}">{% csrf_token %}<button class="ua-btn ed-btn-success" type="submit">Activar licencia</button></form>{% endif %}
+            <p class="ed-action-note">Suspender detiene el acceso sin borrar datos. Activar requiere que la licencia conserve vigencia.</p><a class="ed-text-link" href="#ed-backups">Ver respaldos y autorizaciones <span aria-hidden="true">↓</span></a>
+        </aside>
     </div>
-    <div class="erp-soft-panel" style="margin-bottom:16px;">
-        <strong>Importante:</strong>
-        <div>El ZIP puede contener informacion financiera y datos de salud. Guardalo en un disco cifrado y conserva otra copia fuera del servidor.</div>
-        <div>La restauracion debe probarse primero en un ambiente separado antes de tocar produccion.</div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th>Registros</th>
-                    <th>Archivos</th>
-                    <th>Tamano</th>
-                    <th>Generado por</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for respaldo in respaldos_empresa %}
-                <tr>
-                    <td>{{ respaldo.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                    <td><span class="erp-badge {% if respaldo.estado == 'exitoso' %}success{% elif respaldo.estado == 'fallido' %}danger{% else %}warning{% endif %}">{{ respaldo.get_estado_display }}</span></td>
-                    <td>{{ respaldo.registros_incluidos }}</td>
-                    <td>{{ respaldo.archivos_incluidos }}</td>
-                    <td>{{ respaldo.tamano_bytes|filesizeformat }}</td>
-                    <td>{{ respaldo.generado_por.username|default:"Sistema" }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty">Todavia no se ha generado un respaldo para esta empresa.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Autorizar respaldo al cliente</h3>
-            <p class="erp-card-muted">Genera un codigo temporal y de un solo uso para que el administrador de esta empresa descargue su informacion.</p>
-        </div>
-    </div>
-    <form method="post" action="{% url 'superadmin_empresa_generar_token_respaldo' empresa_obj.id %}" class="erp-compact-form">
-        {% csrf_token %}
-        <div class="erp-form-grid">
-            <div class="erp-field">
-                <label for="horas_vigencia">Vigencia del codigo</label>
-                <select id="horas_vigencia" name="horas_vigencia">
-                    <option value="24">24 horas</option>
-                    <option value="48">48 horas</option>
-                    <option value="72">72 horas</option>
-                    <option value="168">7 dias</option>
-                </select>
-            </div>
-            <div class="erp-field">
-                <label for="referencia_pago">Referencia de pago o autorizacion</label>
-                <input id="referencia_pago" name="referencia_pago" maxlength="160" placeholder="Ej. Transferencia 45821">
-            </div>
-        </div>
-        <div class="erp-form-actions">
-            <span class="erp-field-help">Al crear uno nuevo se revocan los codigos anteriores que no hayan sido utilizados.</span>
-            <button type="submit" class="erp-btn">Generar codigo temporal</button>
-        </div>
-    </form>
-    <div class="erp-table-wrap" style="margin-top:18px;">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Creado</th>
-                    <th>Codigo</th>
-                    <th>Estado</th>
-                    <th>Vence</th>
-                    <th>Referencia</th>
-                    <th>Utilizado por</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for token in tokens_respaldo %}
-                <tr>
-                    <td>{{ token.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                    <td><code>{{ token.token_preview }}</code></td>
-                    <td><span class="erp-badge {% if token.vigente %}success{% elif token.fecha_uso %}info{% else %}neutral{% endif %}">{{ token.estado_display }}</span></td>
-                    <td>{{ token.fecha_expiracion|date:"d/m/Y H:i" }}</td>
-                    <td>{{ token.referencia_pago|default:"-" }}</td>
-                    <td>{{ token.usado_por.username|default:"-" }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty">No se han emitido codigos de respaldo.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="ua-panel" id="ed-users" aria-labelledby="ed-users-title" data-detail-filter data-filter-label="usuarios">
+        <div class="ed-panel-heading"><div><p class="ua-eyebrow">Personas y acceso</p><h2 id="ed-users-title">Usuarios de la empresa <span class="ed-count">{{ usuarios_empresa|length }}</span></h2><p class="ua-description">Cuentas vinculadas por empresa principal o acceso adicional, incluidas las inactivas y retiradas.</p></div><a class="ua-btn" href="{% url 'superadmin_usuario_create' %}">+ Nuevo usuario</a></div>
+        <p class="ed-help">La columna Rol global muestra el perfil general de la cuenta. Abre Editar usuario para revisar sus permisos por empresa.</p>
+        <div class="ed-filter-tools" data-filter-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-filter-search aria-label="Buscar usuarios de esta empresa" placeholder="Buscar por usuario, correo o rol…" autocomplete="off"></label></div>
+        <div class="ed-table-wrap" data-filter-table><table class="ed-table ed-users-table"><caption class="ed-sr-only">Usuarios vinculados y rol global de la cuenta.</caption><thead><tr><th scope="col">Usuario</th><th scope="col">Rol global</th><th scope="col">Tipo</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead><tbody>
+        {% for usuario in usuarios_empresa %}<tr data-filter-row data-detail-user="{{ usuario.id }}">
+            <td data-label="Usuario"><strong class="ed-person-name">{{ usuario.username }}</strong><small class="ed-cell-note">{{ usuario.email|default:'Sin correo' }}</small>{% if usuario.id == request.user.id %}<span class="ed-tag">Tu cuenta</span>{% endif %}</td>
+            <td data-label="Rol global">{{ usuario.rol_sistema.nombre|default:'Sin rol global' }}{% if usuario.rol_sistema and not usuario.rol_sistema.activo %}<small class="ed-cell-note">Rol inactivo</small>{% endif %}</td>
+            <td data-label="Tipo"><span class="ed-tag">{% if usuario.is_superuser %}Superadmin{% elif usuario.es_administrador_empresa %}Admin empresa{% else %}Operativo{% endif %}</span></td>
+            <td data-label="Estado"><span class="ed-badge" data-tone="{{ usuario.is_active|yesno:'success,danger' }}">{{ usuario.is_active|yesno:'Activo,Inactivo' }}</span>{% if usuario.retirado_control %}<small class="ed-cell-note">Retirado del control operativo</small>{% endif %}</td>
+            <td data-label="Acciones"><div class="ed-row-actions"><a href="{% url 'superadmin_usuario_edit' usuario.id %}" class="ed-text-link">Editar usuario<span class="ed-sr-only"> {{ usuario.username }}</span></a>{% if usuario.id != request.user.id %}<a href="{% url 'superadmin_usuario_delete' usuario.id %}" class="ed-text-link ed-text-danger">Retirar<span class="ed-sr-only"> {{ usuario.username }}</span></a>{% endif %}</div></td>
+        </tr>{% empty %}<tr><td colspan="5"><div class="ed-empty">Esta empresa todavía no tiene usuarios asignados.</div></td></tr>{% endfor %}
+        </tbody></table></div><div class="ed-empty ed-no-results" data-filter-empty hidden>No encontramos usuarios con esa búsqueda.<button type="button" data-filter-reset>Limpiar búsqueda</button></div><p class="ed-result-count" data-filter-result role="status" aria-live="polite" hidden></p>
+    </section>
 
-<section class="erp-card">
-    <h3 class="erp-panel-title">Modulos habilitados</h3>
-    <div class="erp-inline-actions">
-        {% for modulo in modulos_empresa %}
-            <span class="erp-badge neutral">{{ modulo.nombre }}</span>
-        {% empty %}
-            <span class="erp-badge neutral">Sin modulos activos</span>
-        {% endfor %}
-    </div>
-</section>
+    <section class="ua-panel" id="ed-modules" aria-labelledby="ed-modules-title" data-detail-filter data-filter-label="módulos">
+        <div class="ed-panel-heading"><div><p class="ua-eyebrow">Servicios disponibles</p><h2 id="ed-modules-title">Módulos habilitados <span class="ed-count">{{ modulos_empresa|length }}</span></h2><p class="ua-description">Activaciones del plan comercial y ajustes manuales de la empresa.</p></div></div>
+        <div class="ed-module-tags">{% for modulo in modulos_empresa %}<span class="ed-module-tag"><span aria-hidden="true">✓</span>{{ modulo.nombre }}</span>{% empty %}<p class="ed-help">Sin módulos activos.</p>{% endfor %}</div>
+        <h3 class="ed-subtitle">Mapa del catálogo comercial</h3><p class="ed-help">Consulta de dónde proviene la activación de cada módulo.</p>
+        <div class="ed-filter-tools ed-filter-tools--two" data-filter-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-filter-search aria-label="Buscar en el mapa de módulos" placeholder="Buscar un módulo…" autocomplete="off"></label><select data-filter-state aria-label="Filtrar módulos por estado"><option value="">Todos los estados</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select></div>
+        <div class="ed-table-wrap" data-filter-table><table class="ed-table"><caption class="ed-sr-only">Mapa de módulos de la empresa y origen de su activación.</caption><thead><tr><th scope="col">Módulo</th><th scope="col">En el plan</th><th scope="col">Activación manual</th><th scope="col">Estado final</th><th scope="col">Origen</th></tr></thead><tbody>
+        {% for item in matriz_modulos %}<tr data-filter-row data-module-row data-filter-state="{{ item.activo_total|yesno:'activo,inactivo' }}"><td data-label="Módulo"><strong>{{ item.modulo.nombre }}</strong></td><td data-label="En el plan"><span class="ed-badge" data-tone="{{ item.incluido_plan|yesno:'success,neutral' }}">{{ item.incluido_plan|yesno:'Sí,No' }}</span></td><td data-label="Activación manual"><span class="ed-badge" data-tone="{{ item.activo_manual|yesno:'info,neutral' }}">{{ item.activo_manual|yesno:'Sí,No' }}</span></td><td data-label="Estado final"><span class="ed-badge" data-tone="{{ item.activo_total|yesno:'success,neutral' }}">{{ item.activo_total|yesno:'Activo,Inactivo' }}</span></td><td data-label="Origen">{{ item.origen }}</td></tr>{% empty %}<tr><td colspan="5"><div class="ed-empty">No hay módulos comerciales registrados.</div></td></tr>{% endfor %}
+        </tbody></table></div><div class="ed-empty ed-no-results" data-filter-empty hidden>No encontramos módulos con esos filtros.<button type="button" data-filter-reset>Limpiar filtros</button></div><p class="ed-result-count" data-filter-result role="status" aria-live="polite" hidden></p>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Licencia comercial</h3>
-            <p class="erp-card-muted">Aqui controlas prueba, renovaciones, suspensiones y vencimiento sin tocar la base de datos del cliente.</p>
-        </div>
-        <div class="erp-inline-actions">
-            {% if empresa_obj.estado_licencia_resuelto != 'suspendida' %}
-            <form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa_obj.id %}" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="erp-btn-secondary">Suspender</button>
-            </form>
-            {% endif %}
-            {% if empresa_obj.estado_licencia_resuelto == 'suspendida' %}
-            <form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa_obj.id %}" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="erp-btn-secondary">Activar</button>
-            </form>
-            {% endif %}
-            <a href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa_obj.id %}" class="erp-btn-secondary">Renovar</a>
-        </div>
-    </div>
-    <div class="erp-soft-panel" style="margin-bottom:16px;">
-        <strong>Como funciona:</strong>
-        <div>`Plan` = lo que contrataste.</div>
-        <div>`Licencia` = si hoy puede operar o no, y hasta cuando.</div>
-        <div>`Renovar` registra pago y extiende tiempo.</div>
-        <div>`Suspender` bloquea temporalmente sin borrar datos.</div>
-        <div>`Activar` solo reactiva una empresa suspendida que aun conserva vigencia.</div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Plan</th>
-                    <th>Meses</th>
-                    <th>Monto</th>
-                    <th>Metodo</th>
-                    <th>Referencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for pago in pagos_licencia %}
-                <tr>
-                    <td>{{ pago.fecha_pago|date:"F j, Y" }}</td>
-                    <td>{{ pago.plan_comercial.nombre|default:"Sin plan" }}</td>
-                    <td>{{ pago.cantidad_meses }}</td>
-                    <td>L. {{ pago.monto }}</td>
-                    <td>{{ pago.get_metodo_display }}</td>
-                    <td>{{ pago.referencia|default:"-" }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty">Todavia no hay pagos de licencia registrados para esta empresa.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="ua-panel" id="ed-license" aria-labelledby="ed-license-title"><div class="ed-panel-heading"><div><p class="ua-eyebrow">Seguimiento comercial</p><h2 id="ed-license-title">Licencia comercial y pagos</h2><p class="ua-description">Historial de renovaciones registradas para esta empresa.</p></div><a class="ua-btn" href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa_obj.id %}">Renovar licencia</a></div>
+        <div class="ed-license-explainer"><p><strong>Plan</strong> · Servicios contratados.</p><p><strong>Licencia</strong> · Estado y vigencia del servicio.</p><p><strong>Renovación</strong> · Registra un pago y extiende el tiempo.</p></div>
+        <div class="ed-table-wrap"><table class="ed-table"><caption class="ed-sr-only">Pagos de licencia registrados.</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Plan</th><th scope="col">Meses</th><th scope="col">Monto</th><th scope="col">Método</th><th scope="col">Referencia</th></tr></thead><tbody>
+        {% for pago in pagos_licencia %}<tr><td data-label="Fecha">{{ pago.fecha_pago|date:'d/m/Y' }}</td><td data-label="Plan">{{ pago.plan_comercial.nombre|default:'Sin plan' }}</td><td data-label="Meses">{{ pago.cantidad_meses }}</td><td data-label="Monto"><strong class="ed-nowrap">L. {{ pago.monto }}</strong></td><td data-label="Método">{{ pago.get_metodo_display }}</td><td data-label="Referencia">{{ pago.referencia|default:'-' }}</td></tr>{% empty %}<tr><td colspan="6"><div class="ed-empty">Todavía no hay pagos de licencia registrados para esta empresa.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Mapa de modulos de la empresa</h3>
-            <p class="erp-card-muted">Aqui ves todos los modulos del ERP y desde donde se activan para esta empresa.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Modulo</th>
-                    <th>Incluido en plan</th>
-                    <th>Activado manualmente</th>
-                    <th>Estado final</th>
-                    <th>Origen</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in matriz_modulos %}
-                <tr>
-                    <td>{{ item.modulo.nombre }}</td>
-                    <td>{% if item.incluido_plan %}<span class="erp-badge success">Si</span>{% else %}<span class="erp-badge neutral">No</span>{% endif %}</td>
-                    <td>{% if item.activo_manual %}<span class="erp-badge info">Si</span>{% else %}<span class="erp-badge neutral">No</span>{% endif %}</td>
-                    <td>{% if item.activo_total %}<span class="erp-badge success">Activo</span>{% else %}<span class="erp-badge danger">Inactivo</span>{% endif %}</td>
-                    <td>{{ item.origen }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="ua-panel" id="ed-backups" aria-labelledby="ed-backups-title"><div class="ed-panel-heading"><div><p class="ua-eyebrow">Protección de datos</p><h2 id="ed-backups-title">Respaldos de la empresa</h2><p class="ua-description">Descarga un ZIP privado con registros, relaciones, usuarios, archivos y su manifiesto de integridad.</p></div><form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa_obj.id %}">{% csrf_token %}<button type="submit" class="ua-btn ua-btn--primary">Generar y descargar respaldo</button></form></div>
+        <details class="ed-backup-guidance"><summary>Recomendaciones para conservar y restaurar un respaldo <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary><p>El ZIP puede contener información financiera y datos de salud. Guárdalo en un disco cifrado y conserva otra copia fuera del servidor. Prueba la restauración en un ambiente separado antes de tocar producción.</p></details>
+        <p class="ed-help ed-history-note">Últimos 8 respaldos de esta empresa.</p><div class="ed-table-wrap"><table class="ed-table"><caption class="ed-sr-only">Historial reciente de respaldos.</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Estado</th><th scope="col">Registros</th><th scope="col">Archivos</th><th scope="col">Tamaño</th><th scope="col">Generado por</th></tr></thead><tbody>
+        {% for respaldo in respaldos_empresa %}<tr><td data-label="Fecha">{{ respaldo.fecha_creacion|date:'d/m/Y H:i' }}</td><td data-label="Estado"><span class="ed-badge" data-tone="{% if respaldo.estado == 'exitoso' %}success{% elif respaldo.estado == 'fallido' %}danger{% else %}warning{% endif %}">{{ respaldo.get_estado_display }}</span></td><td data-label="Registros">{{ respaldo.registros_incluidos }}</td><td data-label="Archivos">{{ respaldo.archivos_incluidos }}</td><td data-label="Tamaño">{{ respaldo.tamano_bytes|filesizeformat }}</td><td data-label="Generado por">{{ respaldo.generado_por.username|default:'Sistema' }}</td></tr>{% empty %}<tr><td colspan="6"><div class="ed-empty">Todavía no se ha generado un respaldo para esta empresa.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Usuarios de la empresa</h3>
-            <p class="erp-card-muted">Aqui puedes ver rapidamente quien pertenece a la empresa y que rol cumple hoy.</p>
-        </div>
-        <a href="{% url 'superadmin_usuario_create' %}" class="erp-btn-secondary">Nuevo Usuario</a>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Usuario</th>
-                    <th>Rol</th>
-                    <th>Tipo</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for usuario in usuarios_empresa %}
-                <tr>
-                    <td>{{ usuario.username }}<br><small>{{ usuario.email|default:"Sin correo" }}</small></td>
-                    <td>{{ usuario.rol_sistema.nombre|default:"Sin rol" }}</td>
-                    <td>
-                        {% if usuario.is_superuser %}
-                            <span class="erp-badge info">Superadmin</span>
-                        {% elif usuario.es_administrador_empresa %}
-                            <span class="erp-badge warning">Admin empresa</span>
-                        {% else %}
-                            <span class="erp-badge neutral">Operativo</span>
-                        {% endif %}
-                    </td>
-                    <td><span class="erp-badge {% if usuario.is_active %}success{% else %}danger{% endif %}">{% if usuario.is_active %}Activo{% else %}Inactivo{% endif %}</span></td>
-                    <td class="actions">
-                        <a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar usuario</a>
-                        {% if usuario.id != request.user.id %}
-                        <a class="erp-link" style="color:#b42318;" href="{% url 'superadmin_usuario_delete' usuario.id %}">Eliminar</a>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="erp-empty">Esta empresa todavia no tiene usuarios asignados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="ua-panel" id="ed-backup-access" aria-labelledby="ed-backup-access-title"><div class="ed-panel-heading"><div><p class="ua-eyebrow">Autorización de descarga</p><h2 id="ed-backup-access-title">Autorizar respaldo al cliente</h2><p class="ua-description">Genera un código temporal y de un solo uso para que el administrador de esta empresa descargue su información.</p></div></div>
+        <form method="post" action="{% url 'superadmin_empresa_generar_token_respaldo' empresa_obj.id %}" class="ed-token-form">{% csrf_token %}<div class="ua-fields"><div class="ua-field"><label for="horas_vigencia">Vigencia del código</label><select id="horas_vigencia" name="horas_vigencia"><option value="24">24 horas</option><option value="48">48 horas</option><option value="72">72 horas</option><option value="168">7 días</option></select></div><div class="ua-field"><label for="referencia_pago">Referencia de pago o autorización</label><input id="referencia_pago" name="referencia_pago" maxlength="160" placeholder="Ej. Transferencia 45821"></div></div><div class="ed-token-actions"><p class="ed-help">Al crear uno nuevo se revocan los códigos anteriores que no hayan sido utilizados.</p><button type="submit" class="ua-btn ua-btn--primary">Generar código temporal</button></div></form>
+        <p class="ed-help ed-history-note">Últimas 8 autorizaciones de esta empresa.</p><div class="ed-table-wrap"><table class="ed-table"><caption class="ed-sr-only">Códigos de respaldo emitidos.</caption><thead><tr><th scope="col">Creado</th><th scope="col">Código</th><th scope="col">Estado</th><th scope="col">Vence</th><th scope="col">Referencia</th><th scope="col">Utilizado por</th></tr></thead><tbody>
+        {% for token in tokens_respaldo %}<tr><td data-label="Creado">{{ token.fecha_creacion|date:'d/m/Y H:i' }}</td><td data-label="Código"><code class="ed-token-preview">{{ token.token_preview }}</code></td><td data-label="Estado"><span class="ed-badge" data-tone="{% if token.vigente %}success{% elif token.fecha_uso %}info{% else %}neutral{% endif %}">{{ token.estado_display }}</span></td><td data-label="Vence">{{ token.fecha_expiracion|date:'d/m/Y H:i' }}</td><td data-label="Referencia">{{ token.referencia_pago|default:'-' }}</td><td data-label="Utilizado por">{{ token.usado_por.username|default:'-' }}</td></tr>{% empty %}<tr><td colspan="6"><div class="ed-empty">No se han emitido códigos de respaldo.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+</div>
 {% endblock %}
