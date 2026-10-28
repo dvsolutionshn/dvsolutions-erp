@@ -118,7 +118,7 @@ class EmpresaControlForm(forms.ModelForm):
         if "estado_licencia" in self.fields:
             self.fields["estado_licencia"].initial = self.instance.estado_licencia or "prueba"
             self.fields["estado_licencia"].required = False
-        self.fields["tipo_solucion"].widget = forms.RadioSelect()
+        self.fields["tipo_solucion"].widget = forms.RadioSelect(choices=self.fields["tipo_solucion"].choices)
         self.fields["tipo_solucion"].required = False
         self.fields["tipo_solucion"].initial = self.instance.tipo_solucion or "erp"
         if self.instance.pk:
@@ -181,7 +181,7 @@ class EmpresaControlForm(forms.ModelForm):
                     self.fields[field_name].help_text = help_text
         for field_name in ["fecha_inicio_plan", "fecha_vencimiento_plan"]:
             if field_name in self.fields:
-                self.fields[field_name].widget = forms.DateInput(attrs={"type": "date"})
+                self.fields[field_name].widget = forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
 
     def clean(self):
         cleaned_data = super().clean()

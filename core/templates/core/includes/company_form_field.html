@@ -1,0 +1,6 @@
+<div class="ua-field{% if full %} ua-field--full{% endif %}{% if field.errors %} has-error{% endif %}{% if file %} cf-file-field{% endif %}">
+    <label for="{{ field.id_for_label }}">{{ label|default:field.label }}{% if field.field.required %}<span class="ua-required" aria-hidden="true"> *</span>{% endif %}</label>
+    {{ field }}
+    {% if field.help_text %}<p class="ua-field-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+    {{ field.errors }}
+</div>

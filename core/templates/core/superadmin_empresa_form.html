@@ -1,91 +1,103 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}{{ titulo }}{% endblock %}
-{% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Gestiona la identidad de la empresa y define los modulos que esta podra usar dentro del ERP.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'superadmin_empresas' %}" class="erp-action-link">Volver a Empresas</a>
+{% block body_class %}user-form-page company-form-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
+{% block header_title %}Empresas{% endblock %}
+{% block header_description %}Organiza los datos, el plan y los servicios de cada empresa.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/company-form.css' %}">
+<script src="{% static 'core/company-form.js' %}" defer></script>
 {% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_empresas' %}" class="ua-btn">Volver a empresas</a>{% endblock %}
 
 {% block content %}
-<form method="post" enctype="multipart/form-data" class="erp-form-shell">
+<form method="post" enctype="multipart/form-data" class="user-form company-form" id="companyForm" data-company-form>
     {% csrf_token %}
-    {% if form.non_field_errors %}
-    <div class="erp-field-errors">{{ form.non_field_errors }}</div>
-    {% endif %}
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h3a1 1 0 0 1 1 1v11M2 21h20M8 7h4M8 11h4M8 15h4M9 21v-2h2v2"/></svg></span><div><p class="ua-eyebrow">Empresas y servicios</p><h1>{% if form.instance.pk %}Editar empresa{% else %}Nueva empresa{% endif %}</h1><p class="ua-description">{% if form.instance.pk %}Actualiza su información y revisa la configuración de sus servicios.{% else %}Configura su identidad, elige un plan y prepara su espacio de trabajo.{% endif %}</p></div></div><span class="ua-mode">{% if form.instance.pk %}Editando empresa{% else %}Nuevo espacio de trabajo{% endif %}</span></header>
+    <nav class="ua-steps" aria-label="Secciones de la empresa"><a href="#cf-solution"><span>1</span> Tipo de sistema</a><a href="#cf-identity"><span>2</span> Datos de empresa</a><a href="#cf-contact"><span>3</span> Contacto</a><a href="#cf-license"><span>4</span> Plan y licencia</a><a href="#cf-modules"><span>5</span> Módulos</a></nav>
+    {% if form.errors %}<section class="ua-errors" role="alert" tabindex="-1" data-company-errors><h2>Revisa los campos señalados</h2><p>Conservamos los datos y las selecciones para que puedas corregirlos. Si cargaste un logo nuevo, vuelve a seleccionarlo.</p>{{ form.non_field_errors }}<div class="ua-error-links">{% for field in form.visible_fields %}{% if field.errors %}<a href="#{% if field.name == 'tipo_solucion' %}cf-solution{% elif field.name == 'modulos_activos' %}cf-modules{% elif field.name == 'modulos_adicionales_visibles_clinica' %}cf-clinical{% else %}{{ field.id_for_label }}{% endif %}">Revisar {{ field.label|lower }}</a>{% endif %}{% endfor %}</div>{% for field in form.hidden_fields %}{{ field.errors }}{% endfor %}</section>{% endif %}
+    <div class="ua-layout">
+        <div class="ua-main">
+            <section class="ua-panel" id="cf-solution" aria-labelledby="cf-solution-title">
+                <div class="ua-panel-head"><span class="ua-section-number">01</span><div><h2 id="cf-solution-title">Tipo de sistema</h2><p>El perfil define la entrada, la experiencia principal y los módulos esenciales.</p></div></div>
+                <div class="cf-solutions" role="group" aria-labelledby="cf-solution-title">{% for opcion in form.tipo_solucion %}<label class="cf-solution"><span class="cf-solution-top">{{ opcion.tag }}<span class="cf-solution-icon" aria-hidden="true">{% if opcion.data.value == 'clinica' %}+{% elif opcion.data.value == 'tecnicentro' %}T{% else %}E{% endif %}</span></span><strong>{% if opcion.data.value == 'clinica' %}Clínica y centro médico{% elif opcion.data.value == 'tecnicentro' %}Tecnicentro vehicular{% else %}ERP empresarial{% endif %}</strong><small>{% if opcion.data.value == 'clinica' %}Pacientes, agenda y operación clínica.{% elif opcion.data.value == 'tecnicentro' %}Recepción, taller y servicios de vehículos.{% else %}Ventas, administración y operación del negocio.{% endif %}</small></label>{% endfor %}</div>{{ form.tipo_solucion.errors }}
+                <p class="ua-note">Puedes agregar módulos adicionales sin cambiar el perfil de la empresa.</p>
+            </section>
 
-    <section class="erp-form-card">
-        <h3>Tipo de solucion</h3>
-        <p>Este perfil define automaticamente la puerta de entrada, experiencia principal y modulos esenciales.</p>
-        <div class="erp-soft-panel solution-profile-selector">
-            {{ form.tipo_solucion }}
-            {{ form.tipo_solucion.errors }}
-            <div class="erp-field-help">Puedes agregar modulos adicionales mas abajo sin perder la identidad seleccionada.</div>
-        </div>
-    </section>
-
-    <section class="erp-form-card">
-        <h3>Perfil empresarial</h3>
-        <p>Este formulario queda reservado para tu operacion interna y no se expone a los clientes finales.</p>
-        <div class="erp-form-grid">
-            {% for field in form %}
-                {% if field.name != 'modulos_activos' and field.name != 'tipo_solucion' and field.name != 'modulos_adicionales_visibles_clinica' and field.name != 'manuales_pdf_habilitados' %}
-                <div class="erp-field {% if field.name == 'direccion' or field.name == 'slogan' or field.name == 'observaciones_comerciales' %}erp-field-span-full{% endif %}">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                    {{ field.errors }}
+            <section class="ua-panel" id="cf-identity" aria-labelledby="cf-identity-title">
+                <div class="ua-panel-head"><span class="ua-section-number" data-tone="teal">02</span><div><h2 id="cf-identity-title">Datos de la empresa</h2><p>Su identidad en el sistema y en sus documentos.</p></div></div>
+                <div class="ua-fields">
+                    {% include 'core/includes/company_form_field.html' with field=form.nombre full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.rtn only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.slug label='Identificador / enlace privado' only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.slogan full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.logo full=True file=True only %}
                 </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </section>
+            </section>
 
-<section class="erp-form-card">
-    <h3>Estado comercial y licencia</h3>
-    <p>Aqui defines si la empresa esta en prueba, activa, suspendida o vencida, y las fechas de control del servicio.</p>
-    <div class="erp-soft-panel">
-        <div class="erp-inline-actions">
-            <span class="erp-badge neutral">Prueba: acceso comercial temporal</span>
-            <span class="erp-badge success">Activa: operacion normal</span>
-            <span class="erp-badge warning">Suspendida: acceso detenido por gestion interna</span>
-            <span class="erp-badge danger">Vencida: servicio fuera de fecha</span>
+            <section class="ua-panel" id="cf-contact" aria-labelledby="cf-contact-title">
+                <div class="ua-panel-head"><span class="ua-section-number" data-tone="blue">03</span><div><h2 id="cf-contact-title">Contacto y ubicación</h2><p>Datos para identificar y contactar a esta empresa.</p></div></div>
+                <div class="ua-fields">
+                    {% include 'core/includes/company_form_field.html' with field=form.correo only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.telefono label='Teléfono' only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.sitio_web full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.pais label='País' only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.ciudad only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.departamento full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.direccion label='Dirección' full=True only %}
+                </div>
+            </section>
+
+            <section class="ua-panel" id="cf-license" aria-labelledby="cf-license-title">
+                <div class="ua-panel-head"><span class="ua-section-number">04</span><div><h2 id="cf-license-title">Plan y licencia</h2><p>Define el servicio contratado y sus fechas de vigencia.</p></div></div>
+                <div class="ua-fields">
+                    {% include 'core/includes/company_form_field.html' with field=form.plan_comercial only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.estado_licencia only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.fecha_inicio_plan only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.fecha_vencimiento_plan only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.condiciones_pago full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.observaciones_comerciales full=True only %}
+                </div>
+                <div class="cf-license-guide" aria-label="Estados de licencia"><span><i data-tone="info" aria-hidden="true"></i> Prueba · acceso temporal</span><span><i data-tone="success" aria-hidden="true"></i> Activa · operación normal</span><span><i data-tone="warning" aria-hidden="true"></i> Suspendida · acceso detenido</span><span><i data-tone="danger" aria-hidden="true"></i> Vencida · fuera de vigencia</span></div>
+                <div class="ua-toggle-item cf-active"><label for="{{ form.activa.id_for_label }}">{{ form.activa }}<span><strong>Empresa activa</strong><small>{{ form.activa.help_text }}</small></span></label>{{ form.activa.errors }}</div>
+            </section>
+
+            <section class="ua-panel" id="cf-modules" aria-labelledby="cf-modules-title" data-module-picker>
+                <div class="ua-panel-head"><span class="ua-section-number" data-tone="teal">05</span><div><h2 id="cf-modules-title">Módulos habilitados</h2><p>Selecciona las activaciones adicionales para esta empresa.</p></div><span class="ua-count" data-module-counter hidden><b data-module-selected>0</b> <span data-module-caption>marcados</span></span></div>
+                <p class="cf-info">El sistema también incluye los módulos esenciales del perfil y los contratados en el plan.</p>
+                <div class="cf-module-tools" data-module-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" aria-label="Buscar módulos habilitados" placeholder="Buscar un módulo…" data-module-search autocomplete="off"></label></div>
+                <div class="cf-module-grid">{% for opcion in form.modulos_activos %}<label class="cf-module-option" data-module-option>{{ opcion.tag }}<span>{{ opcion.choice_label }}</span><span class="cf-module-check" aria-hidden="true">✓</span></label>{% empty %}<p class="ua-note">No hay módulos comerciales disponibles en el catálogo.</p>{% endfor %}</div>{{ form.modulos_activos.errors }}
+                <div class="ua-empty cf-no-results" data-module-empty hidden>No encontramos módulos con esa búsqueda.<button type="button" class="cf-reset" data-module-reset>Limpiar búsqueda</button></div>
+                <p class="ua-note">{{ form.modulos_activos.help_text }} Las selecciones se conservan al buscar.</p>
+            </section>
+
+            <details class="ua-panel ua-advanced" id="cf-clinical" {% if form.tipo_solucion.value == 'clinica' or form.manuales_pdf_habilitados.value or form.modulos_adicionales_visibles_clinica.value or form.manuales_pdf_habilitados.errors or form.modulos_adicionales_visibles_clinica.errors %}open{% endif %}>
+                <summary><span class="ua-advanced-icon" aria-hidden="true">+</span><span><strong>Navegación clínica</strong><small>Manuales PDF y módulos visibles en el panel clínico</small></span><svg class="cf-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary>
+                <div class="ua-advanced-body"><p class="ua-note">Estos ajustes se utilizan en la experiencia clínica. Los accesos respetan los permisos de cada usuario.</p><div class="ua-toggle-item"><label for="{{ form.manuales_pdf_habilitados.id_for_label }}">{{ form.manuales_pdf_habilitados }}<span><strong>{{ form.manuales_pdf_habilitados.label }}</strong><small>{{ form.manuales_pdf_habilitados.help_text }}</small></span></label>{{ form.manuales_pdf_habilitados.errors }}</div>
+                    <h3 class="cf-subtitle">Módulos visibles en la interfaz clínica</h3><p class="ua-note">{{ form.modulos_adicionales_visibles_clinica.help_text }}</p>
+                    <div class="cf-module-grid cf-clinical-grid">{% for opcion in form.modulos_adicionales_visibles_clinica %}<label class="cf-module-option">{{ opcion.tag }}<span>{{ opcion.choice_label }}</span><span class="cf-module-check" aria-hidden="true">✓</span></label>{% empty %}<p class="ua-note">No hay módulos adicionales disponibles.</p>{% endfor %}</div>{{ form.modulos_adicionales_visibles_clinica.errors }}
+                </div>
+            </details>
+
+            <details class="ua-panel ua-advanced" id="cf-special" {% if form.permite_cai_historico.value or form.permite_plantilla_factura_independiente.value or form.permite_cai_historico.errors or form.permite_plantilla_factura_independiente.errors %}open{% endif %}>
+                <summary><span class="ua-advanced-icon" aria-hidden="true">⚙</span><span><strong>Ajustes especiales</strong><small>Correcciones fiscales y formato de factura independiente</small></span><svg class="cf-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary>
+                <div class="ua-advanced-body"><div class="ua-toggle-item"><label for="{{ form.permite_cai_historico.id_for_label }}">{{ form.permite_cai_historico }}<span><strong>Permitir corrección fiscal histórica</strong><small>{{ form.permite_cai_historico.help_text }}</small></span></label>{{ form.permite_cai_historico.errors }}</div><div class="ua-toggle-item"><label for="{{ form.permite_plantilla_factura_independiente.id_for_label }}">{{ form.permite_plantilla_factura_independiente }}<span><strong>{{ form.permite_plantilla_factura_independiente.label }}</strong><small>{{ form.permite_plantilla_factura_independiente.help_text }}</small></span></label>{{ form.permite_plantilla_factura_independiente.errors }}</div></div>
+            </details>
         </div>
+
+        <aside class="ua-sidebar" aria-label="Resumen de la empresa"><section class="ua-panel cf-review"><div class="ua-review-header"><span class="ua-eyebrow">Antes de guardar</span><span class="ua-review-dot" aria-hidden="true"></span></div><h2>Así quedará la empresa</h2>
+            <div data-company-preview hidden>
+                <div class="cf-company-preview"><span class="cf-avatar" data-preview-initials aria-hidden="true">E</span><div><strong data-preview-name>Nueva empresa</strong><span data-preview-slug>Define su identificador</span></div></div>
+                <dl class="ua-review-data"><div><dt>Tipo de sistema</dt><dd data-preview-solution>Por seleccionar</dd></div><div><dt>Plan comercial</dt><dd data-preview-plan>Sin plan asignado</dd></div><div><dt>Estado de la empresa</dt><dd data-preview-active>Activa</dd></div><div><dt>Licencia seleccionada</dt><dd data-preview-license>Prueba</dd></div><div><dt>Vencimiento indicado</dt><dd data-preview-expiry>Sin fecha indicada</dd></div><div><dt>Módulos marcados</dt><dd data-preview-modules>0</dd></div><div><dt>Logo</dt><dd data-preview-logo>{% if form.instance.logo %}Logo actual{% else %}Sin archivo seleccionado{% endif %}</dd></div></dl>
+            </div><noscript><p class="ua-note">Revisa los datos de cada sección antes de guardar.</p></noscript>
+            <div class="ua-review-note"><span aria-hidden="true">✓</span><p>El plan y el perfil también determinan los módulos disponibles. Cada usuario conserva sus permisos.</p></div>
+            <button type="submit" class="ua-btn ua-btn--primary ua-summary-submit"><span>{% if form.instance.pk %}Guardar cambios{% else %}Crear empresa{% endif %}</span><span aria-hidden="true">→</span></button><p class="ua-summary-footnote">La configuración se aplica al guardar.</p>
+        </section></aside>
     </div>
-</section>
-
-<section class="erp-form-card">
-    <h3>Modulos visibles en la interfaz clinica</h3>
-    <p>Marca los modulos habilitados que tambien quieres mostrar en el panel y menu clinico. Su acceso siempre respetara los permisos de cada usuario.</p>
-    <div class="erp-soft-panel">
-        <div class="erp-field" style="margin-bottom:18px">
-            <label for="{{ form.manuales_pdf_habilitados.id_for_label }}">{{ form.manuales_pdf_habilitados.label }}</label>
-            {{ form.manuales_pdf_habilitados }}
-            {% if form.manuales_pdf_habilitados.help_text %}<div class="erp-field-help">{{ form.manuales_pdf_habilitados.help_text }}</div>{% endif %}
-            {{ form.manuales_pdf_habilitados.errors }}
-        </div>
-        {{ form.modulos_adicionales_visibles_clinica }}
-        {% if form.modulos_adicionales_visibles_clinica.help_text %}<div class="erp-field-help">{{ form.modulos_adicionales_visibles_clinica.help_text }}</div>{% endif %}
-        {{ form.modulos_adicionales_visibles_clinica.errors }}
-    </div>
-</section>
-
-<section class="erp-form-card">
-    <h3>Modulos habilitados</h3>
-    <p>Marca solo lo que quieres vender o activar para esta empresa.</p>
-    <div class="erp-soft-panel">
-            {{ form.modulos_activos }}
-            {{ form.modulos_activos.errors }}
-        </div>
-    </section>
-
-    <div class="erp-form-actions">
-        <a href="{% url 'superadmin_empresas' %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Empresa</button>
-    </div>
+    <footer class="ua-actions-bar"><p><span class="ua-save-icon" aria-hidden="true">✓</span>{% if form.instance.pk %}Revisa los cambios antes de guardar.{% else %}Prepara su espacio de trabajo desde el primer día.{% endif %}</p><div><a href="{% url 'superadmin_empresas' %}" class="ua-btn ua-btn--quiet">Cancelar</a><button type="submit" class="ua-btn ua-btn--primary"><span>{% if form.instance.pk %}Guardar cambios{% else %}Crear empresa{% endif %}</span><span aria-hidden="true">→</span></button></div></footer>
 </form>
-<style>
-.solution-profile-selector ul{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:14px;list-style:none;margin:0;padding:0}.solution-profile-selector li{margin:0}.solution-profile-selector label{display:flex;align-items:center;gap:10px;min-height:76px;padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff;color:#102338;font-weight:800;cursor:pointer}.solution-profile-selector label:has(input:checked){border-color:#2a86e8;background:linear-gradient(145deg,#f2f8ff,#f7fffe);box-shadow:0 0 0 3px rgba(42,134,232,.09)}.solution-profile-selector input{width:18px;height:18px}@media(max-width:760px){.solution-profile-selector ul{grid-template-columns:1fr}}
-</style>
 {% endblock %}

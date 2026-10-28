@@ -1,0 +1,47 @@
+.user-form.company-form { max-width: 1600px; }
+.company-form .cf-solutions { display: grid; gap: 11px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.company-form .cf-solution { background: #fff; border: 1px solid #e1e7ef; border-radius: 11px; cursor: pointer; display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 15px; }
+.company-form .cf-solution:has(input:checked) { background: #f8f7ff; border-color: #aaa3e3; }
+.company-form .cf-solution-top { align-items: center; display: flex; flex-direction: row-reverse; gap: 10px; justify-content: space-between; }
+.company-form .cf-solution input, .company-form .cf-module-option input { accent-color: var(--ua-purple); flex: 0 0 17px; height: 17px; margin: 0; width: 17px; }
+.company-form .cf-solution-icon { align-items: center; background: #f0eefb; border-radius: 8px; color: #7063b6; display: flex; font-size: 17px; font-weight: 650; height: 33px; justify-content: center; width: 33px; }
+.company-form .cf-solution strong { color: #4b5d76; font-size: 12px; line-height: 1.6; }
+.company-form .cf-solution small { color: #64748b; font-size: 11px; line-height: 1.7; }
+.company-form .ua-field textarea { background: #fcfdff; border: 1px solid #d9e3ed; border-radius: 9px; color: var(--ua-ink); font-family: inherit; font-size: 13px; line-height: 1.7; min-height: 100px; padding: 11px 12px; resize: vertical; width: 100%; }
+.company-form .ua-field textarea:focus { background: #fff; border-color: #9691de; box-shadow: 0 0 0 3px #efedfb; outline: none; }
+.company-form .ua-field.has-error textarea { border-color: #db9696; }
+.company-form .cf-file-field { color: #64748b; font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
+.company-form .cf-file-field a { color: #7061b3; overflow-wrap: anywhere; }
+.company-form .cf-file-field input[type="file"] { background: #fafbfe; border: 1px dashed #d8dfec; font-size: 11px; height: auto; line-height: 1.6; min-height: 45px; padding: 9px; }
+.company-form .cf-file-field input[type="file"]::file-selector-button { background: #efedfa; border: 0; border-radius: 6px; color: #6d5aaf; cursor: pointer; font-family: inherit; font-size: 11px; margin-right: 10px; padding: 7px 9px; }
+.company-form .cf-file-field input[type="checkbox"] { accent-color: var(--ua-purple); display: inline-block; height: 16px; margin: 0 5px; padding: 0; vertical-align: middle; width: 16px; }
+.company-form .cf-file-field label:not(:first-child) { color: #64748b; display: inline; font-size: 11px; }
+.company-form .cf-license-guide { background: #fafbfe; border: 1px solid #edf1f6; border-radius: 9px; display: grid; gap: 9px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 19px; padding: 13px; }
+.company-form .cf-license-guide span { align-items: center; color: #64748b; display: flex; font-size: 10px; gap: 7px; line-height: 1.7; }
+.company-form .cf-license-guide i { background: #7092c1; border-radius: 50%; flex: 0 0 6px; height: 6px; }
+.company-form .cf-license-guide i[data-tone="success"] { background: #5b9c83; }
+.company-form .cf-license-guide i[data-tone="warning"] { background: #c4a262; }
+.company-form .cf-license-guide i[data-tone="danger"] { background: #bb7970; }
+.company-form .cf-active { border-bottom: 0; margin-top: 8px; padding-bottom: 0; }
+.company-form .cf-info { background: #f4f3fc; border: 1px solid #e9e5f8; border-radius: 9px; color: #6a608e; font-size: 11px; line-height: 1.8; margin-bottom: 16px; padding: 11px 13px; }
+.company-form .cf-module-tools { margin-bottom: 13px; }
+.company-form .cf-module-grid { display: grid; gap: 9px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.company-form .cf-module-option { align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 9px; color: #5d6d84; cursor: pointer; display: flex; font-size: 11px; gap: 9px; line-height: 1.7; min-height: 47px; padding: 11px; }
+.company-form .cf-module-option:has(input:checked) { background: #f9f8ff; border-color: #c1bae9; }
+.company-form .cf-module-option > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.company-form .cf-module-check { color: #8976ba; opacity: 0; }
+.company-form .cf-module-option:has(input:checked) .cf-module-check { opacity: 1; }
+.company-form .cf-subtitle { color: #52637b; font-size: 12px; font-weight: 650; margin: 20px 0 0; }
+.company-form .cf-clinical-grid { margin-top: 13px; }
+.company-form .cf-chevron { fill: none; flex: 0 0 17px; height: 17px; stroke: #8c98ad; stroke-width: 1.6; width: 17px; }
+.company-form .ua-advanced[open] > summary .cf-chevron { transform: rotate(180deg); }
+.company-form .cf-company-preview { align-items: center; display: flex; gap: 11px; margin-top: 22px; min-width: 0; }
+.company-form .cf-avatar { align-items: center; background: #efedfa; border: 1px solid #e5dff5; border-radius: 11px; color: #7e68b5; display: flex; flex: 0 0 42px; font-size: 17px; font-weight: 650; height: 42px; justify-content: center; }
+.company-form .cf-company-preview > div { min-width: 0; }
+.company-form .cf-company-preview strong { color: #4b5d76; display: block; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.company-form .cf-company-preview div > span { color: #64748b; display: block; font-size: 10px; line-height: 1.7; margin-top: 3px; overflow-wrap: anywhere; }
+.company-form .cf-no-results { background: #fafbfe; border: 1px dashed #dce3ed; border-radius: 9px; margin-top: 10px; padding: 18px; }
+.company-form .cf-reset { background: none; border: 0; border-radius: 5px; color: #7061b3; cursor: pointer; display: block; font-size: 11px; margin: 8px auto 0; padding: 5px; }
+.company-form .ua-advanced summary::-webkit-details-marker { display: none; }
+@media (max-width: 1100px) { .company-form .cf-review { display: grid; gap: 0 25px; grid-template-columns: repeat(2, minmax(0, 1fr)); } .company-form .cf-review .ua-review-header, .company-form .cf-review h2, .company-form .cf-review .ua-summary-footnote { grid-column: 1 / -1; } .company-form .cf-review [data-company-preview] { grid-row: span 2; } .company-form .cf-review .ua-review-note { align-self: start; } .company-form .cf-review .ua-summary-submit { align-self: end; } }
+@media (max-width: 720px) { .company-form .cf-solutions, .company-form .cf-module-grid, .company-form .cf-license-guide { grid-template-columns: minmax(0, 1fr); } .company-form .cf-solution { gap: 7px; padding: 14px; } .company-form .cf-solution-top { flex-direction: row; justify-content: flex-start; } .company-form .cf-solution-icon { height: 29px; width: 29px; } .company-form .cf-review { display: block; } }
