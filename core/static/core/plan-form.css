@@ -1,0 +1,36 @@
+.user-form.commercial-plan-form { max-width: 1600px; }
+.commercial-plan-form .ua-field textarea { background: #fcfdff; border: 1px solid #d9e3ed; border-radius: 9px; color: var(--ua-ink); font-family: inherit; font-size: 13px; height: 108px; line-height: 1.7; min-height: 90px; padding: 11px 12px; resize: vertical; width: 100%; }
+.commercial-plan-form .ua-field textarea:focus { background: #fff; border-color: #9691de; box-shadow: 0 0 0 3px #efedfb; outline: none; }
+.commercial-plan-form .ua-field.has-error textarea { border-color: #db9696; }
+.commercial-plan-form .pf-active { border-bottom: 0; border-top: 1px solid #edf0f5; margin-top: 20px; padding: 18px 0 0; }
+.commercial-plan-form .pf-module-tools { margin-bottom: 14px; }
+.commercial-plan-form .pf-module-grid { display: grid; gap: 9px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.commercial-plan-form .pf-module-option { align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 9px; color: #5d6d84; cursor: pointer; display: flex; font-size: 11px; gap: 9px; line-height: 1.7; min-height: 47px; padding: 11px; }
+.commercial-plan-form .pf-module-option input { accent-color: var(--ua-purple); flex: 0 0 17px; height: 17px; margin: 0; width: 17px; }
+.commercial-plan-form .pf-module-option:has(input:checked) { background: #f9f8ff; border-color: #c1bae9; }
+.commercial-plan-form .pf-module-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.commercial-plan-form .pf-module-check { color: #8976ba; opacity: 0; }
+.commercial-plan-form .pf-module-option:has(input:checked) .pf-module-check { opacity: 1; }
+.commercial-plan-form .pf-catalog-empty { color: #64748b; font-size: 12px; grid-column: 1 / -1; line-height: 1.8; padding: 24px 10px; text-align: center; }
+.commercial-plan-form .pf-catalog-empty h3 { color: #53617b; font-size: 14px; margin: 0 0 8px; }
+.commercial-plan-form .pf-module-empty { background: #fafbfe; border: 1px dashed #dce3ed; border-radius: 9px; padding: 20px; }
+.commercial-plan-form .pf-module-empty button { background: none; border: 0; border-radius: 5px; color: #7061b3; cursor: pointer; display: block; font-size: 11px; margin: 8px auto 0; padding: 5px; }
+.commercial-plan-form .pf-preview-identity { align-items: center; display: flex; gap: 11px; margin-top: 22px; min-width: 0; }
+.commercial-plan-form .pf-avatar { align-items: center; background: #efedfa; border: 1px solid #e5dff5; border-radius: 11px; color: #7e68b5; display: flex; flex: 0 0 41px; font-size: 17px; font-weight: 650; height: 41px; justify-content: center; }
+.commercial-plan-form .pf-preview-identity > div { min-width: 0; }
+.commercial-plan-form .pf-preview-identity strong { color: #4b5d76; display: block; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.commercial-plan-form .pf-preview-identity div > span { color: #64748b; display: block; font-size: 10px; line-height: 1.7; margin-top: 3px; overflow-wrap: anywhere; }
+.commercial-plan-form .pf-preview-price { background: #f7f6fd; border: 1px solid #eae6f8; border-radius: 10px; margin-top: 20px; padding: 15px; }
+.commercial-plan-form .pf-preview-price > span { color: #71668f; display: block; font-size: 10px; line-height: 1.7; }
+.commercial-plan-form .pf-preview-price strong { color: #6454a3; display: block; font-size: 27px; font-weight: 700; letter-spacing: -.04em; line-height: 1.5; margin-top: 4px; overflow-wrap: anywhere; }
+.commercial-plan-form .pf-status { align-items: center; background: #edf7f2; border: 1px solid #dceee5; border-radius: 20px; color: #397b64; display: inline-flex; font-size: 10px; gap: 6px; line-height: 1.5; padding: 5px 8px; }
+.commercial-plan-form .pf-status i { background: currentColor; border-radius: 50%; height: 5px; width: 5px; }
+.commercial-plan-form .pf-status[data-state="inactivo"] { background: #f4f5f8; border-color: #e8ebf0; color: #68788e; }
+.commercial-plan-form .pf-preview-label { align-items: center; color: #64748b; display: flex; font-size: 10px; gap: 8px; justify-content: space-between; line-height: 1.7; }
+.commercial-plan-form .pf-preview-label > span { background: #f0eefb; border-radius: 5px; color: #7c69ad; font-size: 10px; padding: 3px 6px; }
+.commercial-plan-form .pf-preview-modules ul { display: grid; gap: 8px; list-style: none; margin: 12px 0 0; max-height: 210px; overflow-y: auto; padding: 0; }
+.commercial-plan-form .pf-preview-modules li { border-left: 2px solid #ded7f4; color: #64748b; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; padding-left: 9px; }
+.commercial-plan-form .pf-preview-modules ul:empty { display: none; }
+.commercial-plan-form .pf-preview-modules .ua-note { margin-top: 10px; }
+@media (max-width: 1100px) { .commercial-plan-form .pf-review { column-gap: 25px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .commercial-plan-form .pf-review .ua-review-header, .commercial-plan-form .pf-review h2, .commercial-plan-form .pf-review .ua-summary-footnote { grid-column: 1 / -1; } .commercial-plan-form .pf-review [data-plan-preview] { grid-row: span 2; } .commercial-plan-form .pf-review .ua-review-note { align-self: start; } .commercial-plan-form .pf-review .ua-summary-submit { align-self: end; } }
+@media (max-width: 720px) { .commercial-plan-form .pf-module-grid { grid-template-columns: minmax(0, 1fr); } .commercial-plan-form #pf-modules .ua-panel-head > div { flex-basis: calc(100% - 47px); } .commercial-plan-form .pf-review { display: block; } }

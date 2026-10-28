@@ -1,41 +1,49 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}{{ titulo }}{% endblock %}
-{% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Configura el alcance comercial del plan y deja definidos los modulos que estaran disponibles para las empresas que lo contraten.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'superadmin_planes' %}" class="erp-action-link">Volver a Planes</a>
+{% block body_class %}user-form-page commercial-plan-form-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
+{% block header_title %}Planes comerciales{% endblock %}
+{% block header_description %}Define el precio, la disponibilidad y los servicios de cada plan.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/plan-form.css' %}">
+<script src="{% static 'core/plan-form.js' %}" defer></script>
 {% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_planes' %}" class="ua-btn">Volver a planes</a>{% endblock %}
 
 {% block content %}
-<form method="post" class="erp-form-shell">
-    {% csrf_token %}
-    <section class="erp-form-card">
-        <h3>Configuracion del plan</h3>
-        <div class="erp-form-grid">
-            {% for field in form %}
-                {% if field.name != 'modulos' %}
-                <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                    {{ field.errors }}
+<form method="post" class="user-form commercial-plan-form" id="commercialPlanForm" data-commercial-plan-form>
+    {% csrf_token %}{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span><div><p class="ua-eyebrow">Oferta comercial</p><h1>{% if form.instance.pk %}Editar plan comercial{% else %}Nuevo plan comercial{% endif %}</h1><p class="ua-description">{% if form.instance.pk %}Actualiza sus datos y revisa los módulos incluidos en el plan.{% else %}Organiza los servicios y el precio de una nueva opción para tus empresas.{% endif %}</p></div></div><span class="ua-mode">{% if form.instance.pk %}Editando plan{% else %}Nuevo plan{% endif %}</span></header>
+    <nav class="ua-steps" aria-label="Secciones del plan"><a href="#pf-data"><span>1</span> Datos del plan</a><a href="#pf-modules"><span>2</span> Módulos incluidos</a></nav>
+    {% if form.errors %}<section class="ua-errors" role="alert" tabindex="-1" data-plan-errors><h2>Revisa los campos señalados</h2><p>Conservamos los datos y los módulos seleccionados para que puedas corregirlos.</p>{{ form.non_field_errors }}<div class="ua-error-links">{% for field in form.visible_fields %}{% if field.errors %}<a href="#{% if field.name == 'modulos' %}pf-modules{% else %}{{ field.id_for_label }}{% endif %}">Revisar {{ field.label|lower }}</a>{% endif %}{% endfor %}</div>{% for field in form.hidden_fields %}{{ field.errors }}{% endfor %}</section>{% endif %}
+
+    <div class="ua-layout">
+        <div class="ua-main">
+            <section class="ua-panel" id="pf-data" aria-labelledby="pf-data-title"><div class="ua-panel-head"><span class="ua-section-number">01</span><div><h2 id="pf-data-title">Datos del plan</h2><p>Identifica el plan y define su precio mensual.</p></div></div>
+                <div class="ua-fields">
+                    {% include 'core/includes/company_form_field.html' with field=form.nombre full=True only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.codigo label='Código interno' only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.precio_mensual label='Precio mensual (L.)' only %}
+                    {% include 'core/includes/company_form_field.html' with field=form.descripcion label='Descripción' full=True only %}
                 </div>
-                {% endif %}
-            {% endfor %}
+                <div class="ua-toggle-item pf-active"><label for="{{ form.activo.id_for_label }}">{{ form.activo }}<span><strong>{{ form.activo.label }}</strong><small>{{ form.activo.help_text }}</small></span></label>{{ form.activo.errors }}</div>
+            </section>
+
+            <section class="ua-panel" id="pf-modules" aria-labelledby="pf-modules-title"><div class="ua-panel-head"><span class="ua-section-number" data-tone="teal">02</span><div><h2 id="pf-modules-title">Módulos incluidos</h2><p>Elige los servicios del catálogo comercial que incluirá este plan.</p></div><span class="ua-count" data-plan-module-counter hidden><b data-module-count>0</b> <span data-module-count-caption>seleccionados</span></span></div>
+                <div class="pf-module-tools" data-module-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-module-search aria-label="Buscar módulos del plan" placeholder="Buscar un módulo…" autocomplete="off"></label></div>
+                <div class="pf-module-grid">{% for opcion in form.modulos %}<label class="pf-module-option" data-plan-module>{{ opcion.tag }}<span class="pf-module-label">{{ opcion.choice_label }}</span><span class="pf-module-check" aria-hidden="true">✓</span></label>{% empty %}<div class="pf-catalog-empty"><h3>No hay módulos comerciales disponibles</h3><p>Los módulos del catálogo comercial aparecerán aquí para incluirlos en el plan.</p></div>{% endfor %}</div>{{ form.modulos.errors }}
+                <div class="ua-empty pf-module-empty" data-module-empty hidden>No encontramos módulos con esa búsqueda.<button type="button" data-module-reset>Limpiar búsqueda</button></div><p class="ua-note">{{ form.modulos.help_text }} Las selecciones se conservan al buscar.</p>
+            </section>
         </div>
-    </section>
-    <section class="erp-form-card">
-        <h3>Modulos incluidos</h3>
-        <div class="erp-soft-panel">
-            {{ form.modulos }}
-            {{ form.modulos.errors }}
-        </div>
-    </section>
-    <div class="erp-form-actions">
-        <a href="{% url 'superadmin_planes' %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Plan</button>
+
+        <aside class="ua-sidebar" aria-label="Resumen del plan"><section class="ua-panel pf-review"><div class="ua-review-header"><span class="ua-eyebrow">Antes de guardar</span><span class="ua-review-dot" aria-hidden="true"></span></div><h2>Así quedará el plan</h2>
+            <div data-plan-preview hidden><div class="pf-preview-identity"><span class="pf-avatar" data-preview-initials aria-hidden="true">P</span><div><strong data-preview-name>Nuevo plan</strong><span data-preview-code>Define su código interno</span></div></div><div class="pf-preview-price"><span>Precio mensual</span><strong data-preview-price>L. 0.00</strong></div><dl class="ua-review-data"><div><dt>Estado del plan</dt><dd><span class="pf-status" data-preview-status data-state="activo"><i aria-hidden="true"></i><span data-preview-status-label>Activo</span></span></dd></div></dl><div class="pf-preview-modules"><p class="pf-preview-label">Módulos comerciales seleccionados <span data-preview-count>0</span></p><ul data-preview-modules></ul><p class="ua-note" data-preview-empty>Sin módulos comerciales seleccionados.</p></div></div>
+            <noscript><p class="ua-note">Revisa los datos y los módulos antes de guardar el plan.</p></noscript><div class="ua-review-note"><span aria-hidden="true">✓</span><p>Los módulos del plan se suman a las activaciones propias de cada empresa. Los permisos de usuario se administran por separado.</p></div><button type="submit" class="ua-btn ua-btn--primary ua-summary-submit"><span>{% if form.instance.pk %}Guardar cambios{% else %}Crear plan{% endif %}</span><span aria-hidden="true">→</span></button><p class="ua-summary-footnote">La configuración se aplica al guardar.</p>
+        </section></aside>
     </div>
+    <footer class="ua-actions-bar"><p><span class="ua-save-icon" aria-hidden="true">✓</span>Revisa el precio, la disponibilidad y los módulos del plan.</p><div><a href="{% url 'superadmin_planes' %}" class="ua-btn ua-btn--quiet">Cancelar</a><button type="submit" class="ua-btn ua-btn--primary">{% if form.instance.pk %}Guardar cambios{% else %}Crear plan{% endif %}</button></div></footer>
 </form>
 {% endblock %}
