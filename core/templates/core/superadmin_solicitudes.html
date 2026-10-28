@@ -1,88 +1,18 @@
 {% extends 'core/superadmin_base.html' %}
-
+{% load static %}
 {% block title %}Solicitudes comerciales{% endblock %}
+{% block body_class %}user-form-page control-lists-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
 {% block header_title %}Solicitudes comerciales{% endblock %}
-{% block header_description %}Centraliza demostraciones, propuestas y solicitudes recibidas desde la web pública de DV Solutions.{% endblock %}
-
+{% block header_description %}Consulta las solicitudes recibidas desde la web pública y organiza su seguimiento.{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'core/user-form.css' %}"><link rel="stylesheet" href="{% static 'core/control-lists.css' %}"><script src="{% static 'core/control-lists.js' %}" defer></script>{% endblock %}
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Solicitudes totales</div>
-        <p class="erp-stat-value">{{ resumen.total }}</p>
-        <p class="erp-card-muted">Todos los prospectos registrados desde la web pública.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Nuevas</div>
-        <p class="erp-stat-value">{{ resumen.nuevas }}</p>
-        <p class="erp-card-muted">Oportunidades pendientes de primer contacto.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Solicitan prueba</div>
-        <p class="erp-stat-value">{{ resumen.prueba }}</p>
-        <p class="erp-card-muted">Prospectos interesados en evaluar el ERP con un piloto de 7 días.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">En demo</div>
-        <p class="erp-stat-value">{{ resumen.demo }}</p>
-        <p class="erp-card-muted">Solicitudes que ya pasaron a una demostración comercial.</p>
-    </article>
-</section>
-
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Bandeja comercial</h3>
-            <p class="erp-card-muted">Usa esta vista para priorizar prospectos, preparar demos y convertir solicitudes en empresas de prueba o propuestas formales.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Contacto</th>
-                    <th>Empresa</th>
-                    <th>Servicio</th>
-                    <th>RTN</th>
-                    <th>Prueba</th>
-                    <th>Estado</th>
-                    <th>Datos</th>
-                    <th>Detalle</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for solicitud in solicitudes %}
-                <tr>
-                    <td>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                    <td><strong>{{ solicitud.nombre_contacto }}</strong></td>
-                    <td>{{ solicitud.empresa_interesada|default:"-" }}</td>
-                    <td>{{ solicitud.get_servicio_interes_display }}</td>
-                    <td>{{ solicitud.rtn_empresa|default:"-" }}</td>
-                    <td>
-                        <span class="erp-badge {% if solicitud.solicita_prueba %}info{% else %}neutral{% endif %}">
-                            {% if solicitud.solicita_prueba %}Sí{% else %}No{% endif %}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="erp-badge {% if solicitud.estado == 'nueva' %}warning{% elif solicitud.estado == 'demo' %}info{% elif solicitud.estado == 'cerrada' %}success{% else %}neutral{% endif %}">
-                            {{ solicitud.get_estado_display }}
-                        </span>
-                    </td>
-                    <td>
-                        <div>{{ solicitud.correo }}</div>
-                        <div class="erp-card-muted">{{ solicitud.telefono|default:"Sin teléfono" }}</div>
-                    </td>
-                    <td style="max-width:320px;">
-                        <div class="erp-card-muted">{{ solicitud.mensaje }}</div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="9" class="erp-empty">Aún no hay solicitudes registradas desde la web pública.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+<div class="user-form control-list" data-control-list>
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span><div><p class="ua-eyebrow">Seguimiento comercial</p><h1>Tus oportunidades, a la vista.</h1><p class="ua-description">Encuentra cada solicitud y revisa lo que necesita el prospecto.</p></div></div><span class="ua-mode">Bandeja comercial</span></header>
+    <section class="cl-stats" aria-label="Resumen de solicitudes"><article class="cl-stat"><span class="cl-stat-icon" aria-hidden="true">S</span><div><p>Solicitudes totales</p><strong>{{ resumen.total }}</strong></div></article><article class="cl-stat" data-tone="amber"><span class="cl-stat-icon" aria-hidden="true">N</span><div><p>Nuevas</p><strong>{{ resumen.nuevas }}</strong></div></article><article class="cl-stat" data-tone="teal"><span class="cl-stat-icon" aria-hidden="true">P</span><div><p>Solicitan prueba</p><strong>{{ resumen.prueba }}</strong></div></article><article class="cl-stat" data-tone="blue"><span class="cl-stat-icon" aria-hidden="true">D</span><div><p>En demo</p><strong>{{ resumen.demo }}</strong></div></article></section>
+    <section class="ua-panel" aria-labelledby="cl-requests-title" data-list-filter data-list-label="solicitudes"><div class="cl-panel-heading"><div><p class="ua-eyebrow">Prospectos de la web</p><h2 id="cl-requests-title">Bandeja comercial</h2><p class="ua-description">Consulta datos de contacto, servicios solicitados y el mensaje completo.</p></div></div>
+        <div class="cl-filter-tools" data-list-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-list-search aria-label="Buscar solicitudes comerciales" placeholder="Buscar contacto, empresa o mensaje…" autocomplete="off"></label><select data-list-state aria-label="Filtrar solicitudes por estado"><option value="">Todos los estados</option>{% for value,label in estados_solicitudes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select><select data-list-extra-filter aria-label="Filtrar solicitudes por servicio"><option value="">Todos los servicios</option>{% for value,label in servicios_solicitudes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="cl-request-grid" data-list-content>{% for solicitud in solicitudes %}<article class="cl-request-card" data-list-row data-list-state="{{ solicitud.estado }}" data-list-extra="{{ solicitud.servicio_interes }}" data-request-id="{{ solicitud.id }}" aria-labelledby="cl-request-{{ solicitud.id }}"><header class="cl-request-heading"><time datetime="{{ solicitud.fecha_creacion|date:'c' }}">{{ solicitud.fecha_creacion|date:'d/m/Y H:i' }}</time><span class="cl-badge" data-tone="{% if solicitud.estado == 'nueva' %}warning{% elif solicitud.estado == 'demo' %}info{% elif solicitud.estado == 'cerrada' %}success{% else %}neutral{% endif %}">{{ solicitud.get_estado_display }}</span></header><h3 id="cl-request-{{ solicitud.id }}">{{ solicitud.nombre_contacto }}</h3><p class="cl-request-company">{{ solicitud.empresa_interesada|default:'Sin empresa indicada' }}</p><dl class="cl-request-facts"><div><dt>Servicio solicitado</dt><dd>{{ solicitud.get_servicio_interes_display }}</dd></div><div><dt>RTN</dt><dd>{{ solicitud.rtn_empresa|default:'Sin indicar' }}</dd></div><div><dt>Correo</dt><dd>{{ solicitud.correo }}</dd></div><div><dt>Teléfono</dt><dd>{{ solicitud.telefono|default:'Sin teléfono' }}</dd></div><div><dt>Solicita prueba</dt><dd><span class="cl-badge" data-tone="{{ solicitud.solicita_prueba|yesno:'info,neutral' }}">{{ solicitud.solicita_prueba|yesno:'Sí,No' }}</span></dd></div></dl><details class="cl-request-message"><summary>Ver mensaje de {{ solicitud.nombre_contacto }}</summary><p>{{ solicitud.mensaje|linebreaksbr }}</p></details></article>{% empty %}<div class="cl-empty"><h3>Aún no hay solicitudes comerciales</h3><p>Las solicitudes recibidas desde la web pública aparecerán aquí.</p></div>{% endfor %}</div><div class="cl-empty" data-list-empty hidden><h3>No encontramos solicitudes con esos filtros</h3><p>Prueba con otro contacto, servicio o estado.</p><button type="button" data-list-reset>Limpiar filtros</button></div><p data-list-result role="status" aria-live="polite">{{ solicitudes|length }} solicitudes en esta vista.</p>
+    </section>
+</div>
 {% endblock %}

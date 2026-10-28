@@ -1,145 +1,52 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}Respaldos{% endblock %}
+{% block body_class %}user-form-page control-lists-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
 {% block header_title %}Respaldos empresariales{% endblock %}
-{% block header_description %}Control privado para generar copias portátiles por empresa, con archivos, relaciones y verificación de integridad.{% endblock %}
+{% block header_description %}Genera copias por empresa y consulta su historial y autorizaciones de descarga.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/control-lists.css' %}">
+<script src="{% static 'core/control-lists.js' %}" defer></script>
+{% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Respaldos generados</div>
-        <p class="erp-stat-value">{{ resumen.total }}</p>
-        <p class="erp-card-muted">Historial completo de solicitudes realizadas desde Control Maestro.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Exitosos</div>
-        <p class="erp-stat-value">{{ resumen.exitosos }}</p>
-        <p class="erp-card-muted">Archivos preparados y entregados para descarga.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Empresas protegidas</div>
-        <p class="erp-stat-value">{{ resumen.empresas_respaldadas }}</p>
-        <p class="erp-card-muted">Empresas que cuentan con al menos un respaldo registrado.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Fallidos</div>
-        <p class="erp-stat-value">{{ resumen.fallidos }}</p>
-        <p class="erp-card-muted">Intentos que requieren revisión técnica.</p>
-    </article>
-</section>
+<div class="user-form control-list" data-control-list>
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/><path d="m8 12 3 3 5-6"/></svg></span><div><p class="ua-eyebrow">Protección de datos</p><h1>Respaldos de tus empresas.</h1><p class="ua-description">Prepara una copia, revisa su integridad y consulta las autorizaciones del cliente.</p></div></div><span class="ua-mode">Copias y autorizaciones</span></header>
 
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Generar respaldo ahora</h3>
-            <p class="erp-card-muted">La descarga inicia al terminar. No cierres la ventana durante la preparacion.</p>
-        </div>
-    </div>
-    <div class="erp-soft-panel" style="margin-bottom:16px;">
-        <strong>Política recomendada:</strong>
-        <div>Genera copias antes de migraciones, cambios grandes o cargas masivas.</div>
-        <div>Mantén una copia cifrada local, otra en un disco externo y una tercera fuera de la ubicación principal.</div>
-        <div>Los ZIP contienen información sensible y no deben compartirse por canales inseguros.</div>
-    </div>
-    <div class="erp-grid">
-        {% for empresa in empresas %}
-        <article class="erp-card">
-            <div class="erp-kpi-label">{{ empresa.slug }}</div>
-            <h3 class="erp-panel-title">{{ empresa.nombre }}</h3>
-            <p class="erp-card-muted">RTN {{ empresa.rtn }}</p>
-            <div class="erp-inline-actions">
-                <form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="erp-btn">Descarga directa</button>
-                </form>
-                <a href="{% url 'superadmin_empresa_detail' empresa.id %}" class="erp-btn-secondary">Autorizar cliente</a>
-            </div>
-        </article>
-        {% empty %}
-        <div class="erp-empty">No hay empresas disponibles.</div>
-        {% endfor %}
-    </div>
-</section>
+    <section class="cl-stats" aria-label="Resumen de respaldos">
+        <article class="cl-stat"><span class="cl-stat-icon" aria-hidden="true">R</span><div><p>Respaldos registrados</p><strong>{{ resumen.total }}</strong><small>Historial completo de solicitudes</small></div></article>
+        <article class="cl-stat" data-tone="teal"><span class="cl-stat-icon" aria-hidden="true">✓</span><div><p>Exitosos</p><strong>{{ resumen.exitosos }}</strong><small>Archivos preparados para descarga</small></div></article>
+        <article class="cl-stat" data-tone="blue"><span class="cl-stat-icon" aria-hidden="true">E</span><div><p>Empresas con respaldo</p><strong>{{ resumen.empresas_respaldadas }}</strong><small>Al menos un respaldo exitoso</small></div></article>
+        <article class="cl-stat" data-tone="amber"><span class="cl-stat-icon" aria-hidden="true">!</span><div><p>Fallidos</p><strong>{{ resumen.fallidos }}</strong><small>Intentos que requieren revisión</small></div></article>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Historial de respaldos</h3>
-            <p class="erp-card-muted">Auditoría de fecha, operador, volumen e integridad de cada archivo generado.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Empresa</th>
-                    <th>Estado</th>
-                    <th>Registros</th>
-                    <th>Archivos</th>
-                    <th>Tamaño</th>
-                    <th>SHA-256</th>
-                    <th>Operador</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for respaldo in respaldos %}
-                <tr>
-                    <td>{{ respaldo.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                    <td><a class="erp-link" href="{% url 'superadmin_empresa_detail' respaldo.empresa.id %}">{{ respaldo.empresa.nombre }}</a></td>
-                    <td><span class="erp-badge {% if respaldo.estado == 'exitoso' %}success{% elif respaldo.estado == 'fallido' %}danger{% else %}warning{% endif %}">{{ respaldo.get_estado_display }}</span></td>
-                    <td>{{ respaldo.registros_incluidos }}</td>
-                    <td>{{ respaldo.archivos_incluidos }}</td>
-                    <td>{{ respaldo.tamano_bytes|filesizeformat }}</td>
-                    <td><code title="{{ respaldo.sha256 }}">{{ respaldo.sha256|slice:":12"|default:"-" }}</code></td>
-                    <td>{{ respaldo.generado_por.username|default:"Sistema" }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="8" class="erp-empty">Todavia no hay respaldos registrados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="ua-panel" aria-labelledby="cl-backup-companies-title" data-list-filter data-list-label="empresas">
+        <div class="cl-panel-heading"><div><p class="ua-eyebrow">Copias por empresa</p><h2 id="cl-backup-companies-title">Generar respaldo ahora</h2><p class="ua-description">La descarga inicia al terminar. Mantén abierta esta ventana durante la preparación.</p></div></div>
+        <details class="cl-note"><summary>Recomendaciones para conservar los respaldos</summary><p>Genera copias antes de migraciones, cambios grandes o cargas masivas. Mantén una copia cifrada local, otra en un disco externo y una tercera fuera de la ubicación principal. Los ZIP contienen información sensible y no deben compartirse por canales inseguros.</p></details>
+        <div class="cl-filter-tools" data-list-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-list-search aria-label="Buscar empresa para respaldo" placeholder="Buscar por empresa, identificador o RTN…" autocomplete="off"></label></div>
+        <div class="cl-company-grid" data-list-content>{% for empresa in empresas %}
+            <article class="cl-company-card" data-list-row data-backup-company="{{ empresa.id }}"><span class="cl-code">{{ empresa.slug }}</span><h3>{{ empresa.nombre }}</h3><p class="cl-note">RTN {{ empresa.rtn }}</p><div class="cl-row-actions"><form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa.id %}">{% csrf_token %}<button type="submit" class="ua-btn ua-btn--primary">Descarga directa<span class="cl-sr-only"> de {{ empresa.nombre }}</span></button></form><a class="ua-btn" href="{% url 'superadmin_empresa_detail' empresa.id %}">Autorizar cliente<span class="cl-sr-only"> de {{ empresa.nombre }}</span></a></div></article>
+        {% empty %}<div class="cl-empty">No hay empresas disponibles.</div>{% endfor %}</div>
+        <div class="cl-empty" data-list-empty hidden>No encontramos empresas con esa búsqueda.<button type="button" class="ua-btn ua-btn--quiet" data-list-reset>Limpiar búsqueda</button></div><p class="cl-note" data-list-result role="status" aria-live="polite" hidden></p>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Codigos autorizados</h3>
-            <p class="erp-card-muted">Auditoria de autorizaciones temporales emitidas para administradores empresariales.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Creado</th>
-                    <th>Empresa</th>
-                    <th>Codigo</th>
-                    <th>Estado</th>
-                    <th>Vencimiento</th>
-                    <th>Referencia</th>
-                    <th>Emitido por</th>
-                    <th>Utilizado por</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for token in tokens_respaldo %}
-                <tr>
-                    <td>{{ token.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                    <td><a class="erp-link" href="{% url 'superadmin_empresa_detail' token.empresa.id %}">{{ token.empresa.nombre }}</a></td>
-                    <td><code>{{ token.token_preview }}</code></td>
-                    <td><span class="erp-badge {% if token.vigente %}success{% elif token.fecha_uso %}info{% else %}neutral{% endif %}">{{ token.estado_display }}</span></td>
-                    <td>{{ token.fecha_expiracion|date:"d/m/Y H:i" }}</td>
-                    <td>{{ token.referencia_pago|default:"-" }}</td>
-                    <td>{{ token.creado_por.username|default:"Sistema" }}</td>
-                    <td>{{ token.usado_por.username|default:"-" }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="8" class="erp-empty">Todavia no se han emitido codigos para clientes.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="ua-panel" aria-labelledby="cl-backup-history-title" data-list-filter data-list-label="respaldos">
+        <div class="cl-panel-heading"><div><p class="ua-eyebrow">Historial de copias</p><h2 id="cl-backup-history-title">Historial de respaldos</h2><p class="ua-description">Fecha, operador, volumen e integridad de los últimos 100 respaldos registrados.</p></div></div>
+        <div class="cl-filter-tools" data-list-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-list-search aria-label="Buscar en el historial de respaldos" placeholder="Buscar empresa, operador o huella de integridad…" autocomplete="off"></label><select data-list-state aria-label="Filtrar respaldos por estado"><option value="">Todos los estados</option><option value="exitoso">Exitosos</option><option value="fallido">Fallidos</option><option value="generando">Generando</option></select></div>
+        <div class="cl-table-wrap" data-list-content><table class="cl-table"><caption class="cl-sr-only">Historial reciente de respaldos empresariales.</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Empresa</th><th scope="col">Estado</th><th scope="col">Registros</th><th scope="col">Archivos</th><th scope="col">Tamaño</th><th scope="col">SHA-256</th><th scope="col">Operador</th></tr></thead><tbody>
+        {% for respaldo in respaldos %}<tr data-list-row data-list-state="{{ respaldo.estado }}" data-backup-record="{{ respaldo.id }}"><td data-label="Fecha">{{ respaldo.fecha_creacion|date:'d/m/Y H:i' }}</td><td data-label="Empresa"><a class="cl-link" href="{% url 'superadmin_empresa_detail' respaldo.empresa.id %}">{{ respaldo.empresa.nombre }}</a></td><td data-label="Estado"><span class="cl-badge" data-tone="{% if respaldo.estado == 'exitoso' %}success{% elif respaldo.estado == 'fallido' %}danger{% else %}warning{% endif %}">{{ respaldo.get_estado_display }}</span></td><td data-label="Registros">{{ respaldo.registros_incluidos }}</td><td data-label="Archivos">{{ respaldo.archivos_incluidos }}</td><td data-label="Tamaño">{{ respaldo.tamano_bytes|filesizeformat }}</td><td data-label="SHA-256"><code class="cl-code-text" title="{{ respaldo.sha256 }}">{{ respaldo.sha256|slice:':12'|default:'-' }}</code></td><td data-label="Operador">{{ respaldo.generado_por.username|default:'Sistema' }}</td></tr>{% empty %}<tr><td colspan="8"><div class="cl-empty">Todavía no hay respaldos registrados.</div></td></tr>{% endfor %}
+        </tbody></table></div><div class="cl-empty" data-list-empty hidden>No encontramos respaldos con esos filtros.<button type="button" class="ua-btn ua-btn--quiet" data-list-reset>Limpiar filtros</button></div><p class="cl-note" data-list-result role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <section class="ua-panel" aria-labelledby="cl-backup-tokens-title" data-list-filter data-list-label="códigos">
+        <div class="cl-panel-heading"><div><p class="ua-eyebrow">Autorizaciones de descarga</p><h2 id="cl-backup-tokens-title">Códigos autorizados</h2><p class="ua-description">Últimas 100 autorizaciones temporales emitidas para administradores empresariales.</p></div></div>
+        <div class="cl-filter-tools" data-list-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-list-search aria-label="Buscar códigos autorizados" placeholder="Buscar empresa, código visible, referencia o usuario…" autocomplete="off"></label><select data-list-state aria-label="Filtrar códigos autorizados por estado"><option value="">Todos los estados</option><option value="Disponible">Disponibles</option><option value="Utilizado">Utilizados</option><option value="Revocado">Revocados</option><option value="Vencido">Vencidos</option></select></div>
+        <div class="cl-table-wrap" data-list-content><table class="cl-table"><caption class="cl-sr-only">Historial reciente de autorizaciones temporales de respaldo.</caption><thead><tr><th scope="col">Creado</th><th scope="col">Empresa</th><th scope="col">Código</th><th scope="col">Estado</th><th scope="col">Vencimiento</th><th scope="col">Referencia</th><th scope="col">Emitido por</th><th scope="col">Utilizado por</th></tr></thead><tbody>
+        {% for token in tokens_respaldo %}<tr data-list-row data-list-state="{{ token.estado_display }}" data-backup-token="{{ token.id }}"><td data-label="Creado">{{ token.fecha_creacion|date:'d/m/Y H:i' }}</td><td data-label="Empresa"><a class="cl-link" href="{% url 'superadmin_empresa_detail' token.empresa.id %}">{{ token.empresa.nombre }}</a></td><td data-label="Código"><code class="cl-code-text">{{ token.token_preview }}</code></td><td data-label="Estado"><span class="cl-badge" data-tone="{% if token.vigente %}success{% elif token.fecha_uso %}info{% else %}neutral{% endif %}">{{ token.estado_display }}</span></td><td data-label="Vencimiento">{{ token.fecha_expiracion|date:'d/m/Y H:i' }}</td><td data-label="Referencia">{{ token.referencia_pago|default:'-' }}</td><td data-label="Emitido por">{{ token.creado_por.username|default:'Sistema' }}</td><td data-label="Utilizado por">{{ token.usado_por.username|default:'-' }}</td></tr>{% empty %}<tr><td colspan="8"><div class="cl-empty">Todavía no se han emitido códigos para clientes.</div></td></tr>{% endfor %}
+        </tbody></table></div><div class="cl-empty" data-list-empty hidden>No encontramos códigos con esos filtros.<button type="button" class="ua-btn ua-btn--quiet" data-list-reset>Limpiar filtros</button></div><p class="cl-note" data-list-result role="status" aria-live="polite" hidden></p>
+    </section>
+</div>
 {% endblock %}

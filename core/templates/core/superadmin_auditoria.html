@@ -1,12 +1,27 @@
 {% extends "core/superadmin_base.html" %}
+{% load static %}
 {% block title %}Bitácora global{% endblock %}
+{% block body_class %}user-form-page control-lists-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
 {% block header_title %}Bitácora global del ERP{% endblock %}
 {% block header_description %}Supervisión transversal de empresas, usuarios y módulos desde un único registro protegido.{% endblock %}
-{% block extra_head %}{% include "core/auditoria_estilos.html" %}{% endblock %}
+{% block extra_head %}
+{% include "core/auditoria_estilos.html" %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/control-lists.css' %}">
+<link rel="stylesheet" href="{% static 'core/audit-control.css' %}">
+{% endblock %}
 {% block content %}
-<section class="erp-card">
-    <div class="audit-heading"><div><div class="erp-kpi-label">Eventos encontrados</div><h3>{{ total_registros }}</h3></div><div class="audit-immutable">Control maestro</div></div>
-    <form method="get" class="audit-filters">
+<div class="user-form control-list audit-control" data-control-list>
+<header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg></span><div><p class="ua-eyebrow">Seguimiento del sistema</p><h1>La actividad del ERP, a la vista.</h1><p class="ua-description">Consulta qué cambió, quién lo hizo y el detalle de cada evento.</p></div></div><span class="ua-mode">Control maestro</span></header>
+<section class="cl-stats" aria-label="Resumen de los eventos encontrados">
+    <article class="cl-stat"><span class="cl-stat-icon" aria-hidden="true">E</span><div><p>Eventos encontrados</p><strong>{{ total_registros }}</strong></div></article>
+    <article class="cl-stat" data-tone="teal"><span class="cl-stat-icon" aria-hidden="true">R</span><div><p>En esta página</p><strong>{{ registros|length }}</strong></div></article>
+    <article class="cl-stat" data-tone="blue"><span class="cl-stat-icon" aria-hidden="true">P</span><div><p>Página actual</p><strong>{{ registros.number }} / {{ registros.paginator.num_pages }}</strong></div></article>
+</section>
+<section class="ua-panel" aria-labelledby="cl-audit-filters-title">
+    <div class="cl-panel-heading"><div><p class="ua-eyebrow">Encuentra un evento</p><h2 id="cl-audit-filters-title">Filtrar la bitácora</h2><p class="ua-description">Combina empresa, usuario, acción y fechas para consultar el historial.</p></div><span class="cl-badge" data-tone="success">Solo consulta</span></div>
+    <form method="get" class="cl-server-filters" data-audit-filters>
         <div class="wide"><label for="audit-q">Buscar</label><input id="audit-q" name="q" value="{{ filtros.q }}" placeholder="Documento, usuario, motivo o ID"></div>
         <div><label for="audit-company">Empresa</label><select id="audit-company" name="empresa"><option value="">Todas</option>{% for value in empresas %}<option value="{{ value.id }}" {% if empresa_seleccionada == value.id|stringformat:"s" %}selected{% endif %}>{{ value.nombre }}</option>{% endfor %}</select></div>
         <div><label for="audit-action">Acción</label><select id="audit-action" name="accion"><option value="">Todas</option>{% for value,label in acciones %}<option value="{{ value }}" {% if filtros.accion == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
@@ -14,8 +29,10 @@
         <div><label for="audit-user">Usuario</label><select id="audit-user" name="usuario"><option value="">Todos</option>{% for value in usuarios_auditoria %}<option value="{{ value.id }}" {% if filtros.usuario == value.id|stringformat:"s" %}selected{% endif %}>{{ value.username }}</option>{% endfor %}</select></div>
         <div><label for="audit-from">Desde</label><input id="audit-from" type="date" name="desde" value="{{ filtros.desde }}"></div>
         <div><label for="audit-to">Hasta</label><input id="audit-to" type="date" name="hasta" value="{{ filtros.hasta }}"></div>
-        <div class="audit-filter-actions"><a class="erp-btn-secondary" href="{% url 'superadmin_auditoria' %}">Limpiar</a><button class="erp-btn" type="submit">Filtrar</button></div>
+        <div class="cl-filter-actions"><a class="ua-btn ua-btn--quiet" href="{% url 'superadmin_auditoria' %}">Limpiar</a><button class="ua-btn ua-btn--primary" type="submit">Filtrar</button></div>
     </form>
 </section>
-<section class="erp-card">{% include "core/_auditoria_tabla.html" %}{% include "core/auditoria_paginacion.html" %}</section>
+<section class="ua-panel" aria-labelledby="cl-audit-events-title"><div class="cl-panel-heading"><div><p class="ua-eyebrow">Historial de actividad</p><h2 id="cl-audit-events-title">Eventos de la bitácora</h2><p class="ua-description">{% if total_registros %}Mostrando del {{ registros.start_index }} al {{ registros.end_index }} de {{ total_registros }} eventos.{% else %}No hay eventos para los filtros seleccionados.{% endif %}</p></div></div>{% include "core/_auditoria_tabla.html" %}{% include "core/auditoria_paginacion.html" %}</section>
+<p class="cl-note">La bitácora es de consulta. Despliega los cambios de cada evento para comparar sus valores anteriores y nuevos.</p>
+</div>
 {% endblock %}

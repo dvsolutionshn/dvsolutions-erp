@@ -2452,6 +2452,8 @@ def superadmin_solicitudes(request):
     return render(request, "core/superadmin_solicitudes.html", {
         **_superadmin_base_context(),
         "solicitudes": solicitudes,
+        "estados_solicitudes": SolicitudComercial.ESTADO_CHOICES,
+        "servicios_solicitudes": SolicitudComercial.SERVICIO_CHOICES,
         "resumen": {
             "total": solicitudes.count(),
             "nuevas": solicitudes.filter(estado="nueva").count(),

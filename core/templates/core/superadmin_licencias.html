@@ -1,103 +1,46 @@
 {% extends 'core/superadmin_base.html' %}
+{% load static %}
 
 {% block title %}Licencias{% endblock %}
+{% block body_class %}user-form-page control-lists-page{% endblock %}
+{% block header_kicker %}Mi Control{% endblock %}
 {% block header_title %}Licencias Comerciales{% endblock %}
-{% block header_description %}Controla periodos de prueba, renovaciones y empresas suspendidas o vencidas desde una sola vista ejecutiva.{% endblock %}
+{% block header_description %}Consulta la vigencia del servicio y el seguimiento de pagos de cada empresa.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/user-form.css' %}">
+<link rel="stylesheet" href="{% static 'core/control-lists.css' %}">
+<script src="{% static 'core/control-lists.js' %}" defer></script>
+{% endblock %}
+{% block topbar_actions %}<a class="ua-btn" href="{% url 'superadmin_empresas' %}">Ver empresas</a>{% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Operativas</div>
-        <p class="erp-stat-value">{{ resumen.operativas }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">En prueba</div>
-        <p class="erp-stat-value">{{ resumen.prueba }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Suspendidas</div>
-        <p class="erp-stat-value">{{ resumen.suspendidas }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Vencidas</div>
-        <p class="erp-stat-value">{{ resumen.vencidas }}</p>
-    </article>
-</section>
+<div class="user-form control-list" data-control-list>
+    <header class="ua-intro"><div class="ua-intro-main"><span class="ua-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 2 2 5-5"/></svg></span><div><p class="ua-eyebrow">Continuidad del servicio</p><h1>Tus licencias, bajo control.</h1><p class="ua-description">Revisa las fechas y encuentra las empresas que requieren seguimiento.</p></div></div><span class="ua-mode">Licencias y renovaciones</span></header>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Estado por empresa</h3>
-            <p class="erp-card-muted">Identifica rápidamente qué empresas requieren renovación, suspensión o reactivación.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Empresa</th>
-                    <th>Plan</th>
-                    <th>Licencia</th>
-                    <th>Vencimiento</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for empresa in empresas %}
-                <tr>
-                    <td>{{ empresa.nombre }}</td>
-                    <td>{{ empresa.plan_comercial.nombre|default:"Sin plan" }}</td>
-                    <td>
-                        <span class="erp-badge {% if empresa.estado_licencia_resuelto == 'activa' %}success{% elif empresa.estado_licencia_resuelto == 'prueba' %}info{% elif empresa.estado_licencia_resuelto == 'suspendida' %}warning{% else %}danger{% endif %}">
-                            {{ empresa.estado_licencia_resuelto|capfirst }}
-                        </span>
-                    </td>
-                    <td>{{ empresa.fecha_vencimiento_plan|date:"F j, Y"|default:"Sin fecha" }}</td>
-                    <td class="actions">
-                        <a class="erp-link" href="{% url 'superadmin_empresa_detail' empresa.id %}">Ver empresa</a>
-                        <a class="erp-link" href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa.id %}">Registrar pago</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="cl-stats" aria-label="Resumen de licencias">
+        <article class="cl-stat" data-tone="teal"><span class="cl-stat-icon" aria-hidden="true">✓</span><div><p>Empresas operativas</p><strong>{{ resumen.operativas }}</strong></div></article>
+        <article class="cl-stat" data-tone="blue"><span class="cl-stat-icon" aria-hidden="true">P</span><div><p>Licencias en prueba</p><strong>{{ resumen.prueba }}</strong></div></article>
+        <article class="cl-stat" data-tone="amber"><span class="cl-stat-icon" aria-hidden="true">—</span><div><p>Licencias suspendidas</p><strong>{{ resumen.suspendidas }}</strong></div></article>
+        <article class="cl-stat" data-tone="slate"><span class="cl-stat-icon" aria-hidden="true">!</span><div><p>Licencias vencidas</p><strong>{{ resumen.vencidas }}</strong></div></article>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Pagos recientes de licencia</h3>
-            <p class="erp-card-muted">Historial comercial para seguimiento de renovaciones.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Empresa</th>
-                    <th>Fecha</th>
-                    <th>Plan</th>
-                    <th>Meses</th>
-                    <th>Monto</th>
-                    <th>Método</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for pago in pagos %}
-                <tr>
-                    <td>{{ pago.empresa.nombre }}</td>
-                    <td>{{ pago.fecha_pago|date:"F j, Y" }}</td>
-                    <td>{{ pago.plan_comercial.nombre|default:"Sin plan" }}</td>
-                    <td>{{ pago.cantidad_meses }}</td>
-                    <td>L. {{ pago.monto }}</td>
-                    <td>{{ pago.get_metodo_display }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty">Todavia no hay pagos de licencia registrados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <section class="ua-panel" aria-labelledby="cl-license-companies-title" data-list-filter data-list-label="empresas">
+        <div class="cl-panel-heading"><div><p class="ua-eyebrow">Vigencia y disponibilidad</p><h2 id="cl-license-companies-title">Estado por empresa</h2><p class="ua-description">Consulta el plan y abre la ficha para renovar o administrar el servicio.</p></div></div>
+        <p class="cl-note">La actividad de la empresa y el estado de su licencia se muestran por separado.</p>
+        <div class="cl-filter-tools" data-list-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-list-search aria-label="Buscar licencias por empresa o plan" placeholder="Buscar por empresa, identificador o plan…" autocomplete="off"></label><select data-list-state aria-label="Filtrar licencias por estado"><option value="">Todas las licencias</option><option value="activa">Activas</option><option value="prueba">En prueba</option><option value="suspendida">Suspendidas</option><option value="vencida">Vencidas</option></select></div>
+        <div class="cl-table-wrap" data-list-content><table class="cl-table"><caption class="cl-sr-only">Estado de licencia y acciones de cada empresa.</caption><thead><tr><th scope="col">Empresa</th><th scope="col">Plan</th><th scope="col">Licencia</th><th scope="col">Vencimiento</th><th scope="col">Acciones</th></tr></thead><tbody>
+        {% for empresa in empresas %}<tr data-list-row data-license-company="{{ empresa.id }}" data-list-state="{{ empresa.estado_licencia_resuelto }}"><td data-label="Empresa"><strong>{{ empresa.nombre }}</strong><small class="cl-cell-note">{{ empresa.slug }}</small><span class="cl-tag">Empresa {{ empresa.activa|yesno:'activa,inactiva' }}</span></td><td data-label="Plan">{{ empresa.plan_comercial.nombre|default:'Sin plan' }}</td><td data-label="Licencia"><span class="cl-badge" data-tone="{% if empresa.estado_licencia_resuelto == 'activa' %}success{% elif empresa.estado_licencia_resuelto == 'prueba' %}info{% elif empresa.estado_licencia_resuelto == 'suspendida' %}warning{% else %}danger{% endif %}">{{ empresa.estado_licencia_resuelto|capfirst }}</span></td><td data-label="Vencimiento">{{ empresa.fecha_vencimiento_plan|date:'d/m/Y'|default:'Sin fecha' }}</td><td data-label="Acciones"><div class="cl-row-actions"><a class="cl-link" href="{% url 'superadmin_empresa_detail' empresa.id %}">Ver empresa<span class="cl-sr-only"> {{ empresa.nombre }}</span></a><a class="cl-link" href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa.id %}">Registrar pago<span class="cl-sr-only"> de {{ empresa.nombre }}</span></a></div></td></tr>{% empty %}<tr><td colspan="5"><div class="cl-empty">Aún no hay empresas registradas.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+        <div class="cl-empty cl-no-results" data-list-empty hidden>No encontramos empresas con esos filtros.<button class="ua-btn ua-btn--quiet" type="button" data-list-reset>Limpiar filtros</button></div><p class="cl-result-count" data-list-result role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <section class="ua-panel" aria-labelledby="cl-license-payments-title" data-list-filter data-list-label="pagos">
+        <div class="cl-panel-heading"><div><p class="ua-eyebrow">Seguimiento comercial</p><h2 id="cl-license-payments-title">Pagos recientes de licencia</h2><p class="ua-description">Últimos 30 pagos registrados, del más reciente al más antiguo.</p></div></div>
+        <div class="cl-filter-tools" data-list-tools hidden><label class="ua-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" data-list-search aria-label="Buscar pagos recientes de licencia" placeholder="Buscar por empresa, plan, fecha o método…" autocomplete="off"></label></div>
+        <div class="cl-table-wrap" data-list-content><table class="cl-table"><caption class="cl-sr-only">Pagos recientes de licencia.</caption><thead><tr><th scope="col">Empresa</th><th scope="col">Fecha</th><th scope="col">Plan</th><th scope="col">Meses</th><th scope="col">Monto</th><th scope="col">Método</th></tr></thead><tbody>
+        {% for pago in pagos %}<tr data-list-row data-license-payment="{{ pago.id }}"><td data-label="Empresa"><strong>{{ pago.empresa.nombre }}</strong></td><td data-label="Fecha">{{ pago.fecha_pago|date:'d/m/Y' }}</td><td data-label="Plan">{{ pago.plan_comercial.nombre|default:'Sin plan' }}</td><td data-label="Meses">{{ pago.cantidad_meses }}</td><td data-label="Monto">L. {{ pago.monto }}</td><td data-label="Método">{{ pago.get_metodo_display }}</td></tr>{% empty %}<tr><td colspan="6"><div class="cl-empty">Todavía no hay pagos de licencia registrados.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+        <div class="cl-empty cl-no-results" data-list-empty hidden>No encontramos pagos con esa búsqueda.<button class="ua-btn ua-btn--quiet" type="button" data-list-reset>Limpiar búsqueda</button></div><p class="cl-result-count" data-list-result role="status" aria-live="polite" hidden></p>
+    </section>
+</div>
 {% endblock %}

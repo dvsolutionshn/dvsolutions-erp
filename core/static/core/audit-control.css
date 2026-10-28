@@ -1,0 +1,55 @@
+.user-form.audit-control { max-width: 1800px; }
+.audit-control .cl-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.audit-control .cl-server-filters { margin: 0; }
+.audit-control .cl-filter-actions { grid-column: 1 / -1; justify-content: flex-end; }
+.audit-control .audit-table-wrap { border: 1px solid #e5eaf1; border-radius: 10px; overflow-x: auto; }
+.audit-control .audit-table { border-collapse: separate; border-spacing: 0; min-width: 0; table-layout: fixed; width: 100%; }
+.audit-control .audit-table th { background: #f8f9fc; border-bottom: 1px solid #e5eaf1; color: #66768c; font-size: 9px; font-weight: 650; letter-spacing: .04em; line-height: 1.6; padding: 13px 11px; text-align: left; text-transform: uppercase; }
+.audit-control .audit-table th:nth-child(1) { width: 10%; }
+.audit-control .audit-table th:nth-child(2) { width: 14%; }
+.audit-control .audit-table th:nth-child(3) { width: 13%; }
+.audit-control .audit-table th:nth-child(4) { width: 11%; }
+.audit-control .audit-table th:nth-child(5) { width: 18%; }
+.audit-control .audit-table th:nth-child(6) { width: 18%; }
+.audit-control .audit-table th:nth-child(7) { width: 16%; }
+.audit-control .audit-table td { background: #fff; border-bottom: 1px solid #edf0f5; color: #52637a; font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; padding: 15px 11px; vertical-align: top; }
+.audit-control .audit-table tr:last-child td { border-bottom: 0; }
+.audit-control .audit-table td strong { color: #425670; font-weight: 600; }
+.audit-control .audit-table td > span, .audit-control .audit-table td > strong + span, .audit-control .audit-object + span { color: #64748b; font-size: 10px; line-height: 1.8; margin-top: 5px; }
+.audit-control .audit-object { color: #7061b3; font-weight: 600; }
+.audit-control .audit-action { background: #f2f4f8; border: 1px solid #e6eaf1; border-radius: 20px; color: #65768d; font-size: 9px !important; font-weight: 500; line-height: 1.6; max-width: 100%; padding: 4px 7px; text-transform: none; }
+.audit-control .audit-action.is-crear { background: #edf7f2; border-color: #dceee5; color: #397b64; }
+.audit-control .audit-action.is-modificar, .audit-control .audit-action.is-relacion { background: #eff4fc; border-color: #dfe8f8; color: #4c71a4; }
+.audit-control .audit-action.is-eliminar { background: #fcf1f0; border-color: #f1dad7; color: #aa554c; }
+.audit-control .audit-details summary { color: #7061b3; cursor: pointer; font-size: 10px; font-weight: 600; line-height: 1.8; }
+.audit-control .audit-change-list { background: #fafaff; border: 1px solid #eeecf8; border-radius: 8px; margin-top: 8px; min-width: 0; padding: 8px; }
+.audit-control .audit-change-list > div { border-color: #e8e8f4; display: grid; font-size: 10px; gap: 5px; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr); padding: 8px 0; }
+.audit-control .audit-change-list > div:first-child { border-top: 0; padding-top: 0; }
+.audit-control .audit-change-list > div > strong { color: #596a82; grid-column: 1 / -1; overflow-wrap: anywhere; }
+.audit-control .audit-change-list .old { color: #a6554c; }
+.audit-control .audit-change-list .new { color: #397b64; }
+.audit-control .audit-change-list .arrow { color: #8490a3; }
+.audit-control .audit-pagination { flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-top: 18px; }
+.audit-control .audit-pagination > span { color: #64748b; font-size: 11px; line-height: 1.8; }
+.audit-control .audit-pagination .erp-btn-secondary { background: #fff; border: 1px solid #dfe6ef; border-radius: 8px; color: #66778f; font-size: 11px; font-weight: 600; line-height: 1.6; min-height: 37px; padding: 8px 12px; }
+.audit-control .audit-pagination .erp-btn-secondary:hover { background: #f7f6fc; border-color: #d6d0ec; }
+.audit-control .audit-table .erp-empty { background: transparent; color: #64748b; font-size: 12px; line-height: 1.8; padding: 28px 15px; text-align: center; }
+@media (max-width: 980px) {
+    .audit-control .audit-table-wrap { border: 0; overflow: visible; }
+    .audit-control .audit-table { display: block; }
+    .audit-control .audit-table thead { clip: rect(0,0,0,0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+    .audit-control .audit-table tbody { display: grid; gap: 14px; }
+    .audit-control .audit-table tr { border: 1px solid #e3e9f1; border-radius: 10px; display: grid; gap: 10px 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; padding: 16px; }
+    .audit-control .audit-table td { border: 0; display: block; min-width: 0; padding: 0; }
+    .audit-control .audit-table td:not([colspan])::before { color: #64748b; display: block; font-size: 9px; font-weight: 650; letter-spacing: .04em; line-height: 1.7; margin-bottom: 4px; text-transform: uppercase; }
+    .audit-control .audit-table td:nth-child(1):not([colspan])::before { content: "Fecha"; }
+    .audit-control .audit-table td:nth-child(2)::before { content: "Usuario"; }
+    .audit-control .audit-table td:nth-child(3)::before { content: "Módulo"; }
+    .audit-control .audit-table td:nth-child(4)::before { content: "Acción"; }
+    .audit-control .audit-table td:nth-child(5)::before { content: "Registro"; }
+    .audit-control .audit-table td:nth-child(6)::before { content: "Motivo"; }
+    .audit-control .audit-table td:nth-child(7)::before { content: "Cambios"; }
+    .audit-control .audit-table td:nth-child(7), .audit-control .audit-table td[colspan] { grid-column: 1 / -1; }
+    .audit-control .audit-change-list { max-width: 650px; }
+}
+@media (max-width: 720px) { .audit-control .cl-stats { grid-template-columns: minmax(0, 1fr); } .audit-control .audit-table tr { grid-template-columns: minmax(0, 1fr); } .audit-control .audit-pagination { justify-content: center; } .audit-control .cl-filter-actions > * { flex: 1; } }
