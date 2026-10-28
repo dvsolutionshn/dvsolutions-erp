@@ -2404,17 +2404,28 @@ def _grupos_permisos_erp_form(form):
 
 @superadmin_required
 def superadmin_modulos(request):
-    modulos = []
-    for modulo in Modulo.objects.filter(es_comercial=True).order_by("nombre"):
-        modulos.append({
+    catalogo = Modulo.objects.filter(es_comercial=True).annotate(
+        planes_count=Count("planmodulo__plan", filter=Q(planmodulo__activo=True), distinct=True),
+        empresas_count=Count("empresamodulo__empresa", filter=Q(empresamodulo__activo=True), distinct=True),
+    ).order_by("nombre")
+    modulos = [
+        {
             "modulo": modulo,
-            "planes_count": PlanModulo.objects.filter(modulo=modulo, activo=True).values("plan_id").distinct().count(),
-            "empresas_count": EmpresaModulo.objects.filter(modulo=modulo, activo=True).values("empresa_id").distinct().count(),
-        })
+            "planes_count": modulo.planes_count,
+            "empresas_count": modulo.empresas_count,
+        }
+        for modulo in catalogo
+    ]
 
     return render(request, "core/superadmin_modulos.html", {
         **_superadmin_base_context(),
         "modulos": modulos,
+        "resumen_modulos": {
+            "total": len(modulos),
+            "con_planes": sum(1 for item in modulos if item["planes_count"]),
+            "con_ajustes": sum(1 for item in modulos if item["empresas_count"]),
+            "sin_asignaciones": sum(1 for item in modulos if not item["planes_count"] and not item["empresas_count"]),
+        },
     })
 
 

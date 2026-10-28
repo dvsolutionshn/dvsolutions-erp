@@ -1,0 +1,43 @@
+.user-form.modules-directory { max-width: 1800px; }
+.modules-directory .md-stats { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.modules-directory .md-stat { align-items: flex-start; background: #fff; border: 1px solid var(--ua-line); border-radius: 13px; display: flex; gap: 12px; min-width: 0; padding: 19px; }
+.modules-directory .md-stat > div { min-width: 0; }
+.modules-directory .md-stat-icon { align-items: center; background: #efedfb; border-radius: 10px; color: #7063bd; display: flex; flex: 0 0 36px; font-size: 14px; font-weight: 650; height: 36px; justify-content: center; width: 36px; }
+.modules-directory .md-stat[data-tone="teal"] .md-stat-icon { background: #eaf6f1; color: #398471; }
+.modules-directory .md-stat[data-tone="slate"] .md-stat-icon { background: #f0f3f7; color: #6b7b90; }
+.modules-directory .md-stat[data-tone="blue"] .md-stat-icon { background: #ebf2fb; color: #4f78b0; }
+.modules-directory .md-stat p { color: #64748b; font-size: 11px; line-height: 1.6; }
+.modules-directory .md-stat strong { color: #30425b; display: block; font-size: 27px; font-weight: 700; letter-spacing: -.04em; line-height: 1.4; margin-top: 4px; }
+.modules-directory .md-stat small { color: #64748b; display: block; font-size: 9px; line-height: 1.7; margin-top: 3px; }
+.modules-directory .md-panel-heading { margin-bottom: 18px; }
+.modules-directory .md-panel-heading h2 { font-size: 19px; margin-top: 5px; }
+.modules-directory .md-panel-heading .ua-description { font-size: 12px; margin-top: 5px; }
+.modules-directory .md-scope-note { align-items: center; background: #f2f8f6; border: 1px solid #e0eee8; border-radius: 9px; color: #4d7664; display: flex; font-size: 11px; gap: 10px; line-height: 1.8; margin-bottom: 19px; padding: 12px 14px; }
+.modules-directory .md-scope-note > span { align-items: center; border: 1px solid #a8c8ba; border-radius: 50%; display: inline-flex; flex: 0 0 16px; font-size: 10px; height: 16px; justify-content: center; }
+.modules-directory .md-filter-tools { display: grid; gap: 11px; grid-template-columns: minmax(0, 1fr) 235px; margin-bottom: 21px; }
+.modules-directory .md-filter-tools select { background: #fafbfe; border: 1px solid #e1e7ef; border-radius: 9px; color: #64748b; font-family: inherit; font-size: 11px; height: 42px; min-width: 0; padding: 0 10px; width: 100%; }
+.modules-directory .md-cards { display: grid; gap: 15px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr)); }
+.modules-directory .md-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; min-width: 0; padding: 20px; }
+.modules-directory .md-card-heading { align-items: center; display: flex; gap: 10px; justify-content: space-between; margin-bottom: 15px; }
+.modules-directory .md-card-icon { align-items: center; background: #eaf5f1; border-radius: 10px; color: #4d8877; display: flex; font-size: 17px; font-weight: 650; height: 37px; justify-content: center; width: 37px; }
+.modules-directory .md-catalog-tag { background: #f2f5fa; border: 1px solid #e4eaf2; border-radius: 20px; color: #66788f; font-size: 9px; line-height: 1.6; padding: 4px 7px; }
+.modules-directory .md-code { color: #64748b; display: block; font-size: 10px; line-height: 1.7; overflow-wrap: anywhere; }
+.modules-directory .md-card h3 { color: #34465f; font-size: 17px; font-weight: 700; letter-spacing: -.025em; line-height: 1.5; margin: 5px 0 0; overflow-wrap: anywhere; }
+.modules-directory .md-metrics { border-top: 1px solid #edf0f5; display: grid; gap: 15px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 18px 0 0; padding-top: 16px; }
+.modules-directory .md-metrics dt { color: #64748b; font-size: 10px; line-height: 1.8; }
+.modules-directory .md-metrics dd { color: #4f6079; font-size: 22px; font-weight: 650; line-height: 1.5; margin: 5px 0 0; }
+.modules-directory .md-card-note { color: #64748b; font-size: 10px; line-height: 1.8; margin-top: 15px; }
+.modules-directory .md-footer { align-items: center; color: #64748b; display: flex; flex-wrap: wrap; font-size: 11px; gap: 12px; justify-content: space-between; line-height: 1.7; margin-top: 18px; }
+.modules-directory .md-footer button { background: none; border: 0; border-radius: 5px; color: #7061b3; cursor: pointer; font-size: 11px; padding: 5px 0; }
+.modules-directory .md-directory-footer { align-items: flex-start; color: #64748b; display: flex; flex-wrap: wrap; font-size: 11px; gap: 14px 25px; justify-content: space-between; line-height: 1.8; padding: 0 3px; }
+.modules-directory .md-directory-footer > p { flex: 1 1 400px; max-width: 760px; }
+.modules-directory .md-directory-footer > div { display: flex; flex-wrap: wrap; gap: 8px 19px; }
+.modules-directory .md-directory-footer a { color: #7061b3; font-weight: 600; line-height: 1.8; padding: 4px 0; }
+.modules-directory .md-empty { color: #64748b; font-size: 12px; grid-column: 1 / -1; line-height: 1.8; padding: 35px 20px; text-align: center; }
+.modules-directory .md-empty h3 { color: #53617b; font-size: 17px; margin: 0; }
+.modules-directory .md-empty p { margin: 8px auto 16px; max-width: 410px; }
+.modules-directory .md-empty-icon { align-items: center; background: #eaf5f1; border-radius: 14px; color: #4d8877; display: flex; font-size: 22px; height: 56px; justify-content: center; margin: 0 auto 15px; width: 56px; }
+.modules-directory .md-no-results { background: #fafbfe; border: 1px dashed #dce3ed; border-radius: 10px; }
+@media (max-width: 1150px) { .modules-directory .md-stat { flex-direction: column; gap: 10px; } }
+@media (max-width: 980px) { .modules-directory .md-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .modules-directory .md-stat { flex-direction: row; } }
+@media (max-width: 720px) { .modules-directory .md-filter-tools { grid-template-columns: minmax(0, 1fr); } .modules-directory .md-stat { flex-direction: column; padding: 14px; } .modules-directory .md-stat p { font-size: 10px; } .modules-directory .md-card { padding: 17px; } .modules-directory .md-scope-note { align-items: flex-start; } .modules-directory .md-scope-note > span { margin-top: 2px; } }
