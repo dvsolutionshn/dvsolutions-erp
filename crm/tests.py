@@ -104,7 +104,9 @@ class CRMTests(TestCase):
         self.assertEqual(response_dashboard.status_code, 200)
         self.assertTemplateUsed(response_dashboard, "core/dashboard_premium.html")
         self.assertNotContains(response_dashboard, 'class="mobile-home mobile-app-screen active"')
-        self.assertContains(response_dashboard, '(display-mode: standalone)')
+        self.assertContains(response_dashboard, '/static/crm/installed_app_entry.js')
+        self.assertContains(response_dashboard, 'clinicalInstalledAppUrl')
+        self.assertEqual(response_dashboard.context["clinical_installed_app_url"], reverse("agenda_mobile", args=[self.empresa.slug]))
         self.assertContains(response_dashboard, reverse("agenda_mobile", args=[self.empresa.slug]))
 
         response_app = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))

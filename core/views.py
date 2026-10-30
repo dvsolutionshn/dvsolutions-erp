@@ -1209,9 +1209,12 @@ def dashboard(request, slug=None):
             **dashboard_context(request, empresa, modulos_activos),
         })
 
+    from crm.mobile_modules import destino_inicio_instalado_app
+
     return render(request, 'core/dashboard_premium.html', {
         'empresa': empresa,
-        'modulos': modulos_activos
+        'modulos': modulos_activos,
+        'clinical_installed_app_url': destino_inicio_instalado_app(request, empresa),
     })
 
 

@@ -123,7 +123,7 @@ class MobileInventoryProductEditTests(TestCase):
     def financial_snapshot(self):
         return tuple(list(model.objects.order_by("pk").values()) for model in (Factura, PagoFactura, CAI))
 
-    def test_home_four_companies_both_roles_keeps_hospital_panel_and_three_native_inventory_links(self):
+    def test_home_four_companies_both_roles_share_original_read_inventory_panel(self):
         for granular in (True, False):
             self.set_role(granular, puede_inventario=True, puede_editar_productos=True)
             for company in self.empresas.values():
@@ -132,16 +132,11 @@ class MobileInventoryProductEditTests(TestCase):
                 self.assertEqual(response.context["app_inventory_products_url"], expected)
                 cards = [attrs for tag, attrs in _InventoryEditMarkup(response.content).nodes if tag == "a" and "mobile-home-card inventory" in attrs.get("class", "")]
                 self.assertEqual(len(cards), 1)
-                if company.slug == "hospital_mia":
-                    self.assertEqual(cards[0]["href"], "#productos-app")
-                    self.assertEqual(cards[0]["data-app-open"], "productos-app")
-                    self.assertTrue(response.context["puede_ver_productos_app"])
-                else:
-                    self.assertEqual(cards[0]["href"], expected)
-                    self.assertNotIn("data-app-open", cards[0])
-                    self.assertFalse(response.context["puede_ver_productos_app"])
-                    self.assertEqual(response.context["inventario_productos_app_payload"], [])
-                    self.assertNotContains(response, 'id="productos-app"')
+                self.assertEqual(cards[0]["href"], "#productos-app")
+                self.assertEqual(cards[0]["data-app-open"], "productos-app")
+                self.assertTrue(response.context["puede_ver_productos_app"])
+                self.assertEqual(response.context["inventario_productos_app_payload"], productos_inventario_app(company))
+                self.assertContains(response, 'id="productos-app"')
 
     def test_hospital_edit_map_is_separate_exact_own_dto_ids_and_trusted_app_urls(self):
         self.set_role(puede_inventario=True, puede_editar_productos=True)
@@ -282,14 +277,15 @@ class MobileInventoryProductEditTests(TestCase):
             home = self.home(company)
             hospital = company.slug == "hospital_mia"
             self.assertEqual(home.context["puede_alimentar_productos_app"], hospital)
-            self.assertEqual(home.context["puede_ver_productos_app"], hospital)
+            self.assertTrue(home.context["puede_ver_productos_app"])
+            self.assertEqual(home.context["inventario_productos_app_payload"], productos_inventario_app(company))
+            self.assertEqual(set(home.context["inventario_productos_app_editar_urls"]), {str(item["id"]) for item in home.context["inventario_productos_app_payload"]})
             if hospital:
                 self.assertContains(home, 'id="inventoryQuickEntryOpen"')
                 self.assertEqual(home.context["inventario_productos_app_payload"], productos_inventario_app(company))
                 self.assertTrue(all("edit_url" not in item for item in home.context["inventario_productos_app_payload"]))
             else:
                 self.assertNotContains(home, 'id="inventoryQuickEntryOpen"')
-                self.assertEqual(home.context["inventario_productos_app_editar_urls"], {})
             self.assertEqual(self.financial_snapshot(), finance)
             self.assertEqual(self.stock_snapshot(), stock)
 

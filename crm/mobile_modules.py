@@ -28,6 +28,37 @@ def inicio_app_disponible(request, empresa):
     return not rol_clinico_granular(request.user, empresa) or request.user.tiene_permiso_erp("puede_ver_calendario", empresa)
 
 
+def destino_inicio_instalado_app(request, empresa):
+    """Reentrada de presentación con las mismas puertas del inicio y del catálogo."""
+    usuario = getattr(request, "user", None)
+    if not (
+        empresa and empresa.slug in EMPRESAS_CLINICAS_CON_ROLES
+        and interfaz_clinica_activa(empresa) and empresa.activa
+        and usuario and usuario.is_authenticated
+        and usuario.puede_acceder_empresa(empresa)
+        and (usuario.is_superuser or empresa.licencia_operativa)
+    ):
+        return ""
+
+    from .views import _proteger_agenda_mobile
+    from core.mobile_users import usuarios_disponibles_app
+    from facturacion.mobile_transfers import transferencia_disponible_app
+    from facturacion.mobile_suppliers import proveedores_disponibles_app
+
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado is None:
+        vista = "agenda_mobile" if inicio_app_disponible(request, empresa) else "agenda_mobile_modules_screen"
+    elif (
+        usuarios_disponibles_app(request, empresa)
+        or transferencia_disponible_app(request, empresa)
+        or any(proveedores_disponibles_app(request, empresa).values())
+    ):
+        vista = "agenda_mobile_modules_screen"
+    else:
+        return ""
+    return reverse(vista, args=[empresa.slug])
+
+
 def url_modulos_app(request, empresa):
     if inicio_app_disponible(request, empresa):
         return f"{reverse('agenda_mobile', args=[empresa.slug])}#mas-funciones-app"

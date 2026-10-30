@@ -2483,13 +2483,15 @@ def agenda_mobile(request, empresa_slug):
         for producto in productos_app_qs
     ]
     puede_ver_productos_app = bool(
-        empresa.slug == "hospital_mia"
+        empresa.slug in EMPRESAS_CLINICAS_CON_ROLES
+        and interfaz_clinica_activa(empresa)
         and empresa.tiene_modulo_activo("facturacion")
         and request.user.tiene_permiso_erp("puede_inventario", empresa)
     )
     contexto["puede_ver_productos_app"] = puede_ver_productos_app
     contexto["puede_alimentar_productos_app"] = bool(
         puede_ver_productos_app
+        and empresa.slug == "hospital_mia"
         and request.user.tiene_permiso_erp("puede_ajustar_inventario", empresa)
     )
     contexto["inventario_productos_app_payload"] = []
