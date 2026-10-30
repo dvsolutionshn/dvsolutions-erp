@@ -18,6 +18,8 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from core.models import Empresa, RolSistema, Usuario, UsuarioEmpresaPermiso
+from facturacion.forms import ProductoForm
+from facturacion.models import Producto
 from . import test_mobile_inventory_product_edit as _inventory_tests
 from .mobile_inventory import productos_inventario_app
 
@@ -26,18 +28,28 @@ class _ClinicInterfaceMarkup(HTMLParser):
     def __init__(self, content):
         super().__init__(convert_charrefs=True)
         self.nodes, self.scripts, self.script_id = [], {}, None
+        self.product_depth, self.product_nodes, self.product_text = 0, [], []
         self.feed(content.decode() if isinstance(content, bytes) else content)
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs); self.nodes.append((tag, values))
+        if tag == "section":
+            if self.product_depth:
+                self.product_depth += 1
+            elif values.get("id") == "productos-app":
+                self.product_depth = 1
+        if self.product_depth:
+            self.product_nodes.append((tag, values))
         if tag == "script" and values.get("id"):
             self.script_id = values["id"]; self.scripts[self.script_id] = ""
 
     def handle_data(self, data):
         if self.script_id: self.scripts[self.script_id] += data
+        if self.product_depth: self.product_text.append(data)
 
     def handle_endtag(self, tag):
         if tag == "script": self.script_id = None
+        if tag == "section" and self.product_depth: self.product_depth -= 1
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}, "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}})
@@ -177,6 +189,64 @@ class MobileClinicInterfaceTests(TestCase):
             self.assertFalse(page.context["puede_editar_productos_app"])
             self.assertEqual(page.context["inventario_productos_app_editar_urls"], {})
             self.assertNotContains(page, 'id="inventoryProductEdit"')
+
+    def test_create_product_top_link_four_companies_both_roles_uses_original_app_form_and_fields(self):
+        for granular in (True, False):
+            self.set_role(granular, puede_inventario=True, puede_crear_productos=True)
+            for company in self.empresas.values():
+                finance, stocks = self.financial_snapshot(), self.stock_snapshot()
+                page = self.home(company)
+                parsed = _ClinicInterfaceMarkup(page.content)
+                links = [(index, attrs) for index, (tag, attrs) in enumerate(parsed.product_nodes) if tag == "a" and "data-inventory-create-product" in attrs]
+                self.assertEqual(len(links), 1)
+                index, link = links[0]
+                expected_url = reverse("crear_producto_facturacion", args=[company.slug])+"?app=1"
+                self.assertEqual(link.get("href"), expected_url)
+                self.assertEqual(page.context["app_product_create_url"], expected_url)
+                search_index = next(index for index, (_, attrs) in enumerate(parsed.product_nodes) if attrs.get("id") == "inventoryProductSearch")
+                self.assertLess(index, search_index)
+                self.assertIn("+ Nuevo producto", " ".join(" ".join(parsed.product_text).split()))
+                # GET uses the existing initializer and constructor; their
+                # configuration effects are not misreported as globally zero.
+                with patch.object(ProductoForm, "save", side_effect=AssertionError("No save on product form GET")) as save:
+                    form_page = self.client.get(link["href"])
+                    save.assert_not_called()
+                self.assertEqual(form_page.status_code, 200)
+                self.assertTemplateUsed(form_page, "facturacion/mobile_product_form.html")
+                self.assertIsInstance(form_page.context["form"], ProductoForm)
+                self.assertEqual(form_page.context["empresa"]["slug"], company.slug)
+                self.assertEqual(form_page.context["app_product_form_url"], expected_url)
+                original = ProductoForm(empresa=company)
+                self.assertEqual(set(form_page.context["form"].fields), set(original.fields))
+                self.assertEqual([name for _, name in form_page.context["form"].bodega_stock_fields], [name for _, name in original.bodega_stock_fields])
+                self.assertTrue(all(warehouse.empresa_id == company.pk for warehouse, _ in form_page.context["form"].bodega_stock_fields))
+                self.assertEqual(self.financial_snapshot(), finance)
+                self.assertEqual(self.stock_snapshot(), stocks)
+
+    def test_create_product_link_requires_both_inventory_and_create_not_read_or_edit_alone(self):
+        for granular in (True, False):
+            for flags in ({"puede_inventario": True}, {"puede_inventario": True, "puede_editar_productos": True}, {"puede_crear_productos": True}):
+                self.set_role(granular, **flags)
+                for company in self.empresas.values():
+                    page = self.home(company)
+                    self.assertEqual(page.context["app_product_create_url"], "")
+                    self.assertFalse(any("data-inventory-create-product" in attrs for _, attrs in _ClinicInterfaceMarkup(page.content).nodes))
+
+    def test_create_product_top_link_remains_available_when_company_inventory_has_no_products(self):
+        self.set_role(puede_inventario=True, puede_crear_productos=True)
+        for company in self.empresas.values():
+            # Synthetic setup only: retain historical inventory rows, exclude
+            # their deleted catalogue products by the existing read queryset.
+            Producto.objects.filter(empresa=company).update(eliminado=True)
+            finance, stocks = self.financial_snapshot(), self.stock_snapshot()
+            page = self.home(company)
+            self.assertEqual(page.context["inventario_productos_app_payload"], [])
+            parsed = _ClinicInterfaceMarkup(page.content)
+            links = [attrs for tag, attrs in parsed.product_nodes if tag == "a" and "data-inventory-create-product" in attrs]
+            self.assertEqual(len(links), 1)
+            self.assertEqual(links[0]["href"], reverse("crear_producto_facturacion", args=[company.slug])+"?app=1")
+            self.assertEqual(self.financial_snapshot(), finance)
+            self.assertEqual(self.stock_snapshot(), stocks)
 
     def test_installed_destination_helper_returns_authorized_home_for_four_companies_without_writes(self):
         for granular in (True, False):

@@ -16,6 +16,7 @@
   {% if puede_ver_modulos_app %}<link rel="stylesheet" href="{% static 'crm/mobile_modules.css' %}?v=categories-20261013">{% endif %}
   {% if puede_ver_modulos_app %}<script src="{% static 'crm/mobile_modules.js' %}" defer></script>{% endif %}
   <style>
+  .mobile-inventory-create{display:flex;align-items:center;justify-content:center;min-height:48px;padding:12px 16px;border:1px solid #127c76;border-radius:15px;background:linear-gradient(135deg,#154e66,#148f82);color:#fff;text-decoration:none;font-size:12px;font-weight:900;box-shadow:0 8px 20px rgba(20,143,130,.14)}.mobile-inventory-create:focus-visible{outline:3px solid #22b8ad;outline-offset:3px}
   :root{--navy:#12324a;--navy2:#185d68;--teal:#22b8ad;--pink:#e675a0;--ink:#14283b;--muted:#6e8191;--line:#dbe6ed;--bg:#f2f7fa;--white:#fff;--danger:#b94343;--safe-bottom:env(safe-area-inset-bottom,0px)}
   .appointment.is-courtesy{overflow:hidden}.appointment.is-courtesy:before{content:"CORTESÍA";position:absolute;top:0;right:0;padding:3px 9px;border-bottom-left-radius:10px;background:linear-gradient(135deg,#7c3aed,#d97706);color:#fff;font-size:8px;font-weight:900;letter-spacing:.1em}.status.courtesy{background:#f3e8ff;color:#7e22ce}
   .appointment.is-unavailable{grid-template-columns:66px minmax(0,1fr) auto;border-color:#efbdc1;border-left-color:#c2414b;background:repeating-linear-gradient(135deg,#fff7f7,#fff7f7 10px,#fdeced 10px,#fdeced 20px)}.appointment.is-unavailable .time,.appointment.is-unavailable .appointment-main strong{color:#842d36}.status.unavailable{background:#c2414b;color:#fff}
@@ -472,6 +473,7 @@
           </div>
         </header>
         <div class="mobile-inventory-controls">
+          {% if app_product_create_url %}<a class="mobile-inventory-create" href="{{ app_product_create_url }}" data-inventory-create-product>+ Nuevo producto</a>{% endif %}
           <label class="mobile-inventory-search" for="inventoryProductSearch">
             <input id="inventoryProductSearch" type="search" placeholder="Buscar producto..." autocomplete="off">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
