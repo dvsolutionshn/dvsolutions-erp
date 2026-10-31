@@ -1,0 +1,22 @@
+{% extends "core/erp_base.html" %}
+{% block title %}WhatsApp - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}CRM / WhatsApp{% endblock %}
+{% block header_title %}Mensajes y entregas{% endblock %}
+{% block header_description %}Respuestas recibidas y estados confirmados por WhatsApp para {{ empresa.nombre }}.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crm_configuracion' empresa.slug %}">Volver a configuracion</a>{% endblock %}
+{% block content %}
+<section class="erp-form-card" style="padding:20px;overflow-x:auto">
+    <p>Los mensajes se muestran por fecha de recepcion. Una respuesta de texto se conserva para revision del equipo; no cambia una cita automaticamente. Los archivos y notas de voz se identifican por tipo.</p>
+    <table style="width:100%;border-collapse:collapse;text-align:left">
+        <thead><tr><th>Fecha</th><th>Direccion</th><th>Telefono</th><th>Mensaje / tipo</th><th>Estado</th></tr></thead>
+        <tbody>{% for mensaje in pagina %}
+        <tr><td style="padding:12px 6px">{{ mensaje.fecha_meta|default:mensaje.fecha_creacion|date:"d/m/Y H:i" }}</td><td>{{ mensaje.get_direccion_display }}</td><td>{{ mensaje.telefono_cliente }}</td><td style="white-space:pre-wrap;overflow-wrap:anywhere;max-width:450px">{{ mensaje.texto|default:mensaje.tipo|default:"Aviso de entrega" }}</td><td>{{ mensaje.get_estado_display }}{% if mensaje.error_codigo %} ({{ mensaje.error_codigo }}){% endif %}</td></tr>
+        {% empty %}<tr><td colspan="5" style="padding:24px">Todavia no se han recibido mensajes o estados de entrega.</td></tr>{% endfor %}</tbody>
+    </table>
+    <nav style="margin-top:18px" aria-label="Paginas de mensajes">
+        {% if pagina.has_previous %}<a href="?pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+        <span>Pagina {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+        {% if pagina.has_next %}<a href="?pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+    </nav>
+</section>
+{% endblock %}

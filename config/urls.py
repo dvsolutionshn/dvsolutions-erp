@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from crm.whatsapp_webhooks import whatsapp_webhook
 
 urlpatterns = []
 
@@ -9,6 +10,7 @@ if settings.ENABLE_DJANGO_ADMIN:
     urlpatterns.append(path(settings.DJANGO_ADMIN_PATH, admin.site.urls))
 
 urlpatterns += [
+    path('integraciones/whatsapp/webhook/', whatsapp_webhook, name='crm_whatsapp_webhook'),
     path('mero/', include('mero.urls')),
     path('api/onix/mobile/v1/', include('onix_mobile.urls')),
     path('formularios/clinica/', include('clinica.public_urls')),

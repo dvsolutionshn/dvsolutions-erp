@@ -492,6 +492,7 @@ class MobileTherapyNavigationTests(TestCase):
         self.assertTemplateNotUsed(web, "clinica/mobile_history_form.html")
         self.assertEqual(tuple(web.context["form"].fields), self.FIELDS)
         outside = Empresa.objects.create(nombre="Terapia web externa", slug="therapy_web_external", rtn="THERAPY-WEB", tipo_solucion="clinica")
+        self.role_for(company=outside, granular=False, puede_pacientes=True, puede_expediente_clinico=True)
         EmpresaModulo.objects.create(empresa=outside, modulo=self.modulo)
         self.actor.empresas_acceso.add(outside)
         patient = Paciente.objects.create(empresa=outside, nombre="Paciente externo sintético", expediente_codigo="THERAPY-WEB")

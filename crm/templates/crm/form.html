@@ -40,9 +40,18 @@
         <div class="crm-status-chip"><span>WhatsApp</span><strong>{% if form.instance.whatsapp_numero_conectado %}{{ form.instance.whatsapp_numero_conectado }}{% elif form.instance.whatsapp_activo %}Activo{% else %}Inactivo{% endif %}</strong></div>
         <div class="crm-status-chip"><span>Plantilla citas</span><strong>{{ form.instance.whatsapp_plantilla_cita|default:"-" }}</strong></div>
         <div class="crm-status-chip"><span>Marketing</span><strong>{{ form.instance.whatsapp_plantilla_marketing|default:"-" }}</strong></div>
-        <div class="crm-status-chip"><span>Recordatorios</span><strong>{% if form.instance.recordatorio_citas_activo %}Activos{% else %}Inactivos{% endif %}</strong></div>
+        <div class="crm-status-chip"><span>Recordatorios</span><strong>{% if form.instance.recordatorio_citas_activo and form.instance.whatsapp_activo %}Activos{% else %}En pausa{% endif %}</strong></div>
     </div>
 </section>
+
+{% if form.instance.whatsapp_pendiente_validacion %}
+<section class="crm-test-box" role="status">
+    <h3>Conexion autorizada: pendiente de prueba</h3>
+    <p>Los envios estan en pausa. Guarda el destinatario y una plantilla de prueba aprobada, envia la prueba y espera su entrega. Despues podras activar los recordatorios.</p>
+    <p>{% if whatsapp_prueba_entregada %}WhatsApp confirmo la entrega de la prueba.{% elif form.instance.whatsapp_prueba_message_id %}Prueba aceptada por Meta. Esperando confirmacion de entrega; actualiza esta pantalla.{% else %}Todavia no has enviado una prueba de esta conexion.{% endif %}</p>
+</section>
+{% endif %}
+<p><a href="{% url 'crm_mensajes_whatsapp' empresa.slug %}">Ver mensajes recibidos y estados de entrega</a></p>
 
 <form method="post" class="crm-config-shell">
     {% csrf_token %}
@@ -51,7 +60,7 @@
         <section class="crm-section">
             <div class="crm-section-head"><div class="crm-section-icon">01</div><div><h3>Estado general</h3><p>Activa o pausa los envios automaticos sin borrar credenciales ni plantillas.</p></div></div>
             <div class="crm-config-grid">
-                <div class="crm-switch-card"><div><label for="{{ form.whatsapp_activo.id_for_label }}">{{ form.whatsapp_activo.label }}</label><p>Habilita WhatsApp Cloud API para esta empresa.</p></div>{{ form.whatsapp_activo }}</div>
+                <div class="crm-switch-card"><div><label for="{{ form.whatsapp_activo.id_for_label }}">{{ form.whatsapp_activo.label }}</label><p>Habilita WhatsApp Cloud API para esta empresa.</p>{% for error in form.whatsapp_activo.errors %}<div class="crm-error" role="alert">{{ error }}</div>{% endfor %}</div>{{ form.whatsapp_activo }}</div>
                 <div class="crm-switch-card"><div><label for="{{ form.recordatorio_citas_activo.id_for_label }}">{{ form.recordatorio_citas_activo.label }}</label><p>Permite confirmaciones y recordatorios de citas.</p></div>{{ form.recordatorio_citas_activo }}</div>
                 <div class="crm-switch-card"><div><label for="{{ form.recordatorio_cumpleanos_activo.id_for_label }}">{{ form.recordatorio_cumpleanos_activo.label }}</label><p>Activa mensajes automaticos de cumpleanos.</p></div>{{ form.recordatorio_cumpleanos_activo }}</div>
                 <div class="crm-switch-card"><div><label for="{{ form.whatsapp_cita_incluir_enlace.id_for_label }}">{{ form.whatsapp_cita_incluir_enlace.label }}</label><p>Solo si la plantilla de Meta trae enlace.</p></div>{{ form.whatsapp_cita_incluir_enlace }}</div>
@@ -63,15 +72,20 @@
             <div class="crm-config-grid">
                 <div class="crm-meta-connect">
                     <h4>Conectar el numero real de WhatsApp Business</h4>
-                    <p>Usa el registro oficial de Meta con Coexistencia para mantener el numero en el telefono y conectarlo tambien al CRM.</p>
+                    <p>El administrador del cliente selecciona su cuenta y autoriza al CRM desde Meta. La opcion de conservar WhatsApp Business en el telefono depende de la elegibilidad que muestre Meta.</p>
                     {% if form.instance.whatsapp_numero_conectado %}
                     <p><strong>Numero conectado:</strong> {{ form.instance.whatsapp_numero_conectado }}</p>
                     {% endif %}
                     {% if meta_whatsapp_ready %}
+                    <label for="meta-whatsapp-mode">Como se usa este numero</label>
+                    <select id="meta-whatsapp-mode">
+                        <option value="coexistence">Conservar WhatsApp Business en el telefono</option>
+                        <option value="cloud">Numero nuevo o cuenta de Cloud API</option>
+                    </select>
                     <button type="button" id="meta-whatsapp-connect">Conectar numero real con Meta</button>
                     <div id="meta-whatsapp-result" class="crm-meta-result" aria-live="polite"></div>
                     {% else %}
-                    <div class="crm-meta-result error">Antes de conectar falta configurar el secreto de la app de Meta en el servidor.</div>
+                    <div class="crm-meta-result error">Antes de conectar falta configurar el secreto de la app de Meta o la verificacion del webhook en el servidor.</div>
                     {% endif %}
                 </div>
                 <div class="crm-config-field"><label for="{{ form.whatsapp_api_version.id_for_label }}">{{ form.whatsapp_api_version.label }}</label>{{ form.whatsapp_api_version }}{% if form.whatsapp_api_version.help_text %}<div class="crm-help">{{ form.whatsapp_api_version.help_text }}</div>{% endif %}{% for error in form.whatsapp_api_version.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
@@ -153,11 +167,21 @@
     <div class="erp-card-header">
         <div>
             <h3>Prueba de WhatsApp Cloud API</h3>
-            <p>Envia la plantilla de prueba al numero configurado para confirmar que Meta responde correctamente.</p>
+            <p>Envia una plantilla aprobada al destinatario de prueba guardado: {{ form.instance.whatsapp_numero_prueba|default:"sin configurar" }}. Las plantillas con variables deben probarse desde su flujo correspondiente.</p>
+            {% if form.instance.whatsapp_pendiente_validacion %}<label><input type="checkbox" name="autorizar_prueba" value="si" required> Este destinatario autorizo recibir la prueba.</label>{% endif %}
         </div>
         <button class="erp-btn-secondary" type="submit">Enviar prueba WhatsApp</button>
     </div>
 </form>
+{% if form.instance.whatsapp_pendiente_validacion %}
+<form method="post" action="{% url 'crm_activar_whatsapp' empresa.slug %}" class="crm-test-box">
+    {% csrf_token %}
+    <h3>Activar conexion validada</h3>
+    <p>Este paso habilita los envios configurados, incluidos los recordatorios pendientes. Revisa los ajustes antes de continuar.</p>
+    <label><input type="checkbox" name="confirmar_activacion" value="si" required> Confirmo la activacion para {{ empresa.nombre }}.</label>
+    <button class="erp-btn-secondary" type="submit" {% if not whatsapp_prueba_entregada %}disabled{% endif %}>Validar plantillas y activar envios</button>
+</form>
+{% endif %}
 {% endif %}
 
 {% if meta_whatsapp_ready %}
@@ -171,6 +195,9 @@
     const result = document.getElementById("meta-whatsapp-result");
     let sessionInfo = null;
     let oauthCode = null;
+    let saving = false;
+    let connecting = false;
+    let attempt = 0;
     if (!button || !result) return;
 
     function csrfToken() {
@@ -181,7 +208,8 @@
         result.className = "crm-meta-result " + (kind || "");
     }
     async function completeConnection() {
-        if (!sessionInfo || !oauthCode) return;
+        if (!connecting || saving || !sessionInfo || !oauthCode) return;
+        saving = true;
         show("Meta confirmo el numero. Guardando la conexion en el CRM...", "");
         try {
             const response = await fetch(endpoint, {
@@ -194,6 +222,9 @@
             show(data.message, "ok");
             window.setTimeout(function () { window.location.reload(); }, 1200);
         } catch (error) {
+            connecting = false;
+            saving = false;
+            oauthCode = null;
             button.disabled = false;
             show(error.message, "error");
         }
@@ -202,14 +233,16 @@
         if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
         let data = event.data;
         try { if (typeof data === "string") data = JSON.parse(data); } catch (_) { return; }
-        if (!data || data.type !== "WA_EMBEDDED_SIGNUP") return;
-        if (data.event === "FINISH" || data.event === "FINISH_ONLY_WABA") {
+        if (!connecting || !data || data.type !== "WA_EMBEDDED_SIGNUP") return;
+        if (["FINISH", "FINISH_ONLY_WABA", "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"].includes(data.event)) {
             sessionInfo = data.data || {};
             completeConnection();
         } else if (data.event === "CANCEL") {
+            connecting = false;
             button.disabled = false;
             show("El registro fue cancelado antes de conectar el numero.", "error");
         } else if (data.event === "ERROR") {
+            connecting = false;
             button.disabled = false;
             show("Meta informo un error durante el registro.", "error");
         }
@@ -220,12 +253,21 @@
             button.disabled = true;
             sessionInfo = null;
             oauthCode = null;
+            saving = false;
+            connecting = true;
+            const currentAttempt = ++attempt;
             show("Abriendo el registro seguro de Meta...", "");
+            const mode = document.getElementById("meta-whatsapp-mode");
+            const extras = mode && mode.value === "cloud" ? {} : {
+                setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3"
+            };
             FB.login(function (response) {
+                if (!connecting || currentAttempt !== attempt) return;
                 if (response.authResponse && response.authResponse.code) {
                     oauthCode = response.authResponse.code;
                     completeConnection();
                 } else {
+                    connecting = false;
                     button.disabled = false;
                     show("Meta no completo la autorizacion.", "error");
                 }
@@ -233,7 +275,7 @@
                 config_id: configId,
                 response_type: "code",
                 override_default_response_type: true,
-                extras: {setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3"}
+                extras: extras
             });
         });
     };

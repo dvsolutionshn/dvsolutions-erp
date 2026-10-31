@@ -359,7 +359,7 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "dias_alerta_producto",
         ]
         widgets = {
-            "whatsapp_token": forms.PasswordInput(render_value=True),
+            "whatsapp_token": forms.PasswordInput(render_value=False),
             "mensaje_cita_confirmacion": forms.Textarea(attrs={"rows": 2}),
             "mensaje_cita_recordatorio_7_dias": forms.Textarea(attrs={"rows": 2}),
             "mensaje_cita_recordatorio_3_dias": forms.Textarea(attrs={"rows": 2}),
@@ -383,7 +383,7 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "cumpleanos_recordatorio_7_dias": "Enviar 7 días antes",
         }
         help_texts = {
-            "whatsapp_token": "Token de Meta/WhatsApp Cloud API. Guardalo solo si el cliente ya tiene credenciales.",
+            "whatsapp_token": "Dejalo vacio para conservar el token guardado. Un token nuevo requiere validar la conexion.",
             "whatsapp_numero_prueba": "Numero autorizado para probar, con codigo de pais. Ejemplo: 50499999999.",
             "whatsapp_plantilla_prueba": "Para pruebas de Meta normalmente se usa hello_world.",
             "whatsapp_idioma_plantilla": "Para hello_world normalmente es en_US.",
@@ -405,6 +405,47 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "cumpleanos_recordatorio_7_dias": "Programa el saludo a las 9:00 AM siete dias antes del cumpleaños.",
             "dias_alerta_producto": "Dias antes para alertar productos con fecha de seguimiento o vencimiento.",
         }
+
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._credenciales_guardadas = {
+            nombre: getattr(self.instance, nombre, None)
+            for nombre in ("whatsapp_phone_number_id", "whatsapp_business_account_id", "whatsapp_token")
+        }
+        self._validacion_previa = self.instance.whatsapp_validado_en
+        self._estado_conexion_guardado = {
+            nombre: getattr(self.instance, nombre, None)
+            for nombre in ("whatsapp_pendiente_validacion", "whatsapp_prueba_message_id", "whatsapp_validado_en")
+        }
+        self._esquema_guardado = {
+            nombre: getattr(self.instance, nombre, None)
+            for nombre in ("whatsapp_api_version", "whatsapp_plantilla_cita", "whatsapp_idioma_cita",
+                           "whatsapp_cita_incluir_enlace", "whatsapp_plantilla_marketing", "whatsapp_idioma_marketing",
+                           "recordatorio_citas_activo", "recordatorio_cumpleanos_activo")
+        }
+
+    def clean_whatsapp_token(self):
+        return self.cleaned_data.get("whatsapp_token") or self._credenciales_guardadas["whatsapp_token"]
+
+    def clean(self):
+        datos = super().clean()
+        cambiaron = any(
+            nombre in datos and (datos[nombre] or "") != (anterior or "")
+            for nombre, anterior in self._credenciales_guardadas.items()
+        )
+        nuevo_esquema = (self._validacion_previa or self.instance.whatsapp_pendiente_validacion) and any(
+            nombre in datos and datos[nombre] != anterior
+            and (not nombre.startswith("recordatorio_") or datos[nombre])
+            for nombre, anterior in self._esquema_guardado.items()
+        )
+        if cambiaron or nuevo_esquema:
+            self.instance.whatsapp_pendiente_validacion = True
+            self.instance.whatsapp_prueba_message_id = ""
+            self.instance.whatsapp_validado_en = None
+        if self.instance.whatsapp_pendiente_validacion and datos.get("whatsapp_activo"):
+            self.add_error("whatsapp_activo", "Valida la conexion y la entrega de la prueba antes de activar los envios.")
+        return datos
 
 
 class PlantillaMensajeForm(forms.ModelForm):

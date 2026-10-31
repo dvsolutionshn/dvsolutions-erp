@@ -21,6 +21,9 @@ class ConfiguracionCRM(models.Model):
     whatsapp_phone_number_id = models.CharField(max_length=120, blank=True, null=True)
     whatsapp_business_account_id = models.CharField(max_length=120, blank=True, null=True)
     whatsapp_numero_conectado = models.CharField(max_length=30, blank=True, null=True)
+    whatsapp_pendiente_validacion = models.BooleanField(default=False)
+    whatsapp_prueba_message_id = models.CharField(max_length=255, blank=True, default="")
+    whatsapp_validado_en = models.DateTimeField(null=True, blank=True)
     whatsapp_token = models.TextField(blank=True, null=True)
     whatsapp_numero_prueba = models.CharField(max_length=30, blank=True, null=True)
     whatsapp_plantilla_prueba = models.CharField(max_length=80, default="hello_world")
@@ -970,6 +973,40 @@ class NotificacionCitaWhatsApp(models.Model):
 
     def __str__(self):
         return f"{self.cita} · {self.get_tipo_display()}"
+
+
+class MensajeWhatsAppWebhook(models.Model):
+    """Minimal signed Cloud API event, isolated by the authorized company assets."""
+
+    DIRECCION_CHOICES = [("entrante", "Entrante"), ("saliente", "Saliente")]
+    ESTADO_CHOICES = [
+        ("received", "Recibido"), ("sent", "Enviado a WhatsApp"),
+        ("delivered", "Entregado"), ("read", "Leído"), ("failed", "No entregado"),
+    ]
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="mensajes_whatsapp_webhook")
+    message_id = models.CharField(max_length=255)
+    direccion = models.CharField(max_length=10, choices=DIRECCION_CHOICES)
+    telefono_cliente = models.CharField(max_length=40, blank=True)
+    phone_number_id = models.CharField(max_length=120)
+    cuenta_id = models.CharField(max_length=120)
+    tipo = models.CharField(max_length=30, blank=True)
+    texto = models.TextField(blank=True)
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES)
+    error_codigo = models.CharField(max_length=80, blank=True)
+    fecha_meta = models.DateTimeField(null=True, blank=True)
+    estado_actualizado_en = models.DateTimeField(null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_meta", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["empresa", "message_id"], name="crm_wa_message_empresa_uniq"),
+        ]
+        indexes = [models.Index(fields=["empresa", "direccion", "fecha_creacion"], name="crm_wa_empresa_inbox_idx")]
+
+    def __str__(self):
+        return f"WhatsApp {self.direccion} · {self.get_estado_display()}"
+
 
 class NotificacionCumpleanosWhatsApp(models.Model):
     ESTADO_CHOICES = [

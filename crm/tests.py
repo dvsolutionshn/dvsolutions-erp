@@ -429,18 +429,21 @@ class CRMTests(TestCase):
         META_WHATSAPP_CONFIG_ID="config-id",
         META_WHATSAPP_APP_SECRET="server-secret",
         META_WHATSAPP_GRAPH_VERSION="v23.0",
+        META_WHATSAPP_VERIFY_TOKEN="webhook-test",
     )
-    @patch("crm.views.urlopen")
+    @patch("crm.meta_onboarding.urlopen")
     def test_conectar_whatsapp_meta_guarda_numero_real(self, mock_urlopen):
         self.client.login(username="crmuser", password="pass12345")
         response_context = mock_urlopen.return_value.__enter__.return_value
         response_context.read.side_effect = [
             json.dumps({"access_token": "token-real"}).encode("utf-8"),
-            json.dumps({
+            json.dumps({"data": {"is_valid": True, "app_id": "app-id", "scopes": ["whatsapp_business_management", "whatsapp_business_messaging"]}}).encode("utf-8"),
+            json.dumps({"data": [{
                 "id": "phone-real",
                 "display_phone_number": "+504 9575-5514",
                 "verified_name": "Hospital Mia",
-            }).encode("utf-8"),
+            }]}).encode("utf-8"),
+            json.dumps({"data": [{"id": "app-id"}]}).encode("utf-8"),
         ]
 
         response = self.client.post(
@@ -451,7 +454,8 @@ class CRMTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         config = ConfiguracionCRM.objects.get(empresa=self.empresa)
-        self.assertTrue(config.whatsapp_activo)
+        self.assertFalse(config.whatsapp_activo)
+        self.assertTrue(config.whatsapp_pendiente_validacion)
         self.assertEqual(config.whatsapp_business_account_id, "waba-real")
         self.assertEqual(config.whatsapp_phone_number_id, "phone-real")
         self.assertEqual(config.whatsapp_numero_conectado, "+504 9575-5514")
@@ -463,8 +467,9 @@ class CRMTests(TestCase):
         META_WHATSAPP_CONFIG_ID="config-id",
         META_WHATSAPP_APP_SECRET="server-secret",
         META_WHATSAPP_GRAPH_VERSION="v23.0",
+        META_WHATSAPP_VERIFY_TOKEN="webhook-test",
     )
-    @patch("crm.views.urlopen")
+    @patch("crm.meta_onboarding.urlopen")
     def test_conectar_whatsapp_meta_no_reemplaza_configuracion_si_meta_devuelve_otro_numero(self, mock_urlopen):
         self.client.login(username="crmuser", password="pass12345")
         config, _ = ConfiguracionCRM.objects.get_or_create(empresa=self.empresa)
@@ -474,10 +479,11 @@ class CRMTests(TestCase):
         response_context = mock_urlopen.return_value.__enter__.return_value
         response_context.read.side_effect = [
             json.dumps({"access_token": "token-nuevo"}).encode("utf-8"),
-            json.dumps({
+            json.dumps({"data": {"is_valid": True, "app_id": "app-id", "scopes": ["whatsapp_business_management", "whatsapp_business_messaging"]}}).encode("utf-8"),
+            json.dumps({"data": [{
                 "id": "phone-diferente",
                 "display_phone_number": "+504 9000-0000",
-            }).encode("utf-8"),
+            }]}).encode("utf-8"),
         ]
 
         response = self.client.post(

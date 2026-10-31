@@ -5,9 +5,8 @@ import re
 import unicodedata
 import uuid
 import json
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
+from urllib.request import urlopen  # Kept as a compatibility seam for existing transport guards.
 
 from django.contrib import messages
 from django.conf import settings
@@ -1168,13 +1167,30 @@ def configuracion_crm(request, empresa_slug):
     if modo_app:
         adaptar_formulario_crm_app(form)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Configuracion CRM actualizada correctamente.")
-        if modo_app:
-            return volver_configuracion_crm_app(empresa)
-        return redirect("crm_dashboard", empresa_slug=empresa.slug)
+        from .whatsapp_setup import bloquear_asignaciones_whatsapp
+        with transaction.atomic():
+            bloquear_asignaciones_whatsapp()
+            actual = ConfiguracionCRM.objects.select_for_update().get(pk=config.pk)
+            originales = form._credenciales_guardadas
+            cambiaron = any((getattr(actual, nombre) or "") != (valor or "") for nombre, valor in originales.items())
+            cambiaron = cambiaron or any(
+                getattr(actual, nombre) != valor for nombre, valor in form._estado_conexion_guardado.items()
+            )
+            phone_id = (form.cleaned_data.get("whatsapp_phone_number_id") or "").strip()
+            numero_modificado = phone_id != (originales.get("whatsapp_phone_number_id") or "")
+            if cambiaron:
+                form.add_error(None, "La conexion cambio mientras editabas. Actualiza esta pantalla antes de guardar.")
+            elif numero_modificado and phone_id and ConfiguracionCRM.objects.exclude(empresa=empresa).filter(whatsapp_phone_number_id=phone_id).exists():
+                form.add_error("whatsapp_phone_number_id", "Este numero ya esta asignado a otra empresa del CRM.")
+            else:
+                form.save()
+                messages.success(request, "Configuracion CRM actualizada correctamente.")
+                if modo_app:
+                    return volver_configuracion_crm_app(empresa)
+                return redirect("crm_dashboard", empresa_slug=empresa.slug)
     if modo_app:
         return render_configuracion_crm_app(request, form, contexto_app)
+    from .whatsapp_setup import prueba_entregada
     response = render(
         request,
         "crm/form.html",
@@ -1185,14 +1201,17 @@ def configuracion_crm(request, empresa_slug):
             "meta_whatsapp_app_id": settings.META_WHATSAPP_APP_ID,
             "meta_whatsapp_config_id": settings.META_WHATSAPP_CONFIG_ID,
             "meta_whatsapp_graph_version": settings.META_WHATSAPP_GRAPH_VERSION,
+            "whatsapp_prueba_entregada": prueba_entregada(config),
             "meta_whatsapp_ready": bool(
                 settings.META_WHATSAPP_APP_ID
                 and settings.META_WHATSAPP_CONFIG_ID
                 and settings.META_WHATSAPP_APP_SECRET
+                and settings.META_WHATSAPP_VERIFY_TOKEN
             ),
         },
     )
     response["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    response["Cache-Control"] = "no-store, private"
     return response
 
 
@@ -1200,92 +1219,65 @@ def configuracion_crm(request, empresa_slug):
 @require_POST
 def conectar_whatsapp_meta(request, empresa_slug):
     from .mobile_crm_configuration import denegar_accion_crm_no_adaptada_app
+    from .meta_onboarding import MetaOnboardingError, complete_connection
+    from .whatsapp_setup import autorizar_configuracion_whatsapp, bloquear_asignaciones_whatsapp
 
     denegar_accion_crm_no_adaptada_app(request)
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_configuracion_whatsapp(request, empresa)
     if not settings.META_WHATSAPP_APP_SECRET:
         return JsonResponse(
             {"ok": False, "error": "Falta configurar el secreto de la app de Meta en el servidor."},
             status=503,
         )
-
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return JsonResponse({"ok": False, "error": "Respuesta de Meta no valida."}, status=400)
 
     denegar_accion_crm_no_adaptada_app(request, payload)
+    if not isinstance(payload, dict):
+        return JsonResponse({"ok": False, "error": "Respuesta de Meta no valida."}, status=400)
+    if not settings.META_WHATSAPP_VERIFY_TOKEN:
+        return JsonResponse({"ok": False, "error": "Falta configurar la verificacion del webhook de WhatsApp en el servidor."}, status=503)
     code = str(payload.get("code") or "").strip()
     waba_id = str(payload.get("waba_id") or "").strip()
     phone_number_id = str(payload.get("phone_number_id") or "").strip()
-    if not code or not waba_id or not phone_number_id:
-        return JsonResponse({"ok": False, "error": "Meta no devolvio todos los datos del numero."}, status=400)
-
-    query = urlencode(
-        {
-            "client_id": settings.META_WHATSAPP_APP_ID,
-            "client_secret": settings.META_WHATSAPP_APP_SECRET,
-            "code": code,
-        }
-    )
-    token_url = f"https://graph.facebook.com/{settings.META_WHATSAPP_GRAPH_VERSION}/oauth/access_token?{query}"
+    if not code or not waba_id:
+        return JsonResponse({"ok": False, "error": "Meta no devolvio el codigo y la cuenta autorizada."}, status=400)
     try:
-        with urlopen(Request(token_url, method="GET"), timeout=20) as response:
-            token_payload = json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        logger.warning("Meta Embedded Signup token exchange failed: HTTP %s", exc.code)
-        return JsonResponse({"ok": False, "error": "Meta no pudo completar la autorizacion."}, status=502)
-    except (URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError):
-        logger.exception("Meta Embedded Signup token exchange failed")
-        return JsonResponse({"ok": False, "error": "No fue posible comunicarse con Meta."}, status=502)
-
-    access_token = str(token_payload.get("access_token") or "").strip()
-    if not access_token:
-        return JsonResponse({"ok": False, "error": "Meta no entrego el token de acceso."}, status=502)
-
-    phone_url = (
-        f"https://graph.facebook.com/{settings.META_WHATSAPP_GRAPH_VERSION}/"
-        f"{quote(phone_number_id, safe='')}?fields=id,display_phone_number,verified_name"
-    )
-    try:
-        phone_request = Request(
-            phone_url,
-            headers={"Authorization": f"Bearer {access_token}"},
-            method="GET",
-        )
-        with urlopen(phone_request, timeout=20) as response:
-            phone_payload = json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        logger.warning("Meta phone verification failed: HTTP %s", exc.code)
-        return JsonResponse({"ok": False, "error": "Meta no pudo verificar el numero autorizado."}, status=502)
-    except (URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError):
-        logger.exception("Meta phone verification failed")
-        return JsonResponse({"ok": False, "error": "No fue posible verificar el numero con Meta."}, status=502)
-
-    verified_phone_id = str(phone_payload.get("id") or "").strip()
-    display_phone_number = str(phone_payload.get("display_phone_number") or "").strip()
-    if verified_phone_id != phone_number_id or not display_phone_number:
-        return JsonResponse({"ok": False, "error": "Meta devolvio un numero diferente al autorizado."}, status=502)
-
-    config = _configuracion_crm(empresa)
-    config.whatsapp_business_account_id = waba_id
-    config.whatsapp_phone_number_id = phone_number_id
-    config.whatsapp_numero_conectado = display_phone_number
-    config.whatsapp_token = access_token
-    config.whatsapp_activo = True
-    config.save(
-        update_fields=[
-            "whatsapp_business_account_id",
-            "whatsapp_phone_number_id",
-            "whatsapp_numero_conectado",
-            "whatsapp_token",
-            "whatsapp_activo",
-        ]
-    )
+        conexion = complete_connection(code, waba_id, phone_number_id or None)
+    except MetaOnboardingError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=502)
+    with transaction.atomic():
+        # Un lock compartido evita que dos clientes asignen el mismo numero
+        # simultaneamente; cada Empresa por separado no impediria esa carrera.
+        bloquear_asignaciones_whatsapp()
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        if ConfiguracionCRM.objects.exclude(empresa=empresa).filter(
+            whatsapp_phone_number_id=conexion["phone_number_id"],
+        ).exists():
+            return JsonResponse({"ok": False, "error": "Este numero ya esta asignado a otra empresa del CRM."}, status=409)
+        config = _configuracion_crm(empresa)
+        config.whatsapp_business_account_id = conexion["business_account_id"]
+        config.whatsapp_phone_number_id = conexion["phone_number_id"]
+        config.whatsapp_numero_conectado = conexion["display_phone_number"]
+        config.whatsapp_token = conexion["access_token"]
+        config.whatsapp_api_version = settings.META_WHATSAPP_GRAPH_VERSION
+        config.whatsapp_activo = False
+        config.whatsapp_pendiente_validacion = True
+        config.whatsapp_prueba_message_id = ""
+        config.whatsapp_validado_en = None
+        config.save(update_fields=[
+            "whatsapp_business_account_id", "whatsapp_phone_number_id", "whatsapp_numero_conectado",
+            "whatsapp_token", "whatsapp_api_version", "whatsapp_activo", "whatsapp_pendiente_validacion",
+            "whatsapp_prueba_message_id", "whatsapp_validado_en",
+        ])
     return JsonResponse({
         "ok": True,
-        "message": f"Numero real {display_phone_number} conectado correctamente.",
-        "display_phone_number": display_phone_number,
+        "message": f"Numero {config.whatsapp_numero_conectado} autorizado. Envios pausados hasta validar la prueba.",
+        "display_phone_number": config.whatsapp_numero_conectado,
+        "pending_validation": True,
     })
 
 
@@ -1293,17 +1285,44 @@ def conectar_whatsapp_meta(request, empresa_slug):
 @require_POST
 def enviar_prueba_whatsapp(request, empresa_slug):
     from .mobile_crm_configuration import denegar_accion_crm_no_adaptada_app
+    from .meta_onboarding import MetaOnboardingError, validate_template
+    from .whatsapp_setup import autorizar_configuracion_whatsapp
 
     denegar_accion_crm_no_adaptada_app(request)
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_configuracion_whatsapp(request, empresa)
     config = _configuracion_crm(empresa)
-    if not config.whatsapp_activo:
+    if not config.whatsapp_activo and not config.whatsapp_pendiente_validacion:
         messages.error(request, "Activa WhatsApp en la configuracion CRM antes de enviar pruebas.")
         return redirect("crm_configuracion", empresa_slug=empresa.slug)
+    if config.whatsapp_pendiente_validacion and request.POST.get("autorizar_prueba") != "si":
+        messages.error(request, "Confirma que el destinatario autorizo recibir la prueba.")
+        return redirect("crm_configuracion", empresa_slug=empresa.slug)
+    campos_prueba = (
+        "whatsapp_business_account_id", "whatsapp_phone_number_id", "whatsapp_token",
+        "whatsapp_api_version", "whatsapp_numero_prueba", "whatsapp_plantilla_prueba",
+        "whatsapp_idioma_plantilla", "whatsapp_prueba_message_id", "whatsapp_pendiente_validacion",
+    )
+    snapshot_prueba = {campo: getattr(config, campo) for campo in campos_prueba}
     try:
+        if config.whatsapp_pendiente_validacion:
+            validate_template(config, config.whatsapp_plantilla_prueba, config.whatsapp_idioma_plantilla, expected_body_parameters=0)
         respuesta = enviar_plantilla_whatsapp(config, config.whatsapp_numero_prueba)
-        messages.success(request, f"Prueba enviada correctamente. Respuesta Meta: {respuesta}")
-    except WhatsAppAPIError as exc:
+        if config.whatsapp_pendiente_validacion:
+            message_id = str((respuesta.get("messages") or [{}])[0].get("id") or "")
+            if not message_id:
+                raise WhatsAppAPIError("Meta no entrego un identificador de envio para validar la prueba.")
+            with transaction.atomic():
+                actual = ConfiguracionCRM.objects.select_for_update().get(pk=config.pk)
+                if any(getattr(actual, campo) != valor for campo, valor in snapshot_prueba.items()):
+                    raise WhatsAppAPIError(
+                        "La configuracion cambio mientras Meta enviaba la prueba. "
+                        "La prueba anterior no valida la conexion actual; revisa los ajustes y repitela."
+                    )
+                actual.whatsapp_prueba_message_id = message_id
+                actual.save(update_fields=["whatsapp_prueba_message_id"])
+        messages.success(request, "Meta acepto la prueba. Revisa el estado de entrega antes de activar los envios.")
+    except (WhatsAppAPIError, MetaOnboardingError) as exc:
         messages.error(request, f"No se pudo enviar la prueba WhatsApp. {exc}")
     return redirect("crm_configuracion", empresa_slug=empresa.slug)
 

@@ -205,11 +205,12 @@ class MobileCrmConfigurationTests(TestCase):
                 self.assertTemplateUsed(web, "crm/form.html")
                 self.assertTemplateNotUsed(web, self.TEMPLATE)
 
-    def test_web_form_class_keeps_all_twenty_seven_fields_and_original_password_widget(self):
+    def test_web_form_class_keeps_all_fields_without_rendering_saved_token(self):
         form = ConfiguracionCRMForm(instance=self.configuration)
         self.assertEqual(set(form.fields), {*self.FIELDS, "whatsapp_token"})
         self.assertEqual(form.fields["whatsapp_token"].widget.input_type, "password")
-        self.assertTrue(form.fields["whatsapp_token"].widget.render_value)
+        self.assertFalse(form.fields["whatsapp_token"].widget.render_value)
+        self.assertNotIn(self.configuration.whatsapp_token, str(form["whatsapp_token"]))
         response = self.client.get(self.url(mobile=False))
         self.assertIn("whatsapp_token", response.context["form"].fields)
 
@@ -514,22 +515,27 @@ class MobileCrmConfigurationTests(TestCase):
         from . import views
         original_getter = views._configuracion_crm
         with patch("crm.views._configuracion_crm", wraps=original_getter) as getter:
-            response = self.client.post(self.url(), self.data(mensaje_cita_confirmacion="Creación original QA"))
+            response = self.client.post(self.url(), self.data(mensaje_cita_confirmacion="Creación original QA", whatsapp_activo=""))
         self.assertEqual(response.status_code, 302)
         getter.assert_called_once()
         stored = ConfiguracionCRM.objects.get(empresa=self.empresa)
         self.assertEqual(stored.mensaje_cita_confirmacion, "Creación original QA")
         self.assertIsNone(stored.whatsapp_token)
+        self.assertFalse(stored.whatsapp_activo)
+        self.assertTrue(stored.whatsapp_pendiente_validacion)
         self.assertEqual(ConfiguracionCRM.objects.filter(empresa=self.empresa).count(), 1)
 
     def test_valid_save_preserves_original_twenty_six_field_values_booleans_and_trimming(self):
         data = self.data(mensaje_cita_confirmacion="  Texto original con espacios  ", remitente_correo="qa@example.invalid",
             dias_alerta_producto="0", whatsapp_phone_number_id="  phone original QA  ",
             **{field: "on" for field in self.BOOLEAN_FIELDS})
+        data["whatsapp_activo"] = ""
         response = self.client.post(self.url(), data)
         self.assertEqual(response.status_code, 302)
         stored = ConfiguracionCRM.objects.get(pk=self.configuration.pk)
-        self.assertTrue(all(getattr(stored, field) for field in self.BOOLEAN_FIELDS))
+        self.assertTrue(all(getattr(stored, field) for field in self.BOOLEAN_FIELDS if field != "whatsapp_activo"))
+        self.assertFalse(stored.whatsapp_activo)
+        self.assertTrue(stored.whatsapp_pendiente_validacion)
         self.assertEqual(stored.mensaje_cita_confirmacion, "Texto original con espacios")
         self.assertEqual(stored.whatsapp_phone_number_id, "phone original QA")
         self.assertEqual(stored.dias_alerta_producto, 0)
@@ -566,15 +572,18 @@ class MobileCrmConfigurationTests(TestCase):
         first, second = self.empresa, self.empresas["medical_spa"]
         data = self.data(first, mensaje_cita_confirmacion="Texto compartido QA", dias_alerta_producto="13",
             remitente_correo="comparacion@example.invalid", **{field: "on" for field in self.BOOLEAN_FIELDS})
+        data["whatsapp_activo"] = ""
         mobile = self.client.post(self.url(first), data)
         original = {**data, "whatsapp_token": "  SYNTHETIC-WEB-TOKEN  "}
+        original["whatsapp_phone_number_id"] = self.configs[second.slug].whatsapp_phone_number_id
+        original["whatsapp_business_account_id"] = self.configs[second.slug].whatsapp_business_account_id
         original.pop("app")
         web = self.client.post(self.url(second, mobile=False), original)
         self.assertEqual(mobile.status_code, 302)
         self.assertEqual(web.status_code, 302)
         self.assertEqual(web.url, reverse("crm_dashboard", args=[second.slug]))
         a, b = ConfiguracionCRM.objects.get(empresa=first), ConfiguracionCRM.objects.get(empresa=second)
-        for field in self.FIELDS:
+        for field in set(self.FIELDS) - {"whatsapp_phone_number_id", "whatsapp_business_account_id"}:
             self.assertEqual(getattr(a, field), getattr(b, field))
         self.assertEqual(a.whatsapp_token, self.configuration.whatsapp_token)
         self.assertEqual(b.whatsapp_token, "SYNTHETIC-WEB-TOKEN")

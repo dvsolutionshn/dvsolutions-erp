@@ -18,6 +18,23 @@ class WhatsAppAPIError(Exception):
     pass
 
 
+def _error_meta_seguro(exc):
+    """Keep numeric diagnostics, never echo remote credentials or patient data."""
+    try:
+        payload = json.loads(exc.read(8192).decode("utf-8", errors="ignore") or "{}")
+        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        code = error.get("code") if isinstance(error, dict) else None
+    except (OSError, ValueError, TypeError):
+        code = None
+    return {"code": code} if isinstance(code, int) and not isinstance(code, bool) else {}
+
+
+def _mensaje_error_meta(exc, error):
+    code = error.get("code")
+    suffix = f", codigo Meta {code}" if code is not None else ""
+    return f"Meta rechazo la solicitud (HTTP {exc.code}{suffix}). Revisa la cuenta, los permisos y la plantilla."
+
+
 def normalizar_telefono_hn(numero):
     telefono = "".join(ch for ch in (numero or "") if ch.isdigit())
     if telefono and not telefono.startswith("504") and len(telefono) == 8:
@@ -60,30 +77,28 @@ def _post_whatsapp(config, payload):
             body = response.read().decode("utf-8")
             return json.loads(body or "{}")
     except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        try:
-            meta_error = json.loads(detail or "{}").get("error", {})
-        except json.JSONDecodeError:
-            meta_error = {}
+        meta_error = _error_meta_seguro(exc)
         if meta_error.get("code") == 132001:
             template_name = payload.get("template", {}).get("name", "")
             language = payload.get("template", {}).get("language", {}).get("code", "")
             raise WhatsAppAPIError(
                 f"La plantilla '{template_name}' no existe aprobada en Meta para idioma '{language}'. "
                 "Creala en WhatsApp Manager o cambia el nombre/idioma en Configuracion CRM."
-            ) from exc
+            ) from None
         if meta_error.get("code") == 131030:
             raise WhatsAppAPIError(
                 "Meta rechazo el envio porque el numero destino no esta autorizado para recibir mensajes "
                 "desde este WhatsApp. Si la cuenta esta en modo prueba, agregue ese numero en la lista de "
                 "destinatarios permitidos de Meta; si ya es produccion, revise que el numero real de la "
                 "empresa este conectado y aprobado."
-            ) from exc
-        raise WhatsAppAPIError(f"Meta respondio con error {exc.code}: {detail}") from exc
+            ) from None
+        raise WhatsAppAPIError(_mensaje_error_meta(exc, meta_error)) from None
     except URLError as exc:
-        raise WhatsAppAPIError(f"No se pudo conectar con WhatsApp Cloud API: {exc}") from exc
+        raise WhatsAppAPIError("No se pudo conectar con WhatsApp Cloud API.") from None
     except (TimeoutError, OSError) as exc:
-        raise WhatsAppAPIError(f"WhatsApp Cloud API no respondió a tiempo: {exc}") from exc
+        raise WhatsAppAPIError("WhatsApp Cloud API no respondio a tiempo.") from None
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise WhatsAppAPIError("Meta devolvio una respuesta no valida.") from None
 
 
 def _post_multipart(config, url, fields, file_field, file_path, content_type):
@@ -123,12 +138,13 @@ def _post_multipart(config, url, fields, file_field, file_path, content_type):
             body_text = response.read().decode("utf-8")
             return json.loads(body_text or "{}")
     except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise WhatsAppAPIError(f"Meta respondio con error {exc.code}: {detail}") from exc
+        raise WhatsAppAPIError(_mensaje_error_meta(exc, _error_meta_seguro(exc))) from None
     except URLError as exc:
-        raise WhatsAppAPIError(f"No se pudo conectar con WhatsApp Cloud API: {exc}") from exc
+        raise WhatsAppAPIError("No se pudo conectar con WhatsApp Cloud API.") from None
     except (TimeoutError, OSError) as exc:
-        raise WhatsAppAPIError(f"WhatsApp Cloud API no respondió a tiempo: {exc}") from exc
+        raise WhatsAppAPIError("WhatsApp Cloud API no respondio a tiempo.") from None
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise WhatsAppAPIError("Meta devolvio una respuesta no valida.") from None
 
 
 def _guardar_imagen_optimizada(imagen, file_path, calidad):

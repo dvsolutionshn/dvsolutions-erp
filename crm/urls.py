@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from . import whatsapp_setup
 
 
 urlpatterns = [
@@ -8,6 +9,8 @@ urlpatterns = [
     path("configuracion/", views.configuracion_crm, name="crm_configuracion"),
     path("configuracion/conectar-whatsapp-meta/", views.conectar_whatsapp_meta, name="crm_conectar_whatsapp_meta"),
     path("configuracion/enviar-prueba-whatsapp/", views.enviar_prueba_whatsapp, name="crm_enviar_prueba_whatsapp"),
+    path("configuracion/whatsapp/activar/", whatsapp_setup.activar_whatsapp, name="crm_activar_whatsapp"),
+    path("configuracion/whatsapp/mensajes/", whatsapp_setup.mensajes_whatsapp, name="crm_mensajes_whatsapp"),
     path("plantillas/", views.plantillas, name="crm_plantillas"),
     path("campanias/", views.campanias, name="crm_campanias"),
     path("campanias/crear/", views.crear_campania, name="crm_crear_campania"),
