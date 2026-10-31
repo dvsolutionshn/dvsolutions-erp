@@ -144,6 +144,14 @@ def extract_archive(archive, release):
             if not (item.isfile() or item.isdir()):
                 raise DeploymentError("El archivo contiene enlaces o tipos especiales no permitidos.")
         bundle.extractall(release, filter="data")
+    # The data filter intentionally ignores directory modes. With our private
+    # umask its newly created folders would otherwise be unreadable by workers.
+    for directory, _, filenames in os.walk(release):
+        Path(directory).chmod(0o755)
+        for filename in filenames:
+            path = Path(directory) / filename
+            executable = path.stat().st_mode & 0o111
+            path.chmod(0o755 if executable else 0o644)
     for name in (".venv", "media", "staticfiles"):
         destination, source = release / name, LIVE / name
         if destination.exists() or destination.is_symlink() or not source.exists():
