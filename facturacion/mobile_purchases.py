@@ -1,12 +1,15 @@
-"""Consulta móvil de compras, sin operaciones ni cálculos financieros nuevos.
+"""Presentación móvil de las compras y de su registro original.
 
 La lista utiliza los filtros y los siete resúmenes de compras_dashboard; el
-detalle y PDF conservan sus consultas y propiedades originales. Las acciones
-de inventario, contabilidad, pago o anulación no se exponen en esta interfaz.
+detalle y PDF conservan sus consultas y propiedades originales. Registrar una
+compra reutiliza el formulario y guardado web, sin otro cálculo o servicio.
+Los pagos, anulaciones y demás operaciones separadas no se exponen aquí.
 """
 
 from urllib.parse import urlencode
+from types import SimpleNamespace
 
+from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
@@ -17,6 +20,7 @@ from django.urls import reverse
 from contabilidad.models import CuentaContable, CuentaFinanciera
 from core.access import interfaz_clinica_activa
 from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
+from core.read_only_permissions import evaluar_ruta_solo_lectura, rol_solo_lectura
 from .models import (
     BodegaInventario, ClienteContable, CompraInventario, ComprobanteEgresoCompra,
     CuentaAcumuladoCompra, EntradaInventarioDocumento, Factura, LineaCompraInventario,
@@ -37,6 +41,10 @@ def es_compras_app(request, empresa):
 
 def compras_disponibles_app(request, empresa):
     """Capacidad de consulta existente, sin leer compras ni preparar catálogos."""
+    return _accion_compras_disponible_app(request, empresa, "puede_compras")
+
+
+def _accion_compras_disponible_app(request, empresa, permiso):
     usuario = request.user
     return bool(
         empresa and empresa.slug in EMPRESAS_CLINICAS_CON_ROLES
@@ -45,8 +53,76 @@ def compras_disponibles_app(request, empresa):
         and (usuario.is_superuser or usuario.puede_acceder_empresa(empresa))
         and (usuario.is_superuser or empresa.licencia_operativa)
         and empresa.tiene_modulo_activo("facturacion")
-        and usuario.tiene_permiso_erp("puede_compras", empresa)
+        and usuario.tiene_permiso_erp(permiso, empresa)
     )
+
+
+def crear_compra_disponible_app(request, empresa):
+    """Crear es una acción independiente del permiso de consultar compras."""
+    return bool(
+        _accion_compras_disponible_app(request, empresa, "puede_crear_compras")
+        and not rol_solo_lectura(request.user, empresa, "inventario")
+    )
+
+
+def puede_aplicar_compra_app(request, empresa):
+    return bool(
+        crear_compra_disponible_app(request, empresa)
+        and request.user.tiene_permiso_erp("puede_aplicar_compras", empresa)
+    )
+
+
+def cuentas_compra_app(empresa):
+    """Consultar cuentas configuradas, sin inicializar catálogos al abrir la app."""
+    return CuentaFinanciera.objects.filter(
+        empresa=empresa, activa=True, cuenta_contable__empresa=empresa,
+        cuenta_contable__activa=True, cuenta_contable__acepta_movimientos=True,
+    ).select_related("cuenta_contable").order_by("nombre")
+
+
+def autorizar_crear_compra_app(request, empresa):
+    if not crear_compra_disponible_app(request, empresa):
+        raise PermissionDenied("No tiene permiso para registrar compras en esta empresa.")
+    if request.method not in {"GET", "HEAD", "POST"} or request.FILES:
+        raise PermissionDenied("Método o archivos no admitidos al registrar la compra móvil.")
+    if evaluar_ruta_solo_lectura(request, empresa, "inventario", "inventario/compras/crear/") is False:
+        raise PermissionDenied("El acceso de sólo lectura no permite registrar compras.")
+    if (
+        set(request.GET) - {"app"}
+        or any(len(request.GET.getlist(clave)) != 1 for clave in request.GET)
+        or ("app" in request.GET and request.GET.getlist("app") != ["1"])
+        or ("app" in request.POST and request.POST.getlist("app") != ["1"])
+        or (request.GET.getlist("app") != ["1"] and request.POST.getlist("app") != ["1"])
+    ):
+        raise PermissionDenied("Parámetros de registro móvil inválidos.")
+    if request.method != "POST":
+        if request.POST or request.body:
+            raise PermissionDenied("La consulta del formulario no admite cuerpo.")
+        return
+    if any(len(request.POST.getlist(clave)) != 1 for clave in request.POST):
+        raise PermissionDenied("El registro móvil no admite campos duplicados.")
+    total = _numero_canonico(request.POST.get("lineas_compra-TOTAL_FORMS", ""))
+    if total > 100 or request.POST.get("lineas_compra-INITIAL_FORMS") != "0":
+        raise PermissionDenied("Envíe entre una y cien líneas nuevas para la compra.")
+    permitidos = {
+        "app", "csrfmiddlewaretoken", "proveedor", "proveedor_nombre", "proveedor_busqueda",
+        "referencia_documento", "fecha_documento", "condicion_pago", "metodo_pago",
+        "cuenta_financiera_pago", "dias_credito", "fecha_vencimiento", "observacion", "estado",
+        "lineas_compra-TOTAL_FORMS", "lineas_compra-INITIAL_FORMS",
+        "lineas_compra-MIN_NUM_FORMS", "lineas_compra-MAX_NUM_FORMS",
+    }
+    for indice in range(total):
+        prefijo = f"lineas_compra-{indice}"
+        permitidos.update(f"{prefijo}-{campo}" for campo in (
+            "producto", "cantidad", "costo_unitario", "descuento_porcentaje", "comentario",
+            "impuesto", "DELETE", "id", "compra",
+        ))
+        if request.POST.get(f"{prefijo}-id") or request.POST.get(f"{prefijo}-compra"):
+            raise PermissionDenied("La compra nueva no admite líneas o documentos existentes.")
+    if set(request.POST) - permitidos:
+        raise PermissionDenied("El formulario de compra móvil no admite esos campos.")
+    if request.POST.get("estado") == "aplicada" and not puede_aplicar_compra_app(request, empresa):
+        raise PermissionDenied("No tiene permiso para aplicar compras al inventario.")
 
 
 def _numero_canonico(valor):
@@ -161,12 +237,14 @@ def _contexto_compras_app(request, empresa, compra=None):
     listado = url_compra_app("compras_dashboard", empresa)
     proveedor = compra.proveedor if compra is not None and compra.proveedor_id else None
     puede_proveedor = bool(proveedor is not None and proveedor.cliente_contable_id is None and proveedores_disponibles_app(request, empresa)["ver"])
+    puede_consultar = compras_disponibles_app(request, empresa)
     contexto = {
         "empresa": empresa, "modo_app": True, "app_base_url": inicio,
         "app_home_disponible": home, "app_modules_url": modulos,
         "app_invoices_url": f"{inicio}#facturas-app",
         "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
-        "can_view_purchases": True, "can_view_purchase": True, "can_download_purchase": True,
+        "can_view_purchases": puede_consultar, "can_view_purchase": puede_consultar,
+        "can_download_purchase": puede_consultar,
         "can_view_supplier": puede_proveedor,
         "can_view_egresos": False,
         "app_purchases_url": listado, "app_purchases_search_url": listado,
@@ -176,6 +254,9 @@ def _contexto_compras_app(request, empresa, compra=None):
     for accion in ("create", "edit", "apply", "void", "delete", "pay"):
         contexto[f"can_{accion}_purchase"] = False
         contexto[f"app_purchase_{accion}_url"] = ""
+    contexto["can_create_purchase"] = compra is None and crear_compra_disponible_app(request, empresa)
+    if contexto["can_create_purchase"]:
+        contexto["app_purchase_create_url"] = url_compra_app("crear_compra", empresa)
     contexto.update({
         "can_revert_purchase_payment": False, "app_purchase_payment_revert_url": "",
         "puede_eliminar_compra_anulada": False,
@@ -187,6 +268,36 @@ def _contexto_compras_app(request, empresa, compra=None):
             "app_purchase_pdf_url": url_compra_app("descargar_compra_pdf", empresa, compra),
         })
     return contexto
+
+
+def render_crear_compra_app(request, empresa, contexto):
+    """Adaptar campos y navegación, sin validar ni guardar otro documento."""
+    form, formset = contexto["form"], contexto["formset"]
+    for nombre in ("fecha_documento", "fecha_vencimiento"):
+        form.fields[nombre].widget = forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+    # empty_form no pertenece a formset.forms: necesita los mismos catálogos
+    # y atributos que la configuración original da a las líneas actuales.
+    from .views import _configurar_lineas_compra_formset
+
+    empty_form = formset.empty_form
+    _configurar_lineas_compra_formset(
+        SimpleNamespace(forms=[empty_form]), contexto["productos"], contexto["impuestos"],
+    )
+    for linea in [*formset.forms, empty_form]:
+        linea.fields["producto"].label_from_instance = lambda producto: (
+            f"{producto.nombre} · {producto.codigo}" if producto.codigo else producto.nombre
+        )
+    form.fields["observacion"].widget.attrs["rows"] = 3
+    contexto = {**contexto, **_contexto_compras_app(request, empresa)}
+    puede_consultar = contexto["can_view_purchases"]
+    puede_aplicar = puede_aplicar_compra_app(request, empresa)
+    contexto.update({
+        "app_purchase_form_action": url_compra_app("crear_compra", empresa),
+        "app_purchase_back_url": contexto["app_purchases_url"] if puede_consultar else contexto["app_modules_url"],
+        "app_purchase_can_apply": puede_aplicar, "can_apply_purchase": puede_aplicar,
+        "app_purchase_empty_form": empty_form, "empty_line_form": empty_form,
+    })
+    return respuesta_compras_app(render(request, "facturacion/mobile_purchase_form.html", contexto))
 
 
 def render_compras_app(request, empresa, contexto):

@@ -1,0 +1,27 @@
+/* Mobile-only purchase presentation. Original forms and services own the save. */
+.mpf-products,.mpf-lines,.mpf-line{display:grid;gap:15px;min-width:0}
+.mpf-section-title,.mpf-line-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.mpf-section-title h2,.mpf-line h3,.mpf-review h2{font-size:15px;line-height:1.7;color:#365f73;margin:0;overflow-wrap:anywhere}
+.mpf-section-title>span{font-size:11px;color:#668493;flex-shrink:0}
+.mpf-line-heading h3{flex:1;min-width:0}
+.mpf-remove{flex-shrink:0;border:1px solid #e7cdd2;border-radius:12px;background:#fff6f7;color:#a05a69;min-height:44px;padding:8px 11px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.mpf-line[hidden]{display:none}
+.mpf-line .mi-field{margin:0}
+.mpf-line-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0}
+.mpf-line-options{border-top:1px solid #deeaed;min-width:0}
+.mpf-line-options>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;color:#557d8b;font-size:12px;font-weight:700;cursor:pointer}
+.mpf-line-options>summary::-webkit-details-marker{display:none}
+.mpf-line-options-body{display:grid;gap:16px;padding-top:10px;min-width:0}
+.mpf-select-label{margin-top:12px}
+.mpf-line-estimate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid #deeaed;color:#698693;font-size:11px;line-height:1.7;overflow-wrap:anywhere}
+.mpf-line-estimate strong{font-size:14px;color:#397f70;text-align:right}
+.mpf-review{display:grid;gap:15px;min-width:0}
+.mpf-estimate{display:grid;gap:8px;padding:18px;border-radius:17px;background:linear-gradient(125deg,#e9f8f4,#edf5fc);color:#467f7a;overflow-wrap:anywhere}
+.mpf-estimate>span{font-size:12px;font-weight:700}.mpf-estimate strong{font-size:27px;color:#226f70;line-height:1.4}
+.mpf-state-note{padding:13px;background:#f3f8fb;border:1px solid #d8e6ec;border-radius:13px;font-size:12px;line-height:1.8;color:#617c8e;overflow-wrap:anywhere;margin:0}
+.mpf-state-note.is-applied{background:#fff7e8;border-color:#eadac0;color:#896836}
+.mpf-register{margin-bottom:16px}.mpf-products>p:empty{display:none}
+#mobilePurchaseForm [hidden]{display:none}
+#mobilePurchaseForm input[type=date]{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+#mobilePurchaseForm button:focus-visible,#mobilePurchaseForm summary:focus-visible{outline:3px solid #4fa6a1;outline-offset:3px}
+@media(max-width:350px){.mpf-line-grid{grid-template-columns:1fr}.mpf-line-estimate{align-items:flex-start;flex-direction:column}.mpf-estimate strong{font-size:24px}.mpf-section-title h2,.mpf-line h3{font-size:14px}}

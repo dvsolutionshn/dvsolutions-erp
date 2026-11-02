@@ -1,0 +1,23 @@
+<article class="mi-card mpf-line" data-purchase-line>
+  {% for hidden in line.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}
+  <div hidden>{{ line.DELETE }}</div>
+  <div class="mpf-line-heading"><h3 data-purchase-line-title>Producto de la compra</h3><button class="mpf-remove" type="button" data-purchase-remove aria-label="Quitar producto de la compra">Quitar</button></div>
+  {% if line.non_field_errors %}<div class="mi-error-box" role="alert">{{ line.non_field_errors }}</div>{% endif %}
+  <div class="mi-field msop-field" data-operation-field="Producto">
+    <label class="msop-label" for="search-{{ line.prefix }}">Buscar producto</label>
+    <input id="search-{{ line.prefix }}" type="search" data-purchase-product-search placeholder="Nombre o código..." autocomplete="off" aria-controls="{{ line.producto.id_for_label }}">
+    <label class="msop-label mpf-select-label" for="{{ line.producto.id_for_label }}">Producto <span class="msop-required" aria-hidden="true">*</span></label>{{ line.producto }}
+    <small data-purchase-search-status aria-live="polite">Seleccione un producto del inventario de esta empresa.</small>
+    {% for error in line.producto.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+  </div>
+  <div class="mpf-line-grid">
+    {% include 'facturacion/mobile_product_management_field.html' with field=line.cantidad form=line %}
+    {% include 'facturacion/mobile_product_management_field.html' with field=line.costo_unitario form=line %}
+  </div>
+  <details class="mpf-line-options"{% if line.errors or line.comentario.value %} open{% endif %}><summary>Descuento, impuesto y nota <span aria-hidden="true">⌄</span></summary><div class="mpf-line-options-body">
+    {% include 'facturacion/mobile_product_management_field.html' with field=line.descuento_porcentaje form=line %}
+    {% include 'facturacion/mobile_product_management_field.html' with field=line.impuesto form=line %}
+    {% include 'facturacion/mobile_product_management_field.html' with field=line.comentario form=line %}
+  </div></details>
+  <div class="mpf-line-estimate"><span>Monto estimado de esta línea</span><strong data-purchase-line-total>L. 0.00</strong></div>
+</article>

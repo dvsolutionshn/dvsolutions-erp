@@ -273,11 +273,12 @@ def construir_contexto_modulos_app(request, empresa):
             "Operación", any(proveedores.values()),
             "disponible" if proveedores["ver"] or proveedores["crear"] else "pendiente",
             f"{reverse('proveedores_facturacion' if proveedores['ver'] else 'crear_proveedor_facturacion', args=[empresa.slug])}?app=1")
-    from facturacion.mobile_purchases import compras_disponibles_app
+    from facturacion.mobile_purchases import compras_disponibles_app, crear_compra_disponible_app
 
-    agregar("compras", "Compras", "Sólo consulta de documentos, productos, pagos registrados, movimientos y PDF; no realiza operaciones contables.",
-            "Operación", compras_disponibles_app(request, empresa), "disponible",
-            f"{reverse('compras_dashboard', args=[empresa.slug])}?app=1")
+    puede_consultar_compras = compras_disponibles_app(request, empresa)
+    agregar("compras", "Compras", "Consultar documentos y PDF o registrar una compra con los permisos actuales. Aplicar al inventario conserva su autorización y efectos originales.",
+            "Operación", puede_consultar_compras or crear_compra_disponible_app(request, empresa), "disponible",
+            f"{reverse('compras_dashboard' if puede_consultar_compras else 'crear_compra', args=[empresa.slug])}?app=1")
     from facturacion.mobile_cxc import cxc_disponible_app
 
     agregar("cxc", "Cuentas por cobrar", "Consultar cartera por cliente, saldos y antigüedad del reporte actual, sin modificar pagos.",

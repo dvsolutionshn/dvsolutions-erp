@@ -5529,9 +5529,24 @@ def anular_registro_compra_fiscal(request, empresa_slug, registro_id):
 @login_required
 def crear_compra(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
+    from .mobile_purchases import (
+        autorizar_crear_compra_app, compras_disponibles_app, cuentas_compra_app,
+        es_compras_app, puede_aplicar_compra_app, render_crear_compra_app, url_compra_app,
+    )
+
+    # An invalid mobile marker must not fall through to the desktop saver.
+    modo_app = es_compras_app(request, empresa) or (
+        empresa.slug in EMPRESAS_CLINICAS_CON_ROLES
+        and ("app" in request.GET or "app" in request.POST)
+    )
+    if modo_app:
+        autorizar_crear_compra_app(request, empresa)
     estados_disponibles = [estado for estado in CompraInventario.ESTADOS if estado[0] != 'anulada']
+    if modo_app and not puede_aplicar_compra_app(request, empresa):
+        estados_disponibles = [estado for estado in estados_disponibles if estado[0] == 'borrador']
     proveedores_qs = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by('nombre')
-    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    cuentas_financieras = cuentas_compra_app(empresa) if modo_app else _cuentas_financieras_activas_para_pago(empresa)
 
     CompraForm = modelform_factory(
         CompraInventario,
@@ -5554,7 +5569,9 @@ def crear_compra(request, empresa_slug):
         LineaCompraInventario,
         fields=['producto', 'cantidad', 'costo_unitario', 'descuento_porcentaje', 'comentario', 'impuesto'],
         extra=1,
-        can_delete=True
+        can_delete=True,
+        max_num=100 if modo_app else 1000,
+        validate_max=modo_app,
     )
 
     productos_qs = Producto.objects.filter(
@@ -5602,6 +5619,10 @@ def crear_compra(request, empresa_slug):
 
         if form.is_valid():
             proveedor = form.cleaned_data.get('proveedor')
+            if modo_app and proveedor:
+                from .mobile_suppliers import validar_proveedor_app
+
+                validar_proveedor_app(empresa, proveedor)
             proveedor_nombre = (form.cleaned_data.get('proveedor_nombre') or proveedor_busqueda or '').strip()
             if proveedor:
                 proveedor_nombre = proveedor.nombre
@@ -5614,7 +5635,7 @@ def crear_compra(request, empresa_slug):
             ):
                 form.add_error('cuenta_financiera_pago', 'Seleccione la cuenta financiera para cancelar esta compra de contado.')
 
-        if form.is_valid() and lineas_validas:
+        if form.is_valid() and lineas_validas and (not modo_app or formset.is_valid()):
             error_asiento = None
             error_pago = None
             try:
@@ -5664,11 +5685,15 @@ def crear_compra(request, empresa_slug):
                     messages.warning(request, "La compra se guardo y el inventario fue actualizado, pero no se pudo crear el asiento contable automatico. Revise la configuracion contable de la empresa.")
                 if error_pago:
                     messages.warning(request, "La compra de contado quedo pagada, pero no se pudo crear el asiento contable del pago. Revise la cuenta financiera y la configuracion contable.")
+                if modo_app:
+                    if compras_disponibles_app(request, empresa):
+                        return redirect(url_compra_app("ver_compra", empresa, compra))
+                    return redirect("agenda_mobile_modules_screen", empresa_slug=empresa.slug)
                 return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
-        elif form.is_valid():
+        elif form.is_valid() and (not modo_app or not lineas_validas):
             messages.error(request, "Debe agregar al menos una linea valida en la compra.")
     else:
-        form = CompraForm()
+        form = CompraForm(initial={"estado": "borrador"}) if modo_app else CompraForm()
         _configurar_compra_form(form, empresa, estados_disponibles, proveedores_qs, cuentas_financieras)
         cuenta_defecto = _cuenta_financiera_por_defecto(cuentas_financieras, "efectivo")
         if cuenta_defecto:
@@ -5676,7 +5701,7 @@ def crear_compra(request, empresa_slug):
         formset = LineaFormSet(prefix='lineas_compra')
         _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
-    return render(request, "facturacion/crear_compra_premium.html", {
+    contexto = {
         "empresa": empresa,
         "form": form,
         "formset": formset,
@@ -5704,7 +5729,10 @@ def crear_compra(request, empresa_slug):
             for producto in productos_qs
         ],
         "modo_edicion": False,
-    })
+    }
+    if modo_app:
+        return render_crear_compra_app(request, empresa, contexto)
+    return render(request, "facturacion/crear_compra_premium.html", contexto)
 
 
 @login_required

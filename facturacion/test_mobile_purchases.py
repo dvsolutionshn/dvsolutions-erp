@@ -281,12 +281,15 @@ class MobilePurchasesIntegrationTests(TestCase):
         self.assertFalse(any(field.name == "moneda" for field in CompraInventario._meta.fields))
         self.assertEqual(self.snapshot(), before)
 
-    def test_original_total_line_fallback_is_used_without_recalculating_or_persisting_old_rows(self):
+    def test_stored_zero_line_totals_are_preserved_without_recalculation_and_match_web(self):
         LineaCompraInventario.objects.filter(pk=self.lines[self.empresa.slug].pk).update(subtotal=0, impuesto_monto=0, cantidad=Decimal("2"), costo_unitario=Decimal("45.1234"))
         before = self.snapshot()
         app = self.client.get(self.url())
         web = self.client.get(self.url(mobile=False))
-        self.assertEqual(app.context["compra"].total_documento, Decimal("90.25"))
+        # The current shared model deliberately uses stored subtotal/tax, not
+        # a new quantity * cost calculation when historical amounts are zero.
+        self.assertEqual(app.context["compra"].total_documento, Decimal("0.00"))
+        self.assertEqual(web.context["compra"].total_documento, Decimal("0.00"))
         self.assertEqual(app.context["compra"].saldo_pendiente, web.context["compra"].saldo_pendiente)
         self.assertEqual(self.snapshot(), before)
 

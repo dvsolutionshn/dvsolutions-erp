@@ -9,6 +9,7 @@
 {% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_egresos.css' %}"><link rel="stylesheet" href="{% static 'facturacion/mobile_purchases.css' %}">{% endblock %}
 {% block mobile_scripts %}<script src="{% static 'facturacion/mobile_egresos.js' %}" defer></script>{% endblock %}
 {% block mobile_content %}
+{% if can_create_purchase and app_purchase_create_url %}<a class="mi-button" style="margin-bottom:16px" href="{{ app_purchase_create_url }}">+ Registrar compra</a>{% endif %}
 <section class="mi-card meg-search-card"><h2>Buscar compras</h2>
   <form id="mobilePurchaseSearchForm" method="get" action="{{ app_purchases_search_url }}">
     <input type="hidden" name="app" value="1">
@@ -38,5 +39,5 @@
 {% empty %}<section class="mi-card meg-empty"><h2>Sin compras que coincidan</h2><p>No hay documentos con estos filtros para la empresa activa.</p></section>{% endfor %}
 </div>
 {% if mobile_purchase_num_pages > 1 %}<nav class="meg-pagination" aria-label="Páginas de compras"><div>{% if mobile_purchase_previous_url %}<a href="{{ mobile_purchase_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_purchase_page }} / {{ mobile_purchase_num_pages }}</span>{% if mobile_purchase_next_url %}<a href="{{ mobile_purchase_next_url }}">Siguiente ›</a>{% endif %}</div></nav>{% endif %}
-<div class="meg-info-note"><strong>Solo consulta</strong><p>Esta pantalla muestra compras, pagos registrados y movimientos. No modifica documentos, pagos, inventario ni contabilidad. Los importes y estados conservan las reglas del sistema actual.</p></div>
+<div class="meg-info-note"><strong>Documentos de esta empresa</strong><p>Consulte compras, pagos registrados y movimientos. {% if can_create_purchase %}También puede registrar una compra desde el botón superior, con sus permisos actuales. {% endif %}Los importes, estados y efectos de cada documento conservan las reglas del sistema existente.</p></div>
 {% endblock %}
