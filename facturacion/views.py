@@ -33,6 +33,7 @@ import tempfile
 import zipfile
 from uuid import uuid4
 from pathlib import Path
+from contextlib import nullcontext
 from .captura_rapida import calcular_importes, captura_rapida
 from .costos_inventario import actualizar_valor_inventario, cantidad_disponible_para_linea, capturar_costos_devolucion, costo_reversion_compra, validar_devoluciones_nota, valor_actual_inventario, valor_contable_linea_inventario, valorar_linea_compra
 
@@ -1073,82 +1074,133 @@ def _compra_proveedor_payload(proveedor):
 @require_POST
 def compra_crear_proveedor_rapido(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        payload = {}
+    from .mobile_purchases import datos_alta_rapida_compra_app, es_alta_rapida_compra_app, respuesta_compras_app
+
+    modo_app = es_alta_rapida_compra_app(request, empresa)
+
+    def responder(datos, status=200):
+        respuesta = JsonResponse(datos, status=status)
+        return respuesta_compras_app(respuesta) if modo_app else respuesta
+
+    if modo_app:
+        try:
+            payload = datos_alta_rapida_compra_app(request, empresa, "proveedor")
+        except PermissionDenied as exc:
+            return responder({"ok": False, "error": str(exc)}, status=403)
+        except ValidationError as exc:
+            return responder({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+    else:
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            payload = {}
 
     nombre = (payload.get("nombre") or "").strip()
     if not nombre:
-        return JsonResponse({"ok": False, "error": "Ingresa el nombre del proveedor."}, status=400)
+        return responder({"ok": False, "error": "Ingresa el nombre del proveedor."}, status=400)
 
     try:
         dias_credito = int(payload.get("dias_credito") or 0)
     except (TypeError, ValueError):
         dias_credito = 0
 
-    proveedor = Proveedor.objects.create(
-        empresa=empresa,
-        nombre=nombre,
-        rtn=(payload.get("rtn") or "").strip() or None,
-        contacto=(payload.get("contacto") or "").strip(),
-        telefono=(payload.get("telefono") or "").strip(),
-        correo=(payload.get("correo") or "").strip().lower(),
-        ciudad=(payload.get("ciudad") or "").strip(),
-        condicion_pago=payload.get("condicion_pago") or "contado",
-        dias_credito=dias_credito if dias_credito > 0 else 0,
-        activo=True,
-    )
-    return JsonResponse({"ok": True, "proveedor": _compra_proveedor_payload(proveedor)})
+    try:
+        with transaction.atomic() if modo_app else nullcontext():
+            proveedor = Proveedor.objects.create(
+                empresa=empresa,
+                nombre=nombre,
+                rtn=(payload.get("rtn") or "").strip() or None,
+                contacto=(payload.get("contacto") or "").strip(),
+                telefono=(payload.get("telefono") or "").strip(),
+                correo=(payload.get("correo") or "").strip().lower(),
+                ciudad=(payload.get("ciudad") or "").strip(),
+                condicion_pago=payload.get("condicion_pago") or "contado",
+                dias_credito=dias_credito if dias_credito > 0 else 0,
+                activo=True,
+            )
+    except ValidationError as exc:
+        if not modo_app:
+            raise
+        return responder({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+    except Exception:
+        if not modo_app:
+            raise
+        logger.exception("No se pudo crear el proveedor desde la compra móvil en empresa %s.", empresa.pk)
+        return responder({"ok": False, "error": "No se pudo crear el proveedor. Revise los datos e intente de nuevo."}, status=500)
+    return responder({"ok": True, "proveedor": _compra_proveedor_payload(proveedor)})
 
 
 @login_required
 @require_POST
 def compra_crear_producto_rapido(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        payload = {}
+    from .mobile_purchases import datos_alta_rapida_compra_app, es_alta_rapida_compra_app, respuesta_compras_app
+
+    modo_app = es_alta_rapida_compra_app(request, empresa)
+
+    def responder(datos, status=200):
+        respuesta = JsonResponse(datos, status=status)
+        return respuesta_compras_app(respuesta) if modo_app else respuesta
+
+    if modo_app:
+        try:
+            payload = datos_alta_rapida_compra_app(request, empresa, "producto")
+        except PermissionDenied as exc:
+            return responder({"ok": False, "error": str(exc)}, status=403)
+        except ValidationError as exc:
+            return responder({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+    else:
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            payload = {}
 
     nombre = (payload.get("nombre") or "").strip()
     codigo = (payload.get("codigo") or "").strip()
     try:
         precio = Decimal(str(payload.get("precio") or "0")).quantize(Decimal("0.01"))
     except (InvalidOperation, ValueError):
-        return JsonResponse({"ok": False, "error": "El precio de venta no es valido."}, status=400)
+        return responder({"ok": False, "error": "El precio de venta no es valido."}, status=400)
     if not nombre:
-        return JsonResponse({"ok": False, "error": "Ingresa el nombre del producto."}, status=400)
+        return responder({"ok": False, "error": "Ingresa el nombre del producto."}, status=400)
     if precio < 0:
-        return JsonResponse({"ok": False, "error": "El precio no puede ser negativo."}, status=400)
+        return responder({"ok": False, "error": "El precio no puede ser negativo."}, status=400)
 
     impuesto_default = TipoImpuesto.objects.filter(activo=True).order_by("nombre").first()
     impuesto = impuesto_default
     impuesto_id = payload.get("impuesto_id")
     if impuesto_id:
-        impuesto = TipoImpuesto.objects.filter(id=impuesto_id, activo=True).first() or impuesto_default
+        impuesto = TipoImpuesto.objects.filter(id=impuesto_id, activo=True).first()
+        if not modo_app:
+            impuesto = impuesto or impuesto_default
     if not impuesto:
-        return JsonResponse({"ok": False, "error": "Configura al menos un impuesto activo antes de crear productos."}, status=400)
+        return responder({"ok": False, "error": "Configura al menos un impuesto activo antes de crear productos."}, status=400)
 
     try:
-        producto = Producto.objects.create(
-            empresa=empresa,
-            nombre=nombre,
-            codigo=codigo or None,
-            tipo_item="producto",
-            unidad_medida=payload.get("unidad_medida") or "unidad",
-            precio=precio,
-            impuesto_predeterminado=impuesto,
-            controla_inventario=True,
-            activo=True,
-        )
-        _obtener_inventario_producto(producto)
+        with transaction.atomic() if modo_app else nullcontext():
+            producto = Producto.objects.create(
+                empresa=empresa,
+                nombre=nombre,
+                codigo=codigo or None,
+                tipo_item="producto",
+                unidad_medida=payload.get("unidad_medida") or "unidad",
+                precio=precio,
+                impuesto_predeterminado=impuesto,
+                controla_inventario=True,
+                activo=True,
+            )
+            _obtener_inventario_producto(producto)
     except ValidationError as exc:
-        return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+        return responder({"ok": False, "error": "; ".join(exc.messages)}, status=400)
     except IntegrityError:
-        return JsonResponse({"ok": False, "error": "Ya existe un producto con esos datos. Revisa el codigo o nombre."}, status=409)
+        return responder({"ok": False, "error": "Ya existe un producto con esos datos. Revisa el codigo o nombre."}, status=400 if modo_app else 409)
+    except Exception:
+        if not modo_app:
+            raise
+        logger.exception("No se pudo crear el producto desde la compra móvil en empresa %s.", empresa.pk)
+        return responder({"ok": False, "error": "No se pudo crear el producto. Revise los datos e intente de nuevo."}, status=500)
 
-    return JsonResponse({"ok": True, "producto": _pos_producto_payload(producto, impuesto_default)})
+    return responder({"ok": True, "producto": _pos_producto_payload(producto, impuesto_default)})
 
 
 @login_required

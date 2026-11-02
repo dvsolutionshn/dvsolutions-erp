@@ -8,10 +8,12 @@ Los pagos, anulaciones y demás operaciones separadas no se exponen aquí.
 
 from urllib.parse import urlencode
 from types import SimpleNamespace
+from decimal import Decimal
+import json
 
 from django import forms
 from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, RequestDataTooBig, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, render
@@ -30,6 +32,7 @@ from .models import (
 
 ESTADOS_FILTRO_COMPRAS = ("borrador", "aplicada", "anulada")
 PAGOS_FILTRO_COMPRAS = ("pendiente", "parcial", "pagado")
+MAX_BYTES_ALTA_RAPIDA_COMPRA = 16384
 
 
 def es_compras_app(request, empresa):
@@ -70,6 +73,110 @@ def puede_aplicar_compra_app(request, empresa):
         crear_compra_disponible_app(request, empresa)
         and request.user.tiene_permiso_erp("puede_aplicar_compras", empresa)
     )
+
+
+def altas_rapidas_compra_app(request, empresa):
+    disponible = crear_compra_disponible_app(request, empresa)
+    return {
+        "proveedor": bool(disponible and request.user.tiene_permiso_erp("puede_crear_proveedores", empresa)),
+        "producto": bool(disponible and request.user.tiene_permiso_erp("puede_crear_productos", empresa)),
+    }
+
+
+def es_alta_rapida_compra_app(request, empresa):
+    """Un marcador incorrecto tampoco puede eludir la guarda hacia la web."""
+    if "app" in request.GET or "app" in request.POST:
+        return True
+    # El cliente usa ?app=1; detectar también un marcador en JSON permite
+    # rechazarlo explícitamente, sin tratarlo como una creación web normal.
+    if request.content_type == "application/json":
+        try:
+            cuerpo = request.body
+            if len(cuerpo) <= MAX_BYTES_ALTA_RAPIDA_COMPRA:
+                datos = json.loads(cuerpo.decode("utf-8"))
+                return isinstance(datos, dict) and "app" in datos
+        except (UnicodeError, ValueError, RecursionError, RequestDataTooBig):
+            pass
+    return False
+
+
+def _objeto_json_compra_sin_duplicados(pares):
+    datos = {}
+    for clave, valor in pares:
+        if clave in datos:
+            raise ValidationError("El formulario no admite campos JSON duplicados.")
+        datos[clave] = valor
+    return datos
+
+
+def datos_alta_rapida_compra_app(request, empresa, tipo):
+    """Sólo preparar el payload del creador original; no guardar otro objeto."""
+    if not altas_rapidas_compra_app(request, empresa).get(tipo, False):
+        raise PermissionDenied("No tiene permiso para crear este registro desde la compra de esta empresa.")
+    if (
+        request.method != "POST" or request.FILES
+        or set(request.GET) != {"app"} or request.GET.getlist("app") != ["1"]
+        or evaluar_ruta_solo_lectura(request, empresa, "inventario", "inventario/compras/crear/") is False
+    ):
+        raise PermissionDenied("Parámetros o acceso móvil no válidos.")
+    if request.content_type != "application/json" or request.POST:
+        raise ValidationError("Envíe el formulario móvil como un objeto JSON.")
+    try:
+        cuerpo = request.body
+        if len(cuerpo) > MAX_BYTES_ALTA_RAPIDA_COMPRA:
+            raise ValidationError("El formulario es demasiado grande.")
+        datos = json.loads(cuerpo.decode("utf-8"), object_pairs_hook=_objeto_json_compra_sin_duplicados)
+    except (UnicodeError, ValueError, RecursionError, RequestDataTooBig) as exc:
+        raise ValidationError("El formulario contiene JSON no válido.") from exc
+    if not isinstance(datos, dict) or any(not isinstance(valor, str) for valor in datos.values()):
+        raise ValidationError("Cada campo del formulario debe ser texto.")
+    campos = (
+        {"nombre", "rtn", "contacto", "telefono", "correo", "ciudad", "condicion_pago", "dias_credito"}
+        if tipo == "proveedor" else {"nombre", "codigo", "precio", "unidad_medida", "impuesto_id"}
+    )
+    if set(datos) - campos:
+        raise ValidationError("El formulario no admite esos campos.")
+    datos = {clave: valor.strip() for clave, valor in datos.items()}
+    if tipo == "proveedor":
+        from .forms import ProveedorForm
+
+        datos.setdefault("condicion_pago", "contado")
+        datos["condicion_pago"] = datos["condicion_pago"] or "contado"
+        datos["dias_credito"] = datos.get("dias_credito") or "0"
+        form = ProveedorForm({**datos, "activo": True}, instance=Proveedor(empresa=empresa))
+        if not form.is_valid():
+            raise ValidationError(dict(form.errors))
+        datos["dias_credito"] = str(form.cleaned_data.get("dias_credito") or 0)
+        return datos
+    # ProductoForm inicializa configuración y bodegas. El ModelForm mínimo
+    # usa los mismos campos/validadores de Producto sin esos inicializadores.
+    ProductoRapidoForm = forms.modelform_factory(
+        Producto, fields=["nombre", "codigo", "precio", "unidad_medida", "impuesto_predeterminado"],
+    )
+    impuesto_id = datos.get("impuesto_id") or ""
+    if impuesto_id:
+        try:
+            _numero_canonico(impuesto_id)
+        except PermissionDenied as exc:
+            raise ValidationError({"impuesto_id": "Seleccione un impuesto activo válido."}) from exc
+    else:
+        impuesto_id = str(TipoImpuesto.objects.filter(activo=True).order_by("nombre").values_list("pk", flat=True).first() or "")
+    form = ProductoRapidoForm({
+        **{clave: valor for clave, valor in datos.items() if clave != "impuesto_id"},
+        "precio": datos.get("precio") or "0", "unidad_medida": datos.get("unidad_medida") or "unidad",
+        "impuesto_predeterminado": impuesto_id,
+    }, instance=Producto(empresa=empresa, tipo_item="producto", controla_inventario=True, activo=True))
+    form.fields["impuesto_predeterminado"].queryset = TipoImpuesto.objects.filter(activo=True)
+    form.fields["impuesto_predeterminado"].required = True
+    if not form.is_valid():
+        raise ValidationError(dict(form.errors))
+    if form.cleaned_data["precio"] < Decimal("0"):
+        raise ValidationError({"precio": "El precio no puede ser negativo."})
+    datos.update({
+        "precio": str(form.cleaned_data["precio"]), "unidad_medida": form.cleaned_data["unidad_medida"],
+        "impuesto_id": str(form.cleaned_data["impuesto_predeterminado"].pk),
+    })
+    return datos
 
 
 def cuentas_compra_app(empresa):
@@ -291,11 +398,18 @@ def render_crear_compra_app(request, empresa, contexto):
     contexto = {**contexto, **_contexto_compras_app(request, empresa)}
     puede_consultar = contexto["can_view_purchases"]
     puede_aplicar = puede_aplicar_compra_app(request, empresa)
+    altas = altas_rapidas_compra_app(request, empresa)
     contexto.update({
         "app_purchase_form_action": url_compra_app("crear_compra", empresa),
         "app_purchase_back_url": contexto["app_purchases_url"] if puede_consultar else contexto["app_modules_url"],
         "app_purchase_can_apply": puede_aplicar, "can_apply_purchase": puede_aplicar,
         "app_purchase_empty_form": empty_form, "empty_line_form": empty_form,
+        "can_create_purchase_supplier": altas["proveedor"], "can_create_purchase_product": altas["producto"],
+        "app_purchase_supplier_create_url": url_compra_app("compra_crear_proveedor_rapido", empresa) if altas["proveedor"] else "",
+        "app_purchase_product_create_url": url_compra_app("compra_crear_producto_rapido", empresa) if altas["producto"] else "",
+        "mobile_purchase_supplier_conditions": Proveedor.CONDICIONES_PAGO,
+        "mobile_purchase_product_units": Producto.UNIDADES_MEDIDA,
+        "mobile_purchase_product_taxes": contexto["impuestos"],
     })
     return respuesta_compras_app(render(request, "facturacion/mobile_purchase_form.html", contexto))
 

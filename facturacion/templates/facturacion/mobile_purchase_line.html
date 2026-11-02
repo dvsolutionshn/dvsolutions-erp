@@ -7,6 +7,7 @@
     <label class="msop-label" for="search-{{ line.prefix }}">Buscar producto</label>
     <input id="search-{{ line.prefix }}" type="search" data-purchase-product-search placeholder="Nombre o código..." autocomplete="off" aria-controls="{{ line.producto.id_for_label }}">
     <label class="msop-label mpf-select-label" for="{{ line.producto.id_for_label }}">Producto <span class="msop-required" aria-hidden="true">*</span></label>{{ line.producto }}
+    {% if can_create_purchase_product and app_purchase_product_create_url %}<button class="mpf-inline-create" type="button" data-purchase-open-product disabled data-purchase-creator-requires-js>+ Nuevo producto</button>{% endif %}
     <small data-purchase-search-status aria-live="polite">Seleccione un producto del inventario de esta empresa.</small>
     {% for error in line.producto.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
   </div>

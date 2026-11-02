@@ -1,0 +1,36 @@
+{% if can_create_purchase_supplier and app_purchase_supplier_create_url %}
+<dialog class="mi-sheet mpf-creator-sheet" id="mobilePurchaseSupplierCreatorSheet" aria-labelledby="purchaseSupplierCreatorTitle" data-purchase-creator="supplier">
+  <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="purchaseSupplierCreatorTitle">Nuevo proveedor</h2><button class="mi-close" type="button" data-purchase-close-creator aria-label="Cerrar nuevo proveedor">×</button></div>
+  <p class="mi-muted">Se creará ahora en el catálogo de <strong>{{ empresa.nombre }}</strong>. La compra todavía no se guarda. Los productos y valores que ya ingresó se mantienen.</p>
+  <form method="post" action="{{ app_purchase_supplier_create_url }}" id="mobilePurchaseSupplierCreatorForm" data-purchase-creator-form="supplier" data-mobile-operation-form data-operation-label="Nuevo proveedor" data-operation-title="Nuevo proveedor" data-operation-caption="Datos del proveedor aún sin crear">
+    {% csrf_token %}
+    <div class="mi-field msop-field"><label for="purchaseSupplierName">Nombre del proveedor *</label><input id="purchaseSupplierName" name="nombre" maxlength="200" autocomplete="organization" required></div>
+    <div class="mi-field msop-field"><label for="purchaseSupplierRTN">RTN</label><input id="purchaseSupplierRTN" name="rtn" maxlength="20" autocomplete="off"></div>
+    <div class="mi-field msop-field"><label for="purchaseSupplierContact">Persona de contacto</label><input id="purchaseSupplierContact" name="contacto" maxlength="150" autocomplete="name"></div>
+    <div class="mi-field msop-field"><label for="purchaseSupplierPhone">Teléfono</label><input id="purchaseSupplierPhone" name="telefono" type="tel" maxlength="50" autocomplete="tel"></div>
+    <div class="mi-field msop-field"><label for="purchaseSupplierEmail">Correo</label><input id="purchaseSupplierEmail" name="correo" type="email" maxlength="254" autocomplete="email"></div>
+    <div class="mi-field msop-field"><label for="purchaseSupplierCity">Ciudad</label><input id="purchaseSupplierCity" name="ciudad" maxlength="100" autocomplete="address-level2"></div>
+    <div class="mi-field msop-field"><label for="purchaseSupplierTerms">Condición habitual del proveedor</label><select id="purchaseSupplierTerms" name="condicion_pago">{% for value, label in mobile_purchase_supplier_conditions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+    <div class="mi-field msop-field"><label for="purchaseSupplierCreditDays">Días de crédito habituales</label><input id="purchaseSupplierCreditDays" name="dias_credito" type="number" inputmode="numeric" min="0" step="1" value="0"></div>
+    <p class="msop-caption">Crear y seleccionar este proveedor no cambia las fechas ni la condición de pago que ya escribió en la compra.</p>
+    <div class="mi-error-box" data-purchase-creator-error role="alert" tabindex="-1" hidden></div><p class="msop-status" data-purchase-creator-status role="status" aria-live="polite"></p>
+    <div class="mpf-creator-actions"><button class="mi-button" type="submit" disabled data-purchase-save-creator>Crear y seleccionar proveedor</button><button class="mi-button secondary" type="button" data-purchase-close-creator>Volver a la compra</button></div>
+  </form>
+</dialog>
+{% endif %}
+{% if can_create_purchase_product and app_purchase_product_create_url %}
+<dialog class="mi-sheet mpf-creator-sheet" id="mobilePurchaseProductCreatorSheet" aria-labelledby="purchaseProductCreatorTitle" data-purchase-creator="product">
+  <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="purchaseProductCreatorTitle">Nuevo producto</h2><button class="mi-close" type="button" data-purchase-close-creator aria-label="Cerrar nuevo producto">×</button></div>
+  <p class="mi-muted">Se creará ahora en el catálogo de <strong>{{ empresa.nombre }}</strong>, sin alimentar existencias. Se seleccionará sólo en la línea desde la que abrió esta opción; la compra aún no se guarda.</p>
+  <form method="post" action="{{ app_purchase_product_create_url }}" id="mobilePurchaseProductCreatorForm" data-purchase-creator-form="product" data-mobile-operation-form data-operation-label="Nuevo producto" data-operation-title="Nuevo producto" data-operation-caption="Datos del producto aún sin crear">
+    {% csrf_token %}
+    <div class="mi-field msop-field"><label for="purchaseProductName">Nombre del producto *</label><input id="purchaseProductName" name="nombre" maxlength="200" autocomplete="off" required></div>
+    <div class="mi-field msop-field"><label for="purchaseProductCode">Código</label><input id="purchaseProductCode" name="codigo" maxlength="50" autocomplete="off"></div>
+    <div class="mi-field msop-field"><label for="purchaseProductPrice">Precio de venta</label><input id="purchaseProductPrice" name="precio" type="number" inputmode="decimal" min="0" step="0.01" value="0.00" required><small>No reemplaza el costo unitario ingresado en la compra.</small></div>
+    <div class="mi-field msop-field"><label for="purchaseProductUnit">Unidad</label><select id="purchaseProductUnit" name="unidad_medida">{% for value, label in mobile_purchase_product_units %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+    <div class="mi-field msop-field"><label for="purchaseProductTax">Impuesto predeterminado *</label><select id="purchaseProductTax" name="impuesto_id" required>{% for impuesto in mobile_purchase_product_taxes %}<option value="{{ impuesto.pk }}">{{ impuesto.nombre }} · {{ impuesto.porcentaje|floatformat:2 }}%</option>{% empty %}<option value="">No hay impuestos activos</option>{% endfor %}</select></div>
+    <div class="mi-error-box" data-purchase-creator-error role="alert" tabindex="-1" hidden></div><p class="msop-status" data-purchase-creator-status role="status" aria-live="polite"></p>
+    <div class="mpf-creator-actions"><button class="mi-button" type="submit" disabled data-purchase-save-creator>Crear y usar en esta línea</button><button class="mi-button secondary" type="button" data-purchase-close-creator>Volver a la compra</button></div>
+  </form>
+</dialog>
+{% endif %}

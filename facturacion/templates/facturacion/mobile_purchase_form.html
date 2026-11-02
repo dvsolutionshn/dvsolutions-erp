@@ -6,10 +6,11 @@
 {% block mobile_back_url %}{{ app_purchase_back_url }}{% endblock %}
 {% block mobile_header_description %}<p>Registre los productos que compra para esta empresa.</p>{% endblock %}
 {% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
-{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_stock_operations.css' %}"><link rel="stylesheet" href="{% static 'facturacion/mobile_purchase_form.css' %}">{% endblock %}
-{% block mobile_scripts %}<script src="{% static 'facturacion/mobile_purchase_form.js' %}" defer></script><script src="{% static 'facturacion/mobile_stock_operations.js' %}" defer></script>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_stock_operations.css' %}"><link rel="stylesheet" href="{% static 'facturacion/mobile_purchase_form.css' %}?v=inline-catalog-1">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'facturacion/mobile_purchase_form.js' %}?v=inline-catalog-1" defer></script><script src="{% static 'facturacion/mobile_stock_operations.js' %}" defer></script>{% endblock %}
 {% block mobile_content %}
 <section class="mi-card msop-intro"><span class="msop-scope">{{ empresa.nombre }}</span><h2>Una compra, sus productos y su documento</h2><p>Guarde un borrador para revisarlo sin mover existencias.{% if can_apply_purchase %} Si elige <strong>Aplicada</strong>, se registrará la entrada de inventario y se ejecutarán los efectos originales de la compra, incluido el pago automático cuando sea de contado.{% endif %}</p></section>
+<p class="mi-message mpf-catalog-status" id="purchaseCatalogStatus" role="status" aria-live="polite" hidden></p>
 <form method="post" action="{{ app_purchase_form_action }}" id="mobilePurchaseForm" class="msop-form" data-submit-once data-mobile-operation-form data-operation-label="Compra" data-operation-title="Confirmar registro de compra" data-purchase-company="{{ empresa.nombre }}" data-operation-caption="{{ empresa.nombre }}: revise proveedor, productos y estado antes de guardar."{% if form.is_bound %} data-operation-unsaved="1"{% endif %}>
   {% csrf_token %}<input type="hidden" name="app" value="1">
   {% for hidden in form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<div class="mi-error-box" role="alert">{{ error }}</div>{% endfor %}{% endfor %}
@@ -17,7 +18,7 @@
   {% if form.non_field_errors %}<div class="mi-error-box msop-error-summary" role="alert" tabindex="-1">{{ form.non_field_errors }}</div>{% endif %}
   {% if formset.non_form_errors %}<div class="mi-error-box msop-error-summary" role="alert" tabindex="-1">{{ formset.non_form_errors }}</div>{% endif %}
   <details class="mi-card msop-section" open><summary><span><small>1 · Documento</small><strong>Proveedor y factura de compra</strong></span><i aria-hidden="true">⌄</i></summary><div class="msop-fields">
-    <div class="mi-field msop-field" data-operation-field="Proveedor registrado"><label class="msop-label" for="{{ form.proveedor.id_for_label }}">Proveedor registrado</label>{{ form.proveedor }}<small>Seleccione uno existente o escriba el nombre documental debajo.</small>{% for error in form.proveedor.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}</div>
+    <div class="mi-field msop-field" data-operation-field="Proveedor registrado"><label class="msop-label" for="{{ form.proveedor.id_for_label }}">Proveedor registrado</label>{{ form.proveedor }}{% if can_create_purchase_supplier and app_purchase_supplier_create_url %}<button class="mpf-inline-create" type="button" data-purchase-open-supplier disabled data-purchase-creator-requires-js>+ Nuevo proveedor</button>{% endif %}<small>Seleccione uno existente o escriba el nombre documental debajo.</small>{% for error in form.proveedor.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}</div>
     <div class="mi-field msop-field" data-operation-field="Nombre del proveedor"><label class="msop-label" for="{{ form.proveedor_nombre.id_for_label }}">Nombre del proveedor en el documento</label>{{ form.proveedor_nombre }}<small>Si selecciona un proveedor registrado, se conservará su nombre actual.</small>{% for error in form.proveedor_nombre.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}</div>
     <div class="mi-field msop-field" data-operation-field="Número de factura de compra"><label class="msop-label" for="{{ form.referencia_documento.id_for_label }}">Número de factura de compra</label>{{ form.referencia_documento }}{% for error in form.referencia_documento.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}</div>
     {% include 'facturacion/mobile_product_management_field.html' with field=form.fecha_documento %}
@@ -47,5 +48,6 @@
   <noscript><p class="mi-error-box">Active JavaScript para agregar productos, revisar y confirmar la compra desde la app. No se ha enviado ningún dato.</p></noscript>
 </form>
 {{ impuestos_payload|json_script:"mobilePurchaseTaxes" }}{{ productos_payload|json_script:"mobilePurchaseProducts" }}{{ proveedores_config|json_script:"mobilePurchaseSuppliers" }}
+{% include 'facturacion/mobile_purchase_catalog_dialogs.html' %}
 {% include 'facturacion/mobile_stock_operation_dialogs.html' %}
 {% endblock %}

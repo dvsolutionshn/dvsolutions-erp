@@ -24,4 +24,11 @@
 #mobilePurchaseForm [hidden]{display:none}
 #mobilePurchaseForm input[type=date]{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
 #mobilePurchaseForm button:focus-visible,#mobilePurchaseForm summary:focus-visible{outline:3px solid #4fa6a1;outline-offset:3px}
+.mpf-inline-create{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;gap:7px;padding:10px 12px;border:1px dashed #91c8bd;border-radius:12px;background:#f0faf6;color:#2c7c70;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.mpf-inline-create:disabled{opacity:.55;cursor:wait}
+.mpf-creator-sheet{overflow-y:auto;overscroll-behavior:contain}.mpf-creator-sheet .mi-sheet-head{align-items:flex-start}.mpf-creator-sheet .mi-sheet-head h2{font-size:21px;line-height:1.5;overflow-wrap:anywhere}
+.mpf-creator-sheet>.mi-muted{line-height:1.8;margin:0 0 18px;overflow-wrap:anywhere}.mpf-creator-sheet form{gap:17px}.mpf-creator-sheet .msop-field{margin:0}
+.mpf-creator-sheet [hidden],.mpf-catalog-status[hidden]{display:none}.mpf-creator-sheet .mi-error-box{white-space:pre-line;overflow-wrap:anywhere}.mpf-creator-sheet .msop-status{margin:0;overflow-wrap:anywhere}
+.mpf-creator-actions{display:grid;gap:10px;margin-top:6px}.mpf-creator-sheet button:focus-visible{outline:3px solid #4fa6a1;outline-offset:3px}
+.mpf-catalog-status{font-size:12px;overflow-wrap:anywhere;line-height:1.8}
 @media(max-width:350px){.mpf-line-grid{grid-template-columns:1fr}.mpf-line-estimate{align-items:flex-start;flex-direction:column}.mpf-estimate strong{font-size:24px}.mpf-section-title h2,.mpf-line h3{font-size:14px}}

@@ -92,6 +92,21 @@ class EmpresaAccessMiddleware:
                         request.LANGUAGE_CODE = "es-ni"
                         return self.get_response(request)
 
+                # Only the inline app creators: their own guards require both
+                # creating purchases and creating the selected catalogue item.
+                # A legacy role need not gain purchase-reading rights to use
+                # those existing write permissions. Unflagged web is unchanged.
+                if suffix in {
+                    "inventario/compras/proveedores/crear-rapido",
+                    "inventario/compras/productos/crear-rapido",
+                }:
+                    from facturacion.mobile_purchases import es_alta_rapida_compra_app
+
+                    if es_alta_rapida_compra_app(request, empresa):
+                        with translation.override("es-ni"):
+                            request.LANGUAGE_CODE = "es-ni"
+                            return self.get_response(request)
+
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     permiso = permiso_facturacion_desde_ruta(suffix)
                     rol_granular = rol_clinico_granular(request.user, empresa)
