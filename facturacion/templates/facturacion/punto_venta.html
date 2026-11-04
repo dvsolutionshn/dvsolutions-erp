@@ -218,7 +218,7 @@
                 <div class="pos-mixed-total"><span>Total dividido</span><strong id="mixedPaymentTotalLabel">L. 0.00</strong></div>
             </div>
             <div class="pos-checkout-status" id="checkoutStatus" role="status" aria-live="polite"></div>
-            <button class="erp-btn" type="submit" id="checkoutButton" disabled>Cobrar, facturar e imprimir</button>
+            <button class="erp-btn" type="submit" id="checkoutButton" disabled>{% if permite_imprimir %}Cobrar, facturar e imprimir{% else %}Cobrar y facturar{% endif %}</button>
         </form>
     </aside>
 </section>
@@ -338,6 +338,8 @@
     const taxLabel = document.getElementById("taxLabel");
     const totalLabel = document.getElementById("totalLabel");
     const checkoutButton = document.getElementById("checkoutButton");
+    const checkoutButtonLabel = checkoutButton.textContent;
+    const permiteImprimir = {{ permite_imprimir|yesno:"true,false" }};
     const payloadInput = document.getElementById("payloadInput");
     const scanFeedback = document.getElementById("scanFeedback");
     const paymentMethod = document.getElementById("paymentMethod");
@@ -993,7 +995,7 @@
         checkoutButton.disabled = true;
         checkoutButton.textContent = "Procesando venta...";
         checkoutStatus.classList.remove("is-visible");
-        const ticketWindow = window.open("", "dv-pos-ticket");
+        const ticketWindow = permiteImprimir ? window.open("", "dv-pos-ticket") : null;
         if(ticketWindow){
             ticketWindow.document.write("<title>Generando factura</title><p style='font-family:Arial;padding:24px'>Generando factura y preparando ticket...</p>");
         }
@@ -1013,10 +1015,12 @@
                 throw new Error(result.error || "No se pudo completar la venta.");
             }
             showCheckoutStatus(
-                `Factura ${result.numero_factura} creada. Cambio ${money(Number(result.cambio))}. Abriendo ticket...`,
+                `Factura ${result.numero_factura} creada. Cambio ${money(Number(result.cambio))}.${result.ticket_url ? " Abriendo ticket..." : ""}`,
                 false
             );
-            if(ticketWindow){
+            if(!result.ticket_url){
+                if(ticketWindow){ticketWindow.close();}
+            }else if(ticketWindow){
                 ticketWindow.location.href = result.ticket_url;
             }else{
                 showCheckoutStatus(
@@ -1039,7 +1043,7 @@
             if(ticketWindow){ticketWindow.close();}
             showCheckoutStatus(error.message, true);
         }finally{
-            checkoutButton.textContent = "Cobrar, facturar e imprimir";
+            checkoutButton.textContent = checkoutButtonLabel;
             checkoutButton.disabled = !cart.size;
         }
     });

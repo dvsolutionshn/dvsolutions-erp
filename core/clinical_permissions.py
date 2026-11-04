@@ -402,6 +402,8 @@ def permiso_facturacion_clinico_granular(path_suffix, method="GET", *, v3=False)
         return None
     first = parts[0]
     unsafe = method.upper() not in {"GET", "HEAD", "OPTIONS"}
+    if len(parts) == 4 and parts[:2] == ["pos", "facturas"] and parts[2].isdigit() and parts[3] == "imprimir":
+        return "puede_imprimir_facturas"
     if not v3:
         if first == "reportes" and len(parts) > 1:
             if parts[1] == "ventas-producto": return "puede_ver_reporte_ventas_producto"

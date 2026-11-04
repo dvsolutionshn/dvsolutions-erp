@@ -115,12 +115,30 @@ def permiso_facturacion_desde_ruta(path_suffix):
     if not path_suffix:
         return None
     normalized = path_suffix if path_suffix.endswith("/") else f"{path_suffix}/"
+    parts = [part for part in normalized.split("/") if part]
+    if len(parts) == 4 and parts[:2] == ["pos", "facturas"] and parts[2].isdigit() and parts[3] == "imprimir":
+        # El ticket usa el mismo documento que la vista previa de la factura.
+        return "puede_ver_facturas"
     if normalized.startswith(tuple(str(i) for i in range(10))):
         return "puede_ver_facturas"
     for prefix, permiso in FACTURACION_PERMISSION_MAP:
         if normalized.startswith(prefix):
             return permiso
     return None
+
+
+def puede_imprimir_facturas(usuario, empresa):
+    """Mismo permiso para abrir, descargar e imprimir el documento de una empresa."""
+    from .clinical_permissions import rol_acciones_v3, rol_clinico_v2
+
+    if not usuario or not usuario.is_authenticated or not usuario.puede_acceder_empresa(empresa):
+        return False
+    permiso = (
+        "puede_imprimir_facturas"
+        if rol_acciones_v3(usuario, empresa) or rol_clinico_v2(usuario, empresa)
+        else "puede_ver_facturas"
+    )
+    return usuario.tiene_permiso_erp(permiso, empresa)
 
 
 def permiso_facturacion_accion(path_suffix):

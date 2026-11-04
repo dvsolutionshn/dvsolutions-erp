@@ -16,31 +16,75 @@
 <body>
     <div class="print-status">
         <div>
-            <strong>Preparando impresion...</strong>
-            <span>El dialogo de la impresora se abrira automaticamente.</span>
+            <strong id="printTitle">Preparando impresión...</strong>
+            <span id="printMessage" role="status">El diálogo de la impresora se abrirá al cargar la factura.</span>
             <button type="button" id="printAgain" hidden>Imprimir ticket</button>
         </div>
     </div>
-    <iframe id="ticketFrame" title="Ticket termico" src="{{ pdf_url }}"></iframe>
+    <iframe id="ticketFrame" title="Factura para imprimir" data-pdf-url="{{ pdf_url }}" src="about:blank"></iframe>
     <script>
     (function(){
         const frame = document.getElementById("ticketFrame");
         const retryButton = document.getElementById("printAgain");
+        const title = document.getElementById("printTitle");
+        const message = document.getElementById("printMessage");
         let printStarted = false;
+        let pdfReady = false;
+        let pdfObjectUrl = "";
+        let loading = false;
+
+        async function loadInvoice(){
+            if(loading){return;}
+            loading = true;
+            pdfReady = false;
+            printStarted = false;
+            retryButton.hidden = true;
+            title.textContent = "Preparando impresión...";
+            message.textContent = "El diálogo de la impresora se abrirá al cargar la factura.";
+            try{
+                // Nunca imprimir una redirección al inicio o al formulario de acceso.
+                const response = await fetch(frame.dataset.pdfUrl, {
+                    credentials: "same-origin",
+                    redirect: "error",
+                    headers: {"Accept": "application/pdf"}
+                });
+                const contentType = (response.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+                if(!response.ok || response.redirected || contentType !== "application/pdf"){
+                    throw new Error("La respuesta no contiene una factura PDF.");
+                }
+                const pdf = await response.blob();
+                if(!pdf.size){throw new Error("La factura está vacía.");}
+                if(pdfObjectUrl){URL.revokeObjectURL(pdfObjectUrl);}
+                pdfObjectUrl = URL.createObjectURL(pdf);
+                frame.src = pdfObjectUrl;
+            }catch(error){
+                title.textContent = "No se pudo preparar la impresión";
+                message.textContent = "Verificá tu sesión y el permiso «Imprimir o descargar facturas» para esta empresa, e intentá nuevamente.";
+                retryButton.textContent = "Reintentar";
+                retryButton.hidden = false;
+            }finally{
+                loading = false;
+            }
+        }
 
         function printTicket(){
-            if(printStarted){return;}
+            if(!pdfReady || printStarted){return;}
             printStarted = true;
             try{
                 frame.contentWindow.focus();
                 frame.contentWindow.print();
             }catch(error){
                 printStarted = false;
+                message.textContent = "No se abrió la impresora. Intentá con el botón Imprimir ticket.";
                 retryButton.hidden = false;
             }
         }
 
         frame.addEventListener("load", function(){
+            if(!pdfObjectUrl || frame.src !== pdfObjectUrl){return;}
+            pdfReady = true;
+            title.textContent = "Factura lista para imprimir";
+            retryButton.textContent = "Imprimir ticket";
             try{
                 frame.contentWindow.addEventListener("afterprint", function(){window.close();});
             }catch(error){
@@ -51,9 +95,13 @@
         });
         retryButton.addEventListener("click", function(){
             printStarted = false;
-            printTicket();
+            if(pdfReady){printTicket();}else{loadInvoice();}
         });
         window.addEventListener("afterprint", function(){window.close();});
+        window.addEventListener("beforeunload", function(){
+            if(pdfObjectUrl){URL.revokeObjectURL(pdfObjectUrl);}
+        });
+        loadInvoice();
     })();
     </script>
 </body>

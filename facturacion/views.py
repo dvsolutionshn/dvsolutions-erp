@@ -38,6 +38,7 @@ from .captura_rapida import calcular_importes, captura_rapida
 from .costos_inventario import actualizar_valor_inventario, cantidad_disponible_para_linea, capturar_costos_devolucion, costo_reversion_compra, validar_devoluciones_nota, valor_actual_inventario, valor_contable_linea_inventario, valorar_linea_compra
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
+from core.access import puede_imprimir_facturas
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from contabilidad.services import (
     asegurar_cuenta_contable_cliente,
@@ -515,6 +516,7 @@ def facturas_dashboard(request, empresa_slug):
 @login_required
 def punto_venta(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    permite_imprimir = puede_imprimir_facturas(request.user, empresa)
     precios_incluyen_impuesto = _precios_incluyen_impuesto(empresa)
     solicitud_pos_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if not empresa.tiene_modulo_activo("punto_venta"):
@@ -768,7 +770,7 @@ def punto_venta(request, empresa_slug):
                     "total": f"{factura.total:.2f}",
                     "cambio": f"{cambio:.2f}",
                     "factura_url": reverse("ver_factura", args=[empresa.slug, factura.id]),
-                    "ticket_url": reverse("imprimir_factura_pos", args=[empresa.slug, factura.id]),
+                    "ticket_url": reverse("imprimir_factura_pos", args=[empresa.slug, factura.id]) if permite_imprimir else None,
                     "whatsapp_url": reverse("pos_enviar_factura_whatsapp", args=[empresa.slug, factura.id]),
                 })
             messages.success(
@@ -825,6 +827,7 @@ def punto_venta(request, empresa_slug):
         "fecha_hoy": timezone.localdate().strftime("%Y-%m-%d"),
         "metodos_pago": PagoFactura.METODOS,
         "cliente_obligatorio": cliente_obligatorio,
+        "permite_imprimir": permite_imprimir,
         "precios_incluyen_impuesto": precios_incluyen_impuesto,
         "phone_prefix_choices": PHONE_PREFIX_CHOICES,
     })
@@ -9991,6 +9994,8 @@ def enviar_factura_whatsapp(request, empresa_slug, factura_id):
 def descargar_factura_pdf(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not puede_imprimir_facturas(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para imprimir o descargar facturas de esta empresa.")
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
     plantilla = _resolver_plantilla_factura(configuracion, empresa)
@@ -10066,6 +10071,8 @@ def descargar_factura_pdf_independiente(request, empresa_slug, factura_id):
 @xframe_options_sameorigin
 def vista_previa_factura_pdf(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not puede_imprimir_facturas(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para imprimir o descargar facturas de esta empresa.")
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
     plantilla = _resolver_plantilla_factura(configuracion, empresa)
@@ -10081,6 +10088,8 @@ def vista_previa_factura_pdf(request, empresa_slug, factura_id):
 @login_required
 def imprimir_factura_pos(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not puede_imprimir_facturas(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para imprimir o descargar facturas de esta empresa.")
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     if empresa.slug not in {"hospital_mia", "medical_spa", "demo_1"}:
         return redirect("vista_previa_factura_pdf", empresa_slug=empresa.slug, factura_id=factura.id)

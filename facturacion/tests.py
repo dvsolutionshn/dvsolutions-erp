@@ -736,6 +736,50 @@ class FacturacionTests(TestCase):
             reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
         )
 
+    def test_punto_venta_ajax_sin_permiso_imprimir_registra_venta_sin_ticket(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        self.cliente.rtn = "08011999000003"
+        self.cliente.save(update_fields=["rtn"])
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+        self.rol_total.es_rol_clinico = True
+        self.rol_total.usa_permisos_clinicos_granulares = True
+        self.rol_total.usa_permisos_clinicos_v2 = True
+        self.rol_total.usa_permisos_acciones_v3 = True
+        self.rol_total.puede_imprimir_facturas = False
+        self.rol_total.save(update_fields=[
+            "es_rol_clinico", "usa_permisos_clinicos_granulares", "usa_permisos_clinicos_v2",
+            "usa_permisos_acciones_v3", "puede_imprimir_facturas",
+        ])
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {"payload": json.dumps({
+                "metodo": "efectivo",
+                "cliente_id": self.cliente.id,
+                "monto_recibido": "250.00",
+                "items": [{"producto_id": self.producto.id, "cantidad": "2", "precio_unitario": "100.00"}],
+            })},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        resultado = response.json()
+        self.assertTrue(resultado["ok"])
+        self.assertIsNone(resultado["ticket_url"])
+        factura = Factura.objects.get(pk=resultado["factura_id"])
+        self.assertEqual(factura.estado, "emitida")
+        self.assertEqual(factura.estado_pago, "pagado")
+        self.assertEqual(factura.total, Decimal("200.00"))
+        pago = PagoFactura.objects.get(factura=factura)
+        self.assertEqual(pago.monto, factura.total)
+        self.assertIn("Recibido L. 250.00", pago.referencia)
+        self.assertTrue(ReciboPago.objects.filter(pago=pago).exists())
+
     def test_punto_venta_aplica_promocion_tres_mas_uno_gratis(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
