@@ -62,6 +62,7 @@ class MobileRecipesIntegrationTests(TestCase):
         )
         cls.usuario = Usuario.objects.create_user(username="mobile-recipes-user", password="test", empresa=cls.empresa, rol_sistema=cls.rol)
         cls.usuario.empresas_acceso.add(*cls.empresas.values())
+        ProfesionalSalud.objects.filter(pk__in=[profesional.pk for profesional in cls.profesionales.values()]).update(usuario=cls.usuario)
         cls.producto_spa = Producto.objects.create(empresa=cls.empresas["medical_spa"], nombre="Medicamento catálogo Spa", codigo="MR-SPA", precio=100)
         cls.producto_hospital = Producto.objects.create(empresa=cls.empresa, nombre="Producto no prescribible Hospital", codigo="MR-HM", precio=50)
         cls.producto_luque = Producto.objects.create(empresa=cls.empresas["luque_aestetic"], nombre="Producto no prescribible Luque", codigo="MR-LUQ", precio=90)
@@ -86,7 +87,6 @@ class MobileRecipesIntegrationTests(TestCase):
         empresa = empresa or self.empresa
         data = {
             "app": "1", "fecha": (timezone.localdate()-timedelta(days=2)).isoformat(),
-            "profesional": self.profesionales[empresa.slug].pk,
             "diagnostico": "Diagnóstico escrito por el profesional", "indicaciones": "Indicaciones generales conservadas",
             "observaciones": "Observaciones conservadas", "medicamento_producto_id": ["", ""],
             "medicamento_manual": ["Medicamento externo uno", "Medicamento externo dos"],
@@ -250,7 +250,9 @@ class MobileRecipesIntegrationTests(TestCase):
                 self.assertEqual(catalogo_ids, set() if empresa == self.empresa else {self.producto_spa.pk})
                 self.assertContains(mobile, 'name="app" value="1"')
                 self.assertTemplateUsed(mobile, "clinica/includes/receta_medicamentos_editor.html")
-                for field in ("fecha", "profesional", "diagnostico", "indicaciones", "observaciones"):
+                self.assertNotIn("profesional", mobile.context["form"].fields)
+                self.assertNotContains(mobile, 'name="profesional"')
+                for field in ("fecha", "diagnostico", "indicaciones", "observaciones"):
                     self.assertContains(mobile, f'name="{field}"')
                 self.assertContains(mobile, 'hiddenProduct.name = "medicamento_producto_id"')
                 self.assertContains(mobile, 'hiddenManual.name = "medicamento_manual"')
@@ -272,6 +274,8 @@ class MobileRecipesIntegrationTests(TestCase):
         self.assertRedirects(response, self.url("clinica_receta_imprimir", receta), fetch_redirect_response=False)
         fields = ("paciente_id", "profesional_id", "fecha", "diagnostico", "indicaciones", "observaciones", "creada_por_id")
         self.assertEqual(tuple(getattr(receta, field) for field in fields), tuple(getattr(web, field) for field in fields))
+        self.assertEqual(receta.profesional_id, self.profesionales[self.empresa.slug].pk)
+        self.assertEqual(receta.creada_por_id, self.usuario.pk)
         line_fields = ("producto_id", "medicamento_manual", "cantidad", "indicaciones", "observaciones", "orden")
         self.assertEqual(list(receta.detalles_medicamentos.values_list(*line_fields)), list(web.detalles_medicamentos.values_list(*line_fields)))
         self.assertEqual(list(receta.manuales.all()), [manual])
@@ -303,10 +307,19 @@ class MobileRecipesIntegrationTests(TestCase):
         self.assertContains(response, "Observaciones conservadas")
         self.assertEqual(self.conteos(), before)
 
-    def test_foreign_professional_manual_and_unavailable_catalog_items_are_rejected(self):
+    def test_posted_professional_is_ignored_and_foreign_manual_and_catalog_are_rejected(self):
+        historica = RecetaMedica.objects.filter(pk=self.receta.pk).values().get()
+        response = self.client.post(self.url("clinica_crear_receta_paciente"), self.datos(
+            profesional=self.profesionales["medical_spa"].pk, creada_por=999999, profesional_id=999999,
+        ))
+        self.assertEqual(response.status_code, 302)
+        receta = RecetaMedica.objects.filter(empresa=self.empresa).latest("pk")
+        self.assertEqual((receta.empresa_id, receta.paciente_id, receta.profesional_id, receta.creada_por_id), (
+            self.empresa.pk, self.paciente.pk, self.profesionales[self.empresa.slug].pk, self.usuario.pk,
+        ))
+        self.assertEqual(RecetaMedica.objects.filter(pk=self.receta.pk).values().get(), historica)
         manual_ajeno = self.manual(self.empresas["medical_spa"], titulo="Manual de otra empresa")
         for field, value in (
-            ("profesional", self.profesionales["medical_spa"].pk),
             ("manuales", [manual_ajeno.pk]),
             ("medicamento_producto_id", [str(self.producto_hospital.pk), ""]),
         ):

@@ -50,7 +50,7 @@
     <section class="rx-form-card">
         <div class="rx-grid">
             <div class="rx-field"><label for="{{ form.fecha.id_for_label }}">{{ form.fecha.label }}</label>{{ form.fecha }}{% for error in form.fecha.errors %}<span class="rx-errors">{{ error }}</span>{% endfor %}</div>
-            <div class="rx-field"><label for="{{ form.profesional.id_for_label }}">{{ form.profesional.label }}</label>{{ form.profesional }}{% for error in form.profesional.errors %}<span class="rx-errors">{{ error }}</span>{% endfor %}</div>
+            <div class="rx-field">{% include "clinica/includes/profesional_autenticado.html" %}</div>
             <div class="rx-field is-wide"><label for="{{ form.diagnostico.id_for_label }}">{{ form.diagnostico.label }}</label>{{ form.diagnostico }}{% for error in form.diagnostico.errors %}<span class="rx-errors">{{ error }}</span>{% endfor %}</div>
         </div>
     </section>

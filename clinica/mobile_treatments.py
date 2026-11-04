@@ -77,7 +77,7 @@ def autorizar_tratamientos_app(request, empresa, crear=False, campos=None):
                 or request.POST.getlist("app") != ["1"]
             ):
                 raise PermissionDenied("Datos del formulario de tratamiento inválidos.")
-            for campo in ("paciente", "servicio", "profesional"):
+            for campo in ("paciente", "servicio"):
                 if request.POST.get(campo):
                     _numero_canonico(request.POST[campo])
     else:
@@ -164,7 +164,7 @@ def listar_tratamientos_app(request, empresa):
 
 def _secciones_formulario(form):
     grupos = (
-        ("Paciente y equipo", ("paciente", "servicio", "profesional")),
+        ("Paciente y equipo", ("paciente", "servicio")),
         ("Tratamiento", ("nombre", "fecha_inicio", "fecha_fin_estimada", "estado")),
         ("Indicaciones", ("objetivo", "plan_clinico")),
         ("Monto estimado", ("monto_estimado",)),

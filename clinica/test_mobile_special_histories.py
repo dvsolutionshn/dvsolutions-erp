@@ -50,7 +50,6 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
         empresa = empresa or self.empresa
         accion, prefix, section = self.FORMULARIOS[codigo]
         data = {"app": "1", "formulario": codigo, "accion": accion,
-                f"{prefix}-profesional": self.profesionales[empresa.slug].pk,
                 f"{prefix}-fecha_atencion": "2026-10-11T10:15", f"{prefix}-estado": "borrador"}
         if codigo == "tricopigmentacion":
             data.update({f"{prefix}-{name}": value for name, value in {
@@ -182,12 +181,13 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
                 self.assertEqual(form.fields[name].required, field.required)
                 self.assertEqual(form.fields[name].label, field.label)
                 self.assertEqual(form.fields[name].input_formats if hasattr(field, "input_formats") else None, field.input_formats if hasattr(field, "input_formats") else None)
-                if hasattr(field, "choices") and name != "profesional":
+                if hasattr(field, "choices"):
                     self.assertEqual(list(form.fields[name].choices), list(field.choices))
             self.assertContains(response, f'name="formulario" value="{formulario}"', count=1)
             self.assertContains(response, f'name="accion" value="{accion}"', count=1)
             self.assertContains(response, f'name="{prefix}-fecha_atencion"', count=1)
-            self.assertEqual(list(form.fields["profesional"].queryset.values_list("pk", flat=True)), [self.profesionales[self.empresa.slug].pk])
+            self.assertNotIn("profesional", form.fields)
+            self.assertNotContains(response, f'name="{prefix}-profesional"')
 
     def test_all_four_actions_use_original_structured_serializer_save_actor_and_audit(self):
         before = self.conteos()
@@ -274,8 +274,7 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
         self.assertEqual(self.client.get(self.url(paciente=self.pacientes["medical_spa"])).status_code, 404)
         self.assertEqual(self.client.post(self.url(paciente=self.pacientes["medical_spa"]), self.datos()).status_code, 404)
         response = self.client.post(self.url("examen_fisico"), self.datos("examen_fisico", **{"examen-profesional": self.profesionales["medical_spa"].pk}))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("profesional", response.context["form"].errors)
+        self.assertEqual(response.status_code, 403)
         self.assertEqual(self.conteos(), before)
 
     def test_old_mobile_post_without_composer_remains_blocked_for_all_other_actions(self):

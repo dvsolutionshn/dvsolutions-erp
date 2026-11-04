@@ -47,14 +47,12 @@ def autorizar_historia_especial_app(request, empresa):
     autorizar_pacientes_app(request, empresa, "puede_editar_historia_clinica", "puede_expediente_clinico")
 
 
-def formulario_historia_especial_app(empresa, codigo, profesional=None):
+def formulario_historia_especial_app(empresa, codigo, usuario=None):
     _nombre, _accion, prefijo, seccion = FORMULARIOS_HISTORIA_ESPECIALES_APP[codigo]
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
-    if profesional:
-        initial["profesional"] = profesional
     if codigo == "tricopigmentacion":
-        return TricopigmentacionForm(empresa=empresa, prefix=prefijo, initial=initial)
-    return EvaluacionClinicaIntegralForm(empresa=empresa, prefix=prefijo, seccion=seccion, initial=initial)
+        return TricopigmentacionForm(empresa=empresa, usuario=usuario, prefix=prefijo, initial=initial)
+    return EvaluacionClinicaIntegralForm(empresa=empresa, usuario=usuario, prefix=prefijo, seccion=seccion, initial=initial)
 
 
 def preparar_historia_especial_app(request, empresa):
@@ -69,7 +67,7 @@ def preparar_historia_especial_app(request, empresa):
         if (not config or len(query) > 1 or posted != [codigo] or request.POST.getlist("app") != ["1"]
                 or request.POST.getlist("accion") != [config[1]]):
             raise PermissionDenied("Esta acción no está disponible en el historial móvil.")
-        campos = formulario_historia_especial_app(empresa, codigo)
+        campos = formulario_historia_especial_app(empresa, codigo, usuario=request.user)
         permitidos = {"app", "formulario", "accion", "csrfmiddlewaretoken"} | {campos.add_prefix(nombre) for nombre in campos.fields}
         if set(request.POST) - permitidos:
             raise PermissionDenied("El formulario móvil contiene acciones o datos no compatibles.")
@@ -93,7 +91,7 @@ def _secciones_formulario(form):
             usados.update(campo.name for campo in campos)
             secciones.append({"key": key, "titulo": titulo, "campos": campos})
 
-    agregar("registro", "Datos del registro", ("profesional", "fecha_atencion"))
+    agregar("registro", "Datos del registro", ("fecha_atencion",))
     agregar("funciones_generales", "Funciones orgánicas generales", ("funciones_generales",))
     for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS:
         agregar(f"funcion_{codigo}", etiqueta, (f"funcion_{codigo}", f"funcion_{codigo}_detalle"))

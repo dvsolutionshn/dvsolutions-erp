@@ -309,10 +309,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(pagina, "Hair pull test positivo")
         self.assertContains(pagina, "Patrón clínico")
         contenido = pagina.content.decode()
-        self.assertLess(
-            contenido.index('<label for="id_historia_capilar-profesional">Profesional</label>'),
-            contenido.index("<h5>Hallazgos tricológicos</h5>"),
-        )
+        self.assertNotContains(pagina, 'name="historia_capilar-profesional"')
         self.assertLess(
             contenido.index("<h5>Hallazgos tricológicos</h5>"),
             contenido.index("<h5>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h5>"),
@@ -693,6 +690,7 @@ class ClinicaPacienteTests(TestCase):
             nombre="Paciente Profesional Automatico",
             identidad="1101200800655",
             fecha_nacimiento="1990-01-01",
+            sexo="masculino",
         )
         profesional = ProfesionalSalud.objects.create(
             empresa=self.empresa,
@@ -705,6 +703,8 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.post(url, {
             "tipo_historia": "capilar",
             "historia_capilar-fecha_atencion": "2026-07-29T09:30",
+            "historia_capilar-alopecia_escala": "hamilton_norwood",
+            "historia_capilar-alopecia_grado": "I",
             "historia_capilar-plan_tratamiento": "Plan con profesional automatico.",
             "historia_capilar-estado": "borrador",
         })
@@ -713,7 +713,7 @@ class ClinicaPacienteTests(TestCase):
         historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="capilar")
         self.assertEqual(historia.profesional, profesional)
 
-    def test_vista_clinica_completa_detecta_profesional_luis_por_usuario(self):
+    def test_vista_clinica_completa_no_atribuye_profesional_por_coincidir_nombre(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
             expediente_codigo="MIA-LUIS-AUTO",
@@ -744,7 +744,9 @@ class ClinicaPacienteTests(TestCase):
 
         self.assertRedirects(response, url)
         historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="cirugia_plastica")
-        self.assertEqual(historia.profesional, profesional)
+        self.assertIsNone(historia.profesional_id)
+        self.assertEqual((historia.creado_por_id, historia.actualizado_por_id), (usuario_luis.pk, usuario_luis.pk))
+        self.assertIsNone(profesional.usuario_id)
 
     def test_editar_paciente_usa_formulario_general_moderno(self):
         paciente = Paciente.objects.create(

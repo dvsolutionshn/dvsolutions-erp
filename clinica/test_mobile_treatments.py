@@ -1,4 +1,4 @@
-"""Treatments adapt the canonical ten-field form, without creating plans or appointments."""
+"""Treatments adapt the canonical treatment form, without creating plans or appointments."""
 from datetime import timedelta
 from decimal import Decimal
 from html.parser import HTMLParser
@@ -24,7 +24,7 @@ from .models import CitaClinica, ConfiguracionClinica, ExpedienteEvento, Histori
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class MobileTreatmentsIntegrationTests(TestCase):
     SLUGS = ("hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos")
-    FORM_FIELDS = ("paciente", "servicio", "profesional", "nombre", "fecha_inicio", "fecha_fin_estimada", "estado", "objetivo", "plan_clinico", "monto_estimado")
+    FORM_FIELDS = ("paciente", "servicio", "nombre", "fecha_inicio", "fecha_fin_estimada", "estado", "objetivo", "plan_clinico", "monto_estimado")
 
     @classmethod
     def setUpTestData(cls):
@@ -44,6 +44,7 @@ class MobileTreatmentsIntegrationTests(TestCase):
         cls.rol = RolSistema.objects.create(nombre="Tratamientos móviles", codigo="mobile-treatment-full", es_rol_clinico=True, usa_permisos_clinicos_granulares=True, puede_ver_planes_tratamiento=True, puede_editar_planes_tratamiento=True)
         cls.usuario = Usuario.objects.create_user(username="mobile-treatments", password="test-only", empresa=cls.empresa, rol_sistema=cls.rol)
         cls.usuario.empresas_acceso.add(*cls.empresas.values())
+        ProfesionalSalud.objects.filter(pk__in=[item.pk for (slug, active), item in cls.profesionales.items() if active]).update(usuario=cls.usuario)
 
     def setUp(self):
         self.client.force_login(self.usuario)
@@ -69,7 +70,7 @@ class MobileTreatmentsIntegrationTests(TestCase):
         empresa = empresa or self.empresa
         data = {
             "app": "1", "paciente": str(self.pacientes[(empresa.slug, True)].pk),
-            "servicio": str(self.servicios[(empresa.slug, True)].pk), "profesional": str(self.profesionales[(empresa.slug, True)].pk),
+            "servicio": str(self.servicios[(empresa.slug, True)].pk),
             "nombre": "Tratamiento capturado móvil", "fecha_inicio": "2026-10-12", "fecha_fin_estimada": "2026-11-02",
             "estado": "en_proceso", "objetivo": "Objetivo escrito conservado", "plan_clinico": "Texto de trabajo conservado", "monto_estimado": "123.45",
         }
@@ -151,7 +152,7 @@ class MobileTreatmentsIntegrationTests(TestCase):
         self.assertContains(response, "estado=pausado")
         self.assertContains(response, "page=2")
 
-    def test_mobile_form_has_exact_original_ten_fields_widgets_and_scoped_choices(self):
+    def test_mobile_form_keeps_widgets_and_scoped_choices_without_manual_author(self):
         for empresa in self.empresas.values():
             response = self.client.get(self.url(empresa, create=True))
             original = self.client.get(self.url(empresa, create=True, mobile=False))
@@ -166,7 +167,8 @@ class MobileTreatmentsIntegrationTests(TestCase):
                     self.assertEqual(list(field.choices), list(web_form.fields[name].choices))
             self.assertEqual(list(form.fields["paciente"].queryset), [self.pacientes[(empresa.slug, True)]])
             self.assertEqual(list(form.fields["servicio"].queryset), [self.servicios[(empresa.slug, True)]])
-            self.assertEqual(list(form.fields["profesional"].queryset), [self.profesionales[(empresa.slug, True)]])
+            self.assertNotIn("profesional", form.fields)
+            self.assertNotContains(response, 'name="profesional"')
             self.assertEqual(form["fecha_inicio"].value(), timezone.localdate())
             self.assertContains(response, 'name="app" value="1"', count=1)
 
@@ -299,7 +301,7 @@ class MobileTreatmentsIntegrationTests(TestCase):
         self.assertTemplateUsed(original, "clinica/tratamientos.html")
         self.assertContains(original, "Tratamiento catálogo web original")
 
-    def test_valid_original_form_saves_exact_ten_fields_only_one_treatment_per_company(self):
+    def test_valid_form_saves_authenticated_professional_and_one_treatment_per_company(self):
         for empresa in self.empresas.values():
             data = self.datos(empresa)
             before, side = TratamientoPaciente.objects.count(), self.side_counts()
@@ -308,7 +310,8 @@ class MobileTreatmentsIntegrationTests(TestCase):
             self.assertEqual(urlsplit(response.url).path, urlsplit(self.url(empresa)).path)
             self.assertEqual(parse_qs(urlsplit(response.url).query)["app"], ["1"])
             treatment = TratamientoPaciente.objects.get(empresa=empresa, nombre=data["nombre"])
-            self.assertEqual((treatment.paciente_id, treatment.servicio_id, treatment.profesional_id), tuple(int(data[name]) for name in ("paciente", "servicio", "profesional")))
+            self.assertEqual((treatment.paciente_id, treatment.servicio_id), tuple(int(data[name]) for name in ("paciente", "servicio")))
+            self.assertEqual(treatment.profesional_id, self.profesionales[(empresa.slug, True)].pk)
             for name in ("nombre", "estado", "objetivo", "plan_clinico"):
                 self.assertEqual(getattr(treatment, name), data[name])
             self.assertEqual(treatment.fecha_inicio.isoformat(), data["fecha_inicio"])
@@ -346,13 +349,13 @@ class MobileTreatmentsIntegrationTests(TestCase):
             if name != "nombre":
                 self.assertEqual(getattr(app, name), getattr(original, name))
 
-    def test_optional_service_professional_end_date_and_zero_amount_follow_original_form(self):
-        data = self.datos(servicio="", profesional="", fecha_fin_estimada="", monto_estimado="0")
+    def test_optional_service_end_date_and_zero_amount_keep_authenticated_professional(self):
+        data = self.datos(servicio="", fecha_fin_estimada="", monto_estimado="0")
         self.assertTrue(TratamientoPacienteForm(data, empresa=self.empresa).is_valid())
         self.assertEqual(self.client.post(self.url(create=True), data).status_code, 302)
         treatment = TratamientoPaciente.objects.get(empresa=self.empresa, nombre=data["nombre"])
         self.assertIsNone(treatment.servicio_id)
-        self.assertIsNone(treatment.profesional_id)
+        self.assertEqual(treatment.profesional_id, self.profesionales[(self.empresa.slug, True)].pk)
         self.assertIsNone(treatment.fecha_fin_estimada)
         self.assertEqual(treatment.monto_estimado, Decimal("0"))
 
@@ -365,7 +368,7 @@ class MobileTreatmentsIntegrationTests(TestCase):
         self.assertEqual(treatment.monto_estimado, Decimal("-3.50"))
         self.assertLess(treatment.fecha_fin_estimada, treatment.fecha_inicio)
 
-    def test_invalid_bound_form_preserves_all_ten_posted_fields_without_writes(self):
+    def test_invalid_bound_form_preserves_posted_fields_without_writes(self):
         for extra in ({"nombre": ""}, {"fecha_inicio": "fecha inválida"}, {"estado": "inexistente"}, {"monto_estimado": ""}):
             data = self.datos(**extra)
             before = self.snapshot()
@@ -400,7 +403,7 @@ class MobileTreatmentsIntegrationTests(TestCase):
 
     def test_foreign_and_inactive_model_choices_keep_original_bound_validation(self):
         foreign = self.empresas["medical_spa"]
-        for field, records in (("paciente", self.pacientes), ("servicio", self.servicios), ("profesional", self.profesionales)):
+        for field, records in (("paciente", self.pacientes), ("servicio", self.servicios)):
             for record in (records[(foreign.slug, True)], records[(self.empresa.slug, False)]):
                 before = self.snapshot()
                 response = self.client.post(self.url(create=True), self.datos(**{field: str(record.pk)}))
@@ -431,7 +434,7 @@ class MobileTreatmentsIntegrationTests(TestCase):
 
     def test_closed_create_query_and_post_envelopes_reject_duplicates_and_unknown_fields(self):
         before = self.snapshot()
-        for extra in ({"accion": "guardar_plan"}, {"tipo_historia": "capilar"}, {"empresa": self.empresa.pk}, {"creado_por": self.usuario.pk}, {"app": "0"}):
+        for extra in ({"profesional": self.profesionales[(self.empresa.slug, True)].pk}, {"accion": "guardar_plan"}, {"tipo_historia": "capilar"}, {"empresa": self.empresa.pk}, {"creado_por": self.usuario.pk}, {"app": "0"}):
             data = self.datos()
             data.update(extra)
             self.assertIn(self.client.post(self.url(create=True), data).status_code, (403, 404))

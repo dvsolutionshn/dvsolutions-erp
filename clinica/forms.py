@@ -8,6 +8,7 @@ from django.utils import timezone
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from core.access import manuales_pdf_habilitados
 from .widgets_citas import PacienteCitaSelect
+from .autoria import asignar_autoria_clinica
 
 from .models import (
     AntecedenteAdicionalPaciente,
@@ -67,12 +68,25 @@ def productos_disponibles_receta(empresa):
 
 
 class BaseClinicaForm(forms.ModelForm):
-    def __init__(self, *args, empresa=None, **kwargs):
+    autoria_automatica = False
+
+    def __init__(self, *args, empresa=None, usuario=None, **kwargs):
+        self.usuario = usuario
         self.empresa = empresa
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             if isinstance(field.widget, forms.Textarea):
                 field.widget.attrs.setdefault("rows", 3)
+
+    def save(self, commit=True):
+        if not self.autoria_automatica:
+            return super().save(commit=commit)
+        registro = super().save(commit=False)
+        asignar_autoria_clinica(registro, self.empresa, self.usuario)
+        if commit:
+            registro.save()
+            self.save_m2m()
+        return registro
 
 
 class PacienteForm(BaseClinicaForm):
@@ -358,9 +372,11 @@ class CitaClinicaForm(BaseClinicaForm):
 
 
 class TratamientoPacienteForm(BaseClinicaForm):
+    autoria_automatica = True
+
     class Meta:
         model = TratamientoPaciente
-        fields = ["paciente", "servicio", "profesional", "nombre", "fecha_inicio", "fecha_fin_estimada", "estado", "objetivo", "plan_clinico", "monto_estimado"]
+        fields = ["paciente", "servicio", "nombre", "fecha_inicio", "fecha_fin_estimada", "estado", "objetivo", "plan_clinico", "monto_estimado"]
         widgets = {
             "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
             "fecha_fin_estimada": forms.DateInput(attrs={"type": "date"}),
@@ -371,13 +387,10 @@ class TratamientoPacienteForm(BaseClinicaForm):
         if empresa:
             self.fields["paciente"].queryset = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["servicio"].queryset = ServicioClinico.objects.filter(empresa=empresa, activo=True).order_by("nombre")
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
         else:
             self.fields["paciente"].queryset = Paciente.objects.none()
             self.fields["servicio"].queryset = ServicioClinico.objects.none()
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.none()
         self.fields["servicio"].required = False
-        self.fields["profesional"].required = False
 
 
 class PlanTratamientoPacienteForm(BaseClinicaForm):
@@ -426,9 +439,11 @@ class AntecedenteAdicionalPacienteForm(BaseClinicaForm):
 
 
 class ExpedienteEventoForm(BaseClinicaForm):
+    autoria_automatica = True
+
     class Meta:
         model = ExpedienteEvento
-        fields = ["paciente", "cita", "tratamiento", "profesional", "tipo", "fecha", "titulo", "descripcion", "diagnostico", "plan", "signos_vitales"]
+        fields = ["paciente", "cita", "tratamiento", "tipo", "fecha", "titulo", "descripcion", "diagnostico", "plan", "signos_vitales"]
         widgets = {
             "fecha": forms.DateTimeInput(attrs={"type": "datetime-local"}),
         }
@@ -442,15 +457,12 @@ class ExpedienteEventoForm(BaseClinicaForm):
             self.fields["paciente"].queryset = pacientes
             self.fields["cita"].queryset = CitaClinica.objects.filter(empresa=empresa).order_by("-fecha_hora")
             self.fields["tratamiento"].queryset = TratamientoPaciente.objects.filter(empresa=empresa).order_by("-fecha_inicio")
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
         else:
             self.fields["paciente"].queryset = Paciente.objects.none()
             self.fields["cita"].queryset = CitaClinica.objects.none()
             self.fields["tratamiento"].queryset = TratamientoPaciente.objects.none()
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.none()
         self.fields["cita"].required = False
         self.fields["tratamiento"].required = False
-        self.fields["profesional"].required = False
 
 
 class PacienteFotoEvolucionForm(BaseClinicaForm):
@@ -634,9 +646,11 @@ class DocumentoClinicoPacienteForm(BaseClinicaForm):
 
 
 class IncapacidadClinicaForm(BaseClinicaForm):
+    autoria_automatica = True
+
     class Meta:
         model = DocumentoClinicoPaciente
-        fields = ["titulo", "fecha_documento", "fecha_inicio", "fecha_fin", "dias", "profesional", "descripcion", "archivo"]
+        fields = ["titulo", "fecha_documento", "fecha_inicio", "fecha_fin", "dias", "descripcion", "archivo"]
         widgets = {
             "fecha_documento": forms.DateInput(attrs={"type": "date"}),
             "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
@@ -650,15 +664,12 @@ class IncapacidadClinicaForm(BaseClinicaForm):
             "fecha_inicio": "Inicio de incapacidad",
             "fecha_fin": "Fin de incapacidad",
             "dias": "Dias indicados",
-            "profesional": "Profesional que emite",
             "descripcion": "Motivo e indicaciones",
             "archivo": "Adjunto firmado (opcional)",
         }
 
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
-        if empresa:
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
         self.fields["archivo"].required = False
         self.fields["titulo"].initial = self.fields["titulo"].initial or "Incapacidad medica"
 
@@ -676,9 +687,11 @@ class IncapacidadClinicaForm(BaseClinicaForm):
 
 
 class RecetaMedicaForm(BaseClinicaForm):
+    autoria_automatica = True
+
     class Meta:
         model = RecetaMedica
-        fields = ["fecha", "profesional", "diagnostico", "productos", "indicaciones", "observaciones", "manuales"]
+        fields = ["fecha", "diagnostico", "productos", "indicaciones", "observaciones", "manuales"]
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}),
             "diagnostico": forms.TextInput(attrs={"placeholder": "Diagnóstico o motivo clínico"}),
@@ -693,16 +706,14 @@ class RecetaMedicaForm(BaseClinicaForm):
 
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop("empresa", None)
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, empresa=empresa, **kwargs)
         self.fields["productos"].required = False
-        self.fields["profesional"].required = False
         self.fields["indicaciones"].required = False
         self.fields["manuales"].required = False
         self.fields["manuales"].queryset = ManualReceta.objects.none()
         self.fields["manuales"].help_text = "Opcional. Puede seleccionar uno o varios PDF activos."
         if empresa:
             self.fields["productos"].queryset = productos_disponibles_receta(empresa).order_by("nombre")
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             if manuales_pdf_habilitados(empresa):
                 self.fields["manuales"].queryset = ManualReceta.objects.filter(empresa=empresa, activo=True).order_by("titulo")
         self.fields["productos"].widget.attrs.update({"size": "8"})
@@ -980,11 +991,7 @@ EXAMEN_FISICO_CAMPOS = [
 
 
 class EvaluacionClinicaIntegralForm(forms.Form):
-    profesional = forms.ModelChoiceField(
-        queryset=ProfesionalSalud.objects.none(),
-        required=False,
-        label="Profesional",
-    )
+    autoria_automatica = True
     fecha_atencion = forms.DateTimeField(
         label="Fecha de evaluación",
         input_formats=["%Y-%m-%dT%H:%M"],
@@ -1002,18 +1009,13 @@ class EvaluacionClinicaIntegralForm(forms.Form):
     )
     estado = forms.ChoiceField(choices=HistoriaClinicaEspecialidad.ESTADO_CHOICES, initial="borrador")
 
-    def __init__(self, *args, empresa=None, instance=None, seccion=None, **kwargs):
+    def __init__(self, *args, empresa=None, usuario=None, instance=None, seccion=None, **kwargs):
         self.instance = instance
         self.seccion = seccion
+        self.usuario = usuario
         super().__init__(*args, **kwargs)
-        self.fields["profesional"].queryset = (
-            ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
-            if empresa
-            else ProfesionalSalud.objects.none()
-        )
         opciones_revision = [("normal", "Normal"), ("alterada", "Alterada")]
         campos = OrderedDict()
-        campos["profesional"] = self.fields["profesional"]
         campos["fecha_atencion"] = self.fields["fecha_atencion"]
         if self.seccion != "examen_fisico":
             campos["funciones_generales"] = self.fields["funciones_generales"]
@@ -1037,7 +1039,6 @@ class EvaluacionClinicaIntegralForm(forms.Form):
         if instance and not self.is_bound:
             datos = instance.datos_especialidad if isinstance(instance.datos_especialidad, dict) else {}
             self.initial.update({
-                "profesional": instance.profesional_id,
                 "fecha_atencion": timezone.localtime(instance.fecha_atencion).strftime("%Y-%m-%dT%H:%M"),
                 "funciones_generales": datos.get("funciones_generales", ""),
                 "examen_fisico": instance.examen_fisico,
@@ -1068,7 +1069,7 @@ class EvaluacionClinicaIntegralForm(forms.Form):
 
 
 class TricopigmentacionForm(forms.Form):
-    profesional = forms.ModelChoiceField(queryset=ProfesionalSalud.objects.none(), required=False, label="Profesional")
+    autoria_automatica = True
     fecha_atencion = forms.DateTimeField(
         label="Fecha de atención",
         input_formats=["%Y-%m-%dT%H:%M"],
@@ -1089,13 +1090,9 @@ class TricopigmentacionForm(forms.Form):
 
     CAMPOS_DATOS = ["numero_sesion", "zona_tratada", "pigmento", "marca_lote", "tecnica", "aguja_cartucho", "proxima_sesion"]
 
-    def __init__(self, *args, empresa=None, **kwargs):
+    def __init__(self, *args, empresa=None, usuario=None, **kwargs):
+        self.usuario = usuario
         super().__init__(*args, **kwargs)
-        self.fields["profesional"].queryset = (
-            ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
-            if empresa
-            else ProfesionalSalud.objects.none()
-        )
 
     def datos_estructurados(self):
         datos = {campo: self.cleaned_data.get(campo) for campo in self.CAMPOS_DATOS}
@@ -1105,6 +1102,8 @@ class TricopigmentacionForm(forms.Form):
 
 
 class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
+    autoria_automatica = True
+
     CAMPOS_POR_TIPO = {
         "capilar": {
             "motivo_consulta": "Motivo de consulta capilar",
@@ -1153,7 +1152,6 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
     class Meta:
         model = HistoriaClinicaEspecialidad
         fields = [
-            "profesional",
             "fecha_atencion",
             "motivo_consulta",
             "antecedentes",
@@ -1180,14 +1178,6 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
         self.tipo = tipo or getattr(self.instance, "tipo", None)
         self.seccion = seccion
         self.paciente = paciente or getattr(self.instance, "paciente", None)
-        if empresa:
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(
-                empresa=empresa,
-                activo=True,
-            ).order_by("nombre")
-        else:
-            self.fields["profesional"].queryset = ProfesionalSalud.objects.none()
-        self.fields["profesional"].required = False
         self.fields["fecha_atencion"].input_formats = ["%Y-%m-%dT%H:%M"]
         for campo, etiqueta in self.CAMPOS_POR_TIPO.get(self.tipo, {}).items():
             self.fields[campo].label = etiqueta
@@ -1306,7 +1296,7 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                     "rows": 8,
                     "placeholder": "Escriba aquí la historia de la enfermedad actual, hallazgos relevantes, diagnóstico, conducta médica, plan de tratamiento, indicaciones y seguimiento.",
                 })
-            orden = ["profesional", "fecha_atencion"]
+            orden = ["fecha_atencion"]
             if self.muestra_clasificacion_alopecia:
                 if "paciente_sexo_confirmado" in self.fields:
                     orden.append("paciente_sexo_confirmado")
@@ -1359,7 +1349,7 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                 self.fields[nombre].widget.attrs.setdefault("rows", 3)
         if self.seccion in {"diagnostico", "plan_tratamiento"}:
             campo_clinico = "diagnostico" if self.seccion == "diagnostico" else "plan_tratamiento"
-            orden = ["profesional", "fecha_atencion", campo_clinico, "estado"]
+            orden = ["fecha_atencion", campo_clinico, "estado"]
             self.fields = OrderedDict(
                 (nombre, self.fields[nombre])
                 for nombre in orden
@@ -1474,6 +1464,7 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             historia.save()
             self.save_m2m()
         return historia
+
 
 
 ANTECEDENTES_PERSONALES_CHOICES = [

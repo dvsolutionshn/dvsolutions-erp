@@ -11,7 +11,7 @@
             {% csrf_token %}
             <input type="hidden" name="accion" value="guardar_examen_fisico">
             <div class="integral-meta-grid">
-                <div class="inline-field"><label for="{{ examen_form.profesional.id_for_label }}">{{ examen_form.profesional.label }}</label>{{ examen_form.profesional }}{{ examen_form.profesional.errors }}</div>
+                <div class="inline-field">{% include "clinica/includes/profesional_autenticado.html" %}</div>
                 <div class="inline-field"><label for="{{ examen_form.fecha_atencion.id_for_label }}">{{ examen_form.fecha_atencion.label }}</label>{{ examen_form.fecha_atencion }}{{ examen_form.fecha_atencion.errors }}</div>
                 <div class="inline-field"><label for="{{ examen_form.estado.id_for_label }}">{{ examen_form.estado.label }}</label>{{ examen_form.estado }}{{ examen_form.estado.errors }}</div>
             </div>

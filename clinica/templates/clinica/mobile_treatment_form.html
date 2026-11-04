@@ -12,6 +12,7 @@
 <form id="mobileTreatmentForm" class="mtr-form" method="post" action="{{ app_treatment_create_url }}" data-submit-once data-treatment-unsaved="{% if form.is_bound %}1{% else %}0{% endif %}">{% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% endfor %}
 {% if form.errors %}<div class="mi-error-box" role="alert"><strong>No se pudo guardar el tratamiento</strong><p>Los datos se conservan en pantalla. Revisa los campos marcados.</p>{{ form.non_field_errors }}</div>{% endif %}
 <div class="mtr-section-tools"><button type="button" data-treatment-expand>Expandir secciones</button><button type="button" data-treatment-collapse>Contraer secciones</button></div>
+<div class="mi-card">{% include "clinica/includes/profesional_autenticado.html" %}</div>
 {% for section in mobile_treatment_sections %}<details class="mi-card mtr-section" data-treatment-section{% if forloop.first or form.errors %} open{% endif %}><summary><span><strong>{{ section.titulo }}</strong><small data-treatment-section-state></small></span><b aria-hidden="true">⌄</b></summary><div class="mtr-fields">{% for field in section.campos %}{% include "clinica/mobile_treatment_field.html" with field=field %}{% endfor %}</div></details>{% endfor %}
 <a class="mtr-cancel" href="{{ app_treatment_cancel_url }}">Cancelar</a>{% if can_create_treatment %}<div class="mi-save-bar"><button class="mi-button" type="button" id="treatmentReview">Revisar y guardar</button></div>{% endif %}
 </form>

@@ -74,7 +74,7 @@ def _secciones_historia_app(form):
             usados.update(campo.name for campo in campos)
             secciones.append({"key": key, "titulo": titulo, "campos": campos})
 
-    agregar("registro", "Datos del registro", ("profesional", "fecha_atencion"))
+    agregar("registro", "Datos del registro", ("fecha_atencion",))
     agregar("alopecia", "Clasificación capilar", ("paciente_sexo_confirmado", "alopecia_grado"))
     for nombre, etiqueta, *_ in form.campos_estructurados:
         agregar(nombre, etiqueta, (nombre, f"{nombre}_otros"))

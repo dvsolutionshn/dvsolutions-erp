@@ -47,7 +47,7 @@ class MobileHistoriesIntegrationTests(TestCase):
         )
         cls.usuario = Usuario.objects.create_user(username="mobile-histories-user", password="test", empresa=cls.empresa, rol_sistema=cls.rol)
         cls.usuario.empresas_acceso.add(*cls.empresas.values())
-        ProfesionalSalud.objects.filter(pk=cls.profesionales[cls.empresa.slug].pk).update(usuario=cls.usuario)
+        ProfesionalSalud.objects.filter(pk__in=[item.pk for item in cls.profesionales.values()]).update(usuario=cls.usuario)
         cls.otro_paciente = Paciente.objects.create(empresa=cls.empresa, nombre="Otro paciente misma empresa", expediente_codigo="MH-OTRO", sexo="femenino")
         cls.mujer = Paciente.objects.create(empresa=cls.empresa, nombre="Paciente femenino de prueba", expediente_codigo="MH-FEM", sexo="femenino")
         cls.sin_sexo = Paciente.objects.create(empresa=cls.empresa, nombre="Paciente sexo histórico no indicado", expediente_codigo="MH-SEX", sexo="no_indicado")
@@ -77,7 +77,7 @@ class MobileHistoriesIntegrationTests(TestCase):
         empresa = empresa or self.empresa
         paciente = paciente or self.pacientes.get(empresa.slug, self.paciente)
         data = {
-            "app": "1", "profesional": self.profesionales[empresa.slug].pk, "fecha_atencion": "2026-10-11T10:15",
+            "app": "1", "fecha_atencion": "2026-10-11T10:15",
             "plan_tratamiento": "Texto de historia, diagnóstico y plan conservado\nSegunda línea de prueba", "observaciones": "Nota de bitácora conservada",
             "estado": "borrador",
         }
@@ -187,7 +187,7 @@ class MobileHistoriesIntegrationTests(TestCase):
                 self.assertTemplateUsed(response, "clinica/"+template)
         self.assertEqual(self.conteos(), before)
 
-    def test_exact_original_form_fields_choices_minute_date_and_scoped_professionals(self):
+    def test_clinical_form_fields_keep_choices_and_date_without_manual_author(self):
         for tipo in self.TIPOS:
             with self.subTest(tipo=tipo):
                 app = self.client.get(self.url(tipo))
@@ -197,11 +197,12 @@ class MobileHistoriesIntegrationTests(TestCase):
                 self.assertEqual(list(form.fields), list(web.context["form"].fields))
                 self.assertEqual(form.fields["fecha_atencion"].input_formats, ["%Y-%m-%dT%H:%M"])
                 self.assertEqual(form.fields["fecha_atencion"].widget.format, "%Y-%m-%dT%H:%M")
-                self.assertEqual(list(form.fields["profesional"].queryset.values_list("pk", flat=True)), [self.profesionales[self.empresa.slug].pk])
+                self.assertNotIn("profesional", form.fields)
+                self.assertNotContains(app, 'name="profesional"')
                 self.assertContains(app, 'name="app" value="1"')
                 self.assertContains(app, 'name="fecha_atencion"', count=1)
                 if tipo in ("enfermeria", "terapias"):
-                    self.assertEqual(list(form.fields), ["profesional", "fecha_atencion", "observaciones", "estado"])
+                    self.assertEqual(list(form.fields), ["fecha_atencion", "observaciones", "estado"])
 
     def test_passive_get_never_creates_preconsulta_professional_history_or_audit(self):
         before = self.conteos()
@@ -298,14 +299,16 @@ class MobileHistoriesIntegrationTests(TestCase):
                 self.assertEqual(response.status_code, 404)
         self.assertEqual(self.conteos(), before)
 
-    def test_foreign_inactive_professional_is_rejected_without_losing_fields(self):
-        before = self.conteos()
+    def test_foreign_inactive_professional_cannot_replace_authenticated_author(self):
+        before = HistoriaClinicaEspecialidad.objects.count()
         for profesional in (self.profesionales["medical_spa"], self.profesional_inactivo):
             response = self.client.post(self.url("cirugia_plastica"), self.datos("cirugia_plastica", profesional=profesional.pk))
-            self.assertEqual(response.status_code, 200)
-            self.assertIn("profesional", response.context["form"].errors)
-            self.assertEqual(response.context["form"]["plan_tratamiento"].value(), self.datos()["plan_tratamiento"])
-        self.assertEqual(self.conteos(), before)
+            self.assertEqual(response.status_code, 302)
+            historia = HistoriaClinicaEspecialidad.objects.filter(paciente=self.paciente, tipo="cirugia_plastica").latest("pk")
+            self.assertEqual(historia.profesional_id, self.profesionales[self.empresa.slug].pk)
+            self.assertEqual((historia.creado_por_id, historia.actualizado_por_id), (self.usuario.pk, self.usuario.pk))
+            self.assertEqual(historia.plan_tratamiento, self.datos()["plan_tratamiento"])
+        self.assertEqual(HistoriaClinicaEspecialidad.objects.count(), before + 2)
 
     def test_create_five_types_uses_original_form_helpers_model_actor_and_audit(self):
         before = self.conteos()

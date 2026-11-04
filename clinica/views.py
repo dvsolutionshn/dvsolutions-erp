@@ -37,6 +37,7 @@ from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
 from facturacion.models import Cliente, Producto
 
+from .autoria import asignar_autoria_clinica, profesional_del_usuario
 from .forms import (
     AntecedenteAdicionalPacienteForm,
     ANTECEDENTES_FAMILIARES_CHOICES,
@@ -210,37 +211,9 @@ def _puede_historia_tipo(usuario, empresa, tipo, *, crear=False, editar=False):
     )
     return bool(permiso and usuario.tiene_permiso_erp(permiso, empresa))
 
-def _texto_busqueda_profesional(valor):
-    return unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii").lower().strip()
-
 
 def _profesional_predeterminado_usuario(empresa, usuario):
-    if not empresa or not getattr(usuario, "is_authenticated", False):
-        return None
-    profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True)
-    vinculado = profesionales.filter(usuario=usuario).first()
-    if vinculado:
-        return vinculado
-    texto_usuario = _texto_busqueda_profesional(
-        f"{getattr(usuario, 'first_name', '')} {getattr(usuario, 'last_name', '')} "
-        f"{getattr(usuario, 'username', '')} {getattr(usuario, 'email', '')}"
-    )
-    reglas = []
-    if "candy" in texto_usuario or "luque" in texto_usuario:
-        reglas.append(("candy", "luque"))
-    if "luis" in texto_usuario or "gonzal" in texto_usuario:
-        reglas.append(("luis", "gonzal"))
-    for principal, apellido in reglas:
-        fallback_principal = None
-        for profesional in profesionales:
-            texto_profesional = _texto_busqueda_profesional(f"{profesional.nombre} {profesional.especialidad}")
-            if principal in texto_profesional and apellido in texto_profesional:
-                return profesional
-            if principal in texto_profesional and fallback_principal is None:
-                fallback_principal = profesional
-        if fallback_principal:
-            return fallback_principal
-    return None
+    return profesional_del_usuario(empresa, usuario)
 
 
 def _guardar_clasificacion_alopecia(historia, form, usuario):
@@ -2691,7 +2664,7 @@ def subir_documento_clinico_paciente(request, empresa_slug, paciente_id, categor
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     config = _config_documento_clinico(categoria)
     form_class = IncapacidadClinicaForm if categoria == "incapacidad" else DocumentoClinicoPacienteForm
-    form_kwargs = {"empresa": empresa}
+    form_kwargs = {"empresa": empresa, "usuario": request.user}
     if categoria != "incapacidad":
         form_kwargs["categoria"] = categoria
     form = form_class(request.POST or None, request.FILES or None, **form_kwargs)
@@ -2949,10 +2922,9 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         form = AntecedenteAdicionalPacienteForm(instance=antecedente, prefix="antecedente_adicional")
         return render_antecedentes_app(request, empresa, paciente, form, antecedente)
     if formulario_especial_app and request.method in {"GET", "HEAD"}:
-        profesional = _profesional_predeterminado_usuario(empresa, request.user)
         return render_historia_especial_app(
             request, empresa, paciente, formulario_especial_app,
-            formulario_historia_especial_app(empresa, formulario_especial_app, profesional),
+            formulario_historia_especial_app(empresa, formulario_especial_app, usuario=request.user),
         )
     if not formulario_antecedentes_app and not formulario_especial_app:
         validar_historias_lectura_app(request, empresa, paciente)
@@ -3129,7 +3101,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             historia.observaciones = texto
         else:
             historia.plan_tratamiento = texto
-        historia.actualizado_por = request.user
+        asignar_autoria_clinica(historia, empresa, request.user)
         try:
             historia.save()
         except ValidationError as exc:
@@ -3155,6 +3127,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         evaluacion_form = EvaluacionClinicaIntegralForm(
             request.POST,
             empresa=empresa,
+            usuario=request.user,
             prefix=prefijo_formulario,
             seccion=seccion_formulario,
         )
@@ -3183,7 +3156,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
                 empresa=empresa,
                 paciente=paciente,
                 tipo="evaluacion_integral",
-                profesional=evaluacion_form.cleaned_data.get("profesional") or profesional_usuario,
+                profesional=profesional_usuario,
                 fecha_atencion=evaluacion_form.cleaned_data["fecha_atencion"],
                 signos_vitales="\n".join(examen_resumen),
                 examen_fisico=evaluacion_form.cleaned_data.get("examen_fisico", ""),
@@ -3216,6 +3189,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         tricopigmentacion_form = TricopigmentacionForm(
             request.POST,
             empresa=empresa,
+            usuario=request.user,
             prefix="tricopigmentacion",
         )
         if tricopigmentacion_form.is_valid():
@@ -3223,7 +3197,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
                 empresa=empresa,
                 paciente=paciente,
                 tipo="tricopigmentacion",
-                profesional=tricopigmentacion_form.cleaned_data.get("profesional") or profesional_usuario,
+                profesional=profesional_usuario,
                 fecha_atencion=tricopigmentacion_form.cleaned_data["fecha_atencion"],
                 evaluacion_clinica=tricopigmentacion_form.cleaned_data.get("evaluacion", ""),
                 procedimiento=tricopigmentacion_form.cleaned_data.get("procedimiento", ""),
@@ -3248,6 +3222,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         form_inline = HistoriaClinicaEspecialidadForm(
             request.POST,
             empresa=empresa,
+            usuario=request.user,
             tipo=tipo_post,
             seccion=seccion_activa,
             paciente=paciente,
@@ -3258,8 +3233,6 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             historia.empresa = empresa
             historia.paciente = paciente
             historia.tipo = tipo_post
-            if profesional_usuario and not historia.profesional_id:
-                historia.profesional = profesional_usuario
             historia.creado_por = request.user
             historia.actualizado_por = request.user
             historia.save()
@@ -3445,13 +3418,12 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             continue
         historias_tipo = [historia for historia in historias if historia.tipo == codigo]
         initial_formulario = {"fecha_atencion": ahora}
-        if profesional_usuario:
-            initial_formulario["profesional"] = profesional_usuario
         formulario = (
             form_inline
             if form_inline is not None and tipo_post == codigo
             else HistoriaClinicaEspecialidadForm(
                 empresa=empresa,
+                usuario=request.user,
                 tipo=codigo,
                 seccion=seccion_activa,
                 paciente=paciente,
@@ -3469,39 +3441,35 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         })
     if evaluacion_form is None:
         evaluacion_initial = {"fecha_atencion": ahora}
-        if profesional_usuario:
-            evaluacion_initial["profesional"] = profesional_usuario
         evaluacion_form = EvaluacionClinicaIntegralForm(
             empresa=empresa,
+            usuario=request.user,
             prefix="evaluacion",
             initial=evaluacion_initial,
         )
     if funciones_form is None:
         funciones_initial = {"fecha_atencion": ahora}
-        if profesional_usuario:
-            funciones_initial["profesional"] = profesional_usuario
         funciones_form = EvaluacionClinicaIntegralForm(
             empresa=empresa,
+            usuario=request.user,
             prefix="funciones",
             seccion="funciones_organicas",
             initial=funciones_initial,
         )
     if examen_form is None:
         examen_initial = {"fecha_atencion": ahora}
-        if profesional_usuario:
-            examen_initial["profesional"] = profesional_usuario
         examen_form = EvaluacionClinicaIntegralForm(
             empresa=empresa,
+            usuario=request.user,
             prefix="examen",
             seccion="examen_fisico",
             initial=examen_initial,
         )
     if tricopigmentacion_form is None:
         tricopigmentacion_initial = {"fecha_atencion": ahora}
-        if profesional_usuario:
-            tricopigmentacion_initial["profesional"] = profesional_usuario
         tricopigmentacion_form = TricopigmentacionForm(
             empresa=empresa,
+            usuario=request.user,
             prefix="tricopigmentacion",
             initial=tricopigmentacion_initial,
         )
@@ -4025,9 +3993,6 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             tablero=True,
         )
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
-    profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
-    if profesional_usuario:
-        initial["profesional"] = profesional_usuario
     preconsultas_tipo = paciente.preconsultas.filter(tipo=tipo).select_related("creada_por")[:10] if puede_ver_historia else []
     ultima_preconsulta = (
         paciente.preconsultas.filter(estado="completada", tipo__in=[tipo, "general"])
@@ -4054,6 +4019,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     form = HistoriaClinicaEspecialidadForm(
         request.POST or None,
         empresa=empresa,
+        usuario=request.user,
         tipo=tipo,
         paciente=paciente,
         initial=initial,
@@ -4063,8 +4029,6 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         historia.empresa = empresa
         historia.paciente = paciente
         historia.tipo = tipo
-        if profesional_usuario and not historia.profesional_id:
-            historia.profesional = profesional_usuario
         historia.creado_por = request.user
         historia.actualizado_por = request.user
         historia.save()
@@ -4142,6 +4106,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
     form = HistoriaClinicaEspecialidadForm(
         request.POST or None,
         empresa=empresa,
+        usuario=request.user,
         tipo=historia.tipo,
         paciente=paciente,
         instance=historia,
@@ -4766,7 +4731,7 @@ def crear_evento_expediente(request, empresa_slug, paciente_id=None):
     paciente = None
     if paciente_id:
         paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    form = ExpedienteEventoForm(request.POST or None, empresa=empresa, paciente=paciente, initial={"paciente": paciente})
+    form = ExpedienteEventoForm(request.POST or None, empresa=empresa, usuario=request.user, paciente=paciente, initial={"paciente": paciente})
     if request.method == "POST" and form.is_valid():
         evento = form.save(commit=False)
         evento.empresa = empresa
@@ -4855,11 +4820,10 @@ def crear_receta_paciente(request, empresa_slug, paciente_id):
     autorizar_recetas_app(request, empresa, "puede_crear_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     avanzada = _recetas_avanzadas_activas(empresa)
-    profesional_inicial = _profesional_predeterminado_usuario(empresa, request.user)
     form = RecetaMedicaForm(
         request.POST or None,
         empresa=empresa,
-        initial={"profesional": profesional_inicial} if profesional_inicial else None,
+        usuario=request.user,
     )
     lineas, errores_lineas = ([], [])
     formulario_valido = False
@@ -5155,6 +5119,7 @@ def crear_tratamiento(request, empresa_slug):
     form = TratamientoPacienteForm(
         request.POST or None,
         empresa=empresa,
+        usuario=request.user,
         initial={"paciente": paciente_inicial} if paciente_inicial else None,
     )
     if request.method == "POST" and form.is_valid():

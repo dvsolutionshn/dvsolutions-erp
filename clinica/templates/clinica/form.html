@@ -134,6 +134,7 @@
     <form method="post" enctype="multipart/form-data" class="clinic-form-body">
         {% csrf_token %}
         <div class="clinic-form-grid">
+        {% if form.autoria_automatica %}<div class="clinic-field is-wide">{% include "clinica/includes/profesional_autenticado.html" %}</div>{% endif %}
         {% for field in form %}{% if field.name == "fecha_cita" %}
         <div class="clinic-field">
             <label for="{{ field.id_for_label }}">{{ field.label }}</label>

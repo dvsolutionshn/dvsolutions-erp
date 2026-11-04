@@ -10,6 +10,7 @@
         {% if puede_editar_tricopigmentacion %}<form method="post" action="#tricopigmentacion" class="tricopig-form">
             {% csrf_token %}
             <input type="hidden" name="accion" value="guardar_tricopigmentacion">
+            <div class="inline-field">{% include "clinica/includes/profesional_autenticado.html" %}</div>
             <div class="tricopig-grid">
                 {% for field in tricopigmentacion_form %}
                 <div class="inline-field {% if field.name == 'evaluacion' or field.name == 'procedimiento' or field.name == 'indicaciones' or field.name == 'observaciones' %}is-wide{% endif %}">

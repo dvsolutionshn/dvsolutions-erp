@@ -45,6 +45,7 @@ class MobileAnnexesIntegrationTests(TestCase):
         )
         cls.usuario = Usuario.objects.create_user(username="mobile-annexes-user", password="test", empresa=cls.empresa, rol_sistema=cls.rol)
         cls.usuario.empresas_acceso.add(*cls.empresas.values())
+        ProfesionalSalud.objects.filter(pk__in=[profesional.pk for profesional in cls.profesionales.values()]).update(usuario=cls.usuario)
 
     def setUp(self):
         self.client.force_login(self.usuario)
@@ -133,7 +134,7 @@ class MobileAnnexesIntegrationTests(TestCase):
     def datos_documento(self, categoria="documento", **overrides):
         data = {"app": "1", "titulo": "Documento móvil", "fecha_documento": "2026-10-10", "entidad": "Centro de prueba", "descripcion": "Nota conservada", "archivo": self.pdf()}
         if categoria == "incapacidad":
-            data.update(fecha_inicio="2026-10-10", fecha_fin="2026-10-12", dias="", profesional=self.profesionales["hospital_mia"].pk)
+            data.update(fecha_inicio="2026-10-10", fecha_fin="2026-10-12", dias="")
         data.update(overrides)
         return data
 
@@ -184,6 +185,8 @@ class MobileAnnexesIntegrationTests(TestCase):
                 self.assertEqual(set(response.context["form"].fields), set(web.context["form"].fields))
                 self.assertContains(response, 'enctype="multipart/form-data"')
                 self.assertContains(response, 'name="app" value="1"')
+                self.assertNotIn("profesional", response.context["form"].fields)
+                self.assertNotContains(response, 'name="profesional"')
                 for name in response.context["form"].fields:
                     self.assertContains(response, f'name="{name}"')
                 self.assertTemplateUsed(web, "clinica/form.html")
@@ -304,21 +307,28 @@ class MobileAnnexesIntegrationTests(TestCase):
                     if not expected:
                         self.assertIn(field, form.errors)
 
-    def test_incapacity_original_date_and_professional_validation_preserves_work(self):
+    def test_incapacity_keeps_date_validation_and_uses_authenticated_author(self):
         inactive = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Profesional inactivo anexos", activo=False)
         before = self.conteos()
-        for overrides, error_field in (
-            ({"fecha_fin": "2026-10-09"}, "__all__"),
-            ({"profesional": self.profesionales["medical_spa"].pk}, "profesional"),
-            ({"profesional": inactive.pk}, "profesional"),
-        ):
-            data = self.datos_documento("incapacidad", **overrides)
+        data = self.datos_documento("incapacidad", fecha_fin="2026-10-09")
+        response = self.client.post(self.url("clinica_subir_documento_categoria_paciente", categoria="incapacidad"), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("__all__", response.context["form"].errors)
+        self.assertContains(response, "Nota conservada")
+        self.assertEqual(response.context["form"]["fecha_inicio"].value(), "2026-10-10")
+        self.assertEqual(self.conteos(), before)
+        historica = DocumentoClinicoPaciente.objects.filter(pk=self.documentos["incapacidad"].pk).values().get()
+        for profesional in (self.profesionales["medical_spa"].pk, inactive.pk):
+            data = self.datos_documento("incapacidad", profesional=profesional, creado_por=999999)
             response = self.client.post(self.url("clinica_subir_documento_categoria_paciente", categoria="incapacidad"), data)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(error_field, response.context["form"].errors)
-            self.assertContains(response, "Nota conservada")
-            self.assertEqual(response.context["form"]["fecha_inicio"].value(), "2026-10-10")
-            self.assertEqual(self.conteos(), before)
+            self.assert_app_return(response, "clinica_documentos_categoria_paciente", categoria="incapacidad")
+            documento = DocumentoClinicoPaciente.objects.filter(empresa=self.empresa).latest("pk")
+            self.assertEqual((documento.empresa_id, documento.paciente_id, documento.profesional_id, documento.creado_por_id), (
+                self.empresa.pk, self.paciente.pk, self.profesionales[self.empresa.slug].pk, self.usuario.pk,
+            ))
+            self.assertEqual((documento.categoria, documento.dias, documento.descripcion), ("incapacidad", 3, "Nota conservada"))
+            self.assert_audit(documento)
+        self.assertEqual(DocumentoClinicoPaciente.objects.filter(pk=self.documentos["incapacidad"].pk).values().get(), historica)
 
     def test_reader_cannot_upload_and_upload_forms_are_backend_denied_independently(self):
         self.asignar_rol(puede_ver_anexos_clinicos=True)

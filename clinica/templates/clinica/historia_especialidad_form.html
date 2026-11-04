@@ -113,9 +113,7 @@
         {% if tipo == "capilar" %}
         <div class="clinical-form-grid capilar-meta">
             <div class="clinical-field">
-                <label for="{{ form.profesional.id_for_label }}">{{ form.profesional.label }}</label>
-                {{ form.profesional }}
-                {% for error in form.profesional.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+                {% include "clinica/includes/profesional_autenticado.html" %}
             </div>
             <div class="clinical-field">
                 <label for="{{ form.fecha_atencion.id_for_label }}">{{ form.fecha_atencion.label }}</label>
@@ -125,6 +123,7 @@
         </div>
         {% endif %}
         <div class="clinical-form-grid">
+        {% if tipo != "capilar" %}<div class="clinical-field">{% include "clinica/includes/profesional_autenticado.html" %}</div>{% endif %}
         {% for field in form %}
             {% if tipo != "capilar" or field.name != "profesional" and field.name != "fecha_atencion" %}
             {% if field.name != "alopecia_escala" and field.name != "alopecia_grado" and field.name != "paciente_sexo_confirmado" and field.name != "capilar_hallazgos_tricologicos" and field.name != "capilar_hallazgos_tricologicos_otros" and field.name != "capilar_distribucion_tricologica" and field.name != "capilar_distribucion_tricologica_otros" and field.name != "capilar_patron_clinico" and field.name != "capilar_patron_clinico_otros" %}
