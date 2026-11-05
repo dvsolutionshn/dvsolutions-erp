@@ -58,6 +58,7 @@ from .importadores import importar_libro_compras_desde_excel
 from .forms import RegistrarLoteInventarioForm
 from .mobile_presentation import preparar_historial_factura_mobile
 from .lotes import LOT_DUPLICATE_MESSAGE, parse_vencimiento_lote_rapido
+from .inventario_edicion import ajustar_inventario_factura_editada
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera, bloquear_empresas_contables, validar_fecha_contable_abierta
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_documento_whatsapp
@@ -2130,6 +2131,7 @@ def _obtener_lote_generico(producto):
     return lote
 
 
+@transaction.atomic
 def _registrar_movimiento_lote_bodega(
     *, empresa, bodega, lote, tipo, cantidad, referencia="", observacion="", factura=None, usuario=None
 ):
@@ -2137,7 +2139,7 @@ def _registrar_movimiento_lote_bodega(
         raise ValidationError("La empresa, la bodega y el lote deben pertenecer a la misma empresa.")
     if lote.producto.empresa_id != empresa.id:
         raise ValidationError("El producto del lote no pertenece a la empresa activa.")
-    existencia, _ = ExistenciaLoteBodega.objects.get_or_create(
+    existencia, _ = ExistenciaLoteBodega.objects.select_for_update().get_or_create(
         empresa=empresa,
         bodega=bodega,
         lote=lote,
@@ -2413,7 +2415,7 @@ def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
     return faltantes
 
 
-def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, usuario=None):
+def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, usuario=None, cantidades_por_producto=None):
     """Descuenta por FEFO y deja trazabilidad exacta por lote y bodega."""
     if not _empresa_usa_control_lotes_fefo(factura.empresa):
         return False
@@ -2427,13 +2429,15 @@ def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, u
     bodega_venta = _obtener_bodega_venta(factura.empresa) if config.ventas_solo_desde_vitrina else None
     hoy = timezone.localdate()
     observacion = observacion or "Salida automatica por FEFO desde el lote con vencimiento mas cercano."
-    cantidades = {}
-    for linea in factura.lineas.select_related("producto").all():
-        producto = linea.producto
-        if not producto or not producto.controla_inventario:
-            continue
-        cantidades.setdefault(producto.id, {"producto": producto, "cantidad": Decimal("0.00")})
-        cantidades[producto.id]["cantidad"] += linea.cantidad
+    cantidades = cantidades_por_producto
+    if cantidades is None:
+        cantidades = {}
+        for linea in factura.lineas.select_related("producto").all():
+            producto = linea.producto
+            if not producto or not producto.controla_inventario:
+                continue
+            cantidades.setdefault(producto.id, {"producto": producto, "cantidad": Decimal("0.00")})
+            cantidades[producto.id]["cantidad"] += linea.cantidad
 
     # Validar todo antes de descontar evita que una factura deje salidas parciales.
     faltantes = _validar_stock_vitrina_para_lineas(factura.empresa, cantidades)
@@ -2473,6 +2477,8 @@ def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, u
                 usuario=usuario,
             )
             pendiente -= salida
+        if pendiente > 0:
+            raise ValidationError(f"No hay suficiente inventario por lotes para {item['producto'].nombre}.")
     return True
 
 
@@ -2522,7 +2528,7 @@ def _registrar_ajuste_salida_fefo(*, empresa, producto, cantidad, referencia, ob
         pendiente -= salida
 
 
-def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None, usuario=None):
+def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None, usuario=None, cantidades_por_producto=None):
     config = ConfiguracionAvanzadaEmpresa.para_empresa(factura.empresa)
     if not config.ventas_solo_desde_vitrina:
         return
@@ -2531,17 +2537,22 @@ def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None
 
     bodega_venta = _obtener_bodega_venta(factura.empresa)
     observacion = observacion or "Salida automatica desde Vitrina por factura emitida."
-    for linea in factura.lineas.select_related("producto").all():
-        if not linea.producto_id or not linea.producto:
-            continue
-        if not linea.producto.controla_inventario:
-            continue
-        pendiente = linea.cantidad
+    cantidades = cantidades_por_producto
+    if cantidades is None:
+        cantidades = {}
+        for linea in factura.lineas.select_related("producto").all():
+            if not linea.producto_id or not linea.producto.controla_inventario:
+                continue
+            cantidades.setdefault(linea.producto_id, {"producto": linea.producto, "cantidad": Decimal("0.00")})
+            cantidades[linea.producto_id]["cantidad"] += linea.cantidad
+    for item in cantidades.values():
+        producto = item["producto"]
+        pendiente = item["cantidad"]
         existencias = (
             ExistenciaLoteBodega.objects.filter(
                 empresa=factura.empresa,
                 bodega=bodega_venta,
-                lote__producto=linea.producto,
+                lote__producto=producto,
                 lote__activo=True,
                 cantidad__gt=0,
             )
@@ -2565,7 +2576,7 @@ def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None
             )
             pendiente -= salida
         if pendiente > 0:
-            raise ValidationError(f"No hay suficiente inventario en Vitrina para {linea.producto.nombre}.")
+            raise ValidationError(f"No hay suficiente inventario en Vitrina para {producto.nombre}.")
 
 
 @transaction.atomic
@@ -2762,6 +2773,7 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None, usuario
             reversion=Sum("cantidad", filter=Q(tipo="reversion_factura")),
             valor_salida=Sum("valor_contable", filter=Q(tipo="salida_factura")),
             valor_reversion=Sum("valor_contable", filter=Q(tipo="reversion_factura")),
+            salidas_sin_valor=Count("id", filter=Q(tipo="salida_factura", valor_contable__isnull=True)),
         )
     )
     for resumen in movimientos_producto:
@@ -2771,6 +2783,18 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None, usuario
         producto = Producto.objects.get(pk=resumen["producto_id"])
         if not producto.controla_inventario:
             continue
+        if resumen["salidas_sin_valor"]:
+            # SUM ignora los valores nulos de ventas históricas. Tras ajustes
+            # parciales, el costo pendiente está congelado en las líneas vigentes.
+            valor_pendiente = sum((
+                valor_contable_linea_inventario(linea)
+                for linea in factura.lineas.filter(producto=producto)
+            ), Decimal("0.00"))
+        else:
+            valor_pendiente = (
+                Decimal(resumen['valor_salida']) - Decimal(resumen.get('valor_reversion') or 0)
+                if resumen.get('valor_salida') is not None else None
+            )
         _registrar_movimiento_inventario(
             empresa=factura.empresa,
             producto=producto,
@@ -2779,10 +2803,7 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None, usuario
             referencia=factura.numero_factura or f"Factura {factura.id}",
             observacion=observacion,
             factura=factura,
-            valor_contable=(
-                Decimal(resumen['valor_salida']) - Decimal(resumen.get('valor_reversion') or 0)
-                if resumen.get('valor_salida') is not None else None
-            ),
+            valor_contable=valor_pendiente,
             usuario=usuario,
         )
 
@@ -8535,6 +8556,9 @@ def editar_factura(request, empresa_slug, factura_id):
 
     if request.method == "POST":
         estado_original = factura.estado
+        # El formset modifica sus instancias durante is_valid(); conservar una
+        # lectura independiente para comparar cantidades y costos originales.
+        lineas_originales = list(factura.lineas.select_related('producto').order_by('pk'))
         if not request.user.tiene_permiso_erp("puede_cambiar_fecha_factura", empresa):
             fecha_solicitada = request.POST.get("fecha_emision")
             if fecha_solicitada and _parsear_fecha_latam(fecha_solicitada) != fecha_original:
@@ -8585,21 +8609,20 @@ def editar_factura(request, empresa_slug, factura_id):
                             list(lineas_conservadas.values()) + lineas_nuevas,
                         )
                     factura = form.save()
-                    reconstruir_factura_emitida = estado_original == 'emitida' and factura.estado == 'emitida'
-                    if reconstruir_factura_emitida:
-                        _revertir_salida_factura(
-                            factura,
-                            forzar=True,
-                            observacion='Reversion por correccion historica de factura emitida.',
-                            usuario=request.user,
-                        )
+                    editar_factura_emitida = estado_original == 'emitida' and factura.estado == 'emitida'
 
                     lineas_actualizadas = formset.save(commit=False)
+                    productos_originales = {linea.pk: linea.producto_id for linea in lineas_originales}
                     for linea in formset.deleted_objects:
                         linea.delete()
                     for linea in lineas_actualizadas:
                         if not linea.pk:
                             linea.precio_incluye_impuesto = _precios_incluyen_impuesto(empresa)
+                        elif productos_originales.get(linea.pk) != linea.producto_id:
+                            # El costo congelado pertenece al producto anterior.
+                            # Los productos inventariados se valoran por su delta.
+                            linea.costo_contable_total = None
+                            linea.costo_unitario = (linea.producto.costo_promedio or Decimal("0")) if linea.producto_id else Decimal("0")
                         linea.save()
                     formset.save_m2m()
 
@@ -8610,7 +8633,7 @@ def editar_factura(request, empresa_slug, factura_id):
 
                     _actualizar_totales_factura(factura)
 
-                    if reconstruir_factura_emitida:
+                    if editar_factura_emitida:
                         total_pagado_actual = Decimal(factura.total_pagado or 0).quantize(Decimal("0.01"))
                         total_documento_actual = Decimal(factura.total_documento_ajustado or 0).quantize(Decimal("0.01"))
                         if total_pagado_actual > total_documento_actual:
@@ -8618,22 +8641,17 @@ def editar_factura(request, empresa_slug, factura_id):
                                 "El nuevo total de la factura no puede ser menor que los pagos ya registrados. "
                                 "Primero ajusta el pago o conserva el total cobrado."
                             )
-                        _validar_stock_disponible_para_lineas(
-                            factura.lineas.select_related('producto').all()
-                        )
-                        _registrar_salida_factura(
-                            factura,
-                            forzar=True,
-                            observacion='Salida reconstruida por correccion historica de factura emitida.',
-                            usuario=request.user,
-                        )
+                        ajustar_inventario_factura_editada(factura, lineas_originales, usuario=request.user)
                         AsientoContable.objects.filter(
                             empresa=factura.empresa,
                             documento_tipo="factura",
                             documento_id=factura.id,
                             evento="emision",
                         ).delete()
-                        registrar_asiento_factura_emitida(factura)
+                        # Al eliminar la última línea no quedan importes ni
+                        # costo de venta para generar una partida contable.
+                        if factura.lineas.exists():
+                            registrar_asiento_factura_emitida(factura)
                         _recalcular_y_recontabilizar_pagos_factura(factura)
                     elif estado_original != 'emitida' and factura.estado == 'emitida':
                         _registrar_salida_factura(factura, usuario=request.user)
