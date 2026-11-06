@@ -141,18 +141,28 @@ def _repartir_valor_lineas(grupo, valor):
         repartido = objetivo
 
 
-@transaction.atomic
-def ajustar_inventario_factura_editada(factura, lineas_originales, *, usuario=None):
-    # Importación diferida: utiliza las mismas operaciones que emisión/anulación.
-    from . import views
-
+def planificar_diferencias_inventario(lineas_originales, lineas_editadas):
+    """Compara las dos colecciones sin escribir líneas ni inventario."""
     originales = _agrupar_lineas(lineas_originales)
-    actuales = _agrupar_lineas(factura.lineas.select_related("producto").order_by("pk"), validar_cantidades=True)
+    actuales = _agrupar_lineas(lineas_editadas, validar_cantidades=True)
     diferencias = {
         producto_id: actuales.get(producto_id, {}).get("cantidad", CERO) - originales.get(producto_id, {}).get("cantidad", CERO)
         for producto_id in originales.keys() | actuales.keys()
     }
     cambios = {producto_id: cantidad for producto_id, cantidad in diferencias.items() if cantidad != 0}
+    return {"originales": originales, "actuales": actuales, "cambios": cambios}
+
+
+@transaction.atomic
+def ajustar_inventario_factura_editada(factura, lineas_originales, *, usuario=None, plan=None):
+    # Importación diferida: utiliza las mismas operaciones que emisión/anulación.
+    from . import views
+
+    if plan is None:
+        plan = planificar_diferencias_inventario(
+            lineas_originales, factura.lineas.select_related("producto").order_by("pk"),
+        )
+    originales, actuales, cambios = (plan[campo] for campo in ("originales", "actuales", "cambios"))
     if cambios:
         bloquear_empresas_contables([factura.empresa_id])
         validar_fecha_contable_abierta(factura.empresa_id, factura.fecha_emision)
@@ -216,7 +226,7 @@ def ajustar_inventario_factura_editada(factura, lineas_originales, *, usuario=No
             valores[producto_id] = valores.get(producto_id, CERO) + valor
 
     for producto_id, grupo in actuales.items():
-        firma_original = [(linea.pk, linea.cantidad) for linea in originales.get(producto_id, {}).get("lineas", [])]
-        firma_actual = [(linea.pk, linea.cantidad) for linea in grupo["lineas"]]
+        firma_original = {linea.pk: linea.cantidad for linea in originales.get(producto_id, {}).get("lineas", [])}
+        firma_actual = {linea.pk: linea.cantidad for linea in grupo["lineas"]}
         if firma_original != firma_actual:
             _repartir_valor_lineas(grupo, valores.get(producto_id, CERO))

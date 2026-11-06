@@ -59,6 +59,7 @@ from .forms import RegistrarLoteInventarioForm
 from .mobile_presentation import preparar_historial_factura_mobile
 from .lotes import LOT_DUPLICATE_MESSAGE, parse_vencimiento_lote_rapido
 from .inventario_edicion import ajustar_inventario_factura_editada
+from .edicion_lineas import preparar_lineas_factura_emitida
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera, bloquear_empresas_contables, validar_fecha_contable_abierta
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_documento_whatsapp
@@ -8589,6 +8590,10 @@ def editar_factura(request, empresa_slug, factura_id):
 
             try:
                 with transaction.atomic():
+                    plan_edicion = (
+                        preparar_lineas_factura_emitida(factura, lineas_originales, formset)
+                        if estado_original == 'emitida' else None
+                    )
                     if gasto_adicional_origen and form.cleaned_data['estado'] == 'emitida':
                         lineas_conservadas = {
                             linea.pk: linea
@@ -8611,9 +8616,9 @@ def editar_factura(request, empresa_slug, factura_id):
                     factura = form.save()
                     editar_factura_emitida = estado_original == 'emitida' and factura.estado == 'emitida'
 
-                    lineas_actualizadas = formset.save(commit=False)
+                    lineas_actualizadas = plan_edicion.guardar if editar_factura_emitida else formset.save(commit=False)
                     productos_originales = {linea.pk: linea.producto_id for linea in lineas_originales}
-                    for linea in formset.deleted_objects:
+                    for linea in (plan_edicion.eliminar if editar_factura_emitida else formset.deleted_objects):
                         linea.delete()
                     for linea in lineas_actualizadas:
                         if not linea.pk:
@@ -8624,7 +8629,8 @@ def editar_factura(request, empresa_slug, factura_id):
                             linea.costo_contable_total = None
                             linea.costo_unitario = (linea.producto.costo_promedio or Decimal("0")) if linea.producto_id else Decimal("0")
                         linea.save()
-                    formset.save_m2m()
+                    if not editar_factura_emitida:
+                        formset.save_m2m()
 
                     if estado_original != 'emitida' and factura.estado == 'emitida':
                         _validar_stock_disponible_para_lineas(
@@ -8641,7 +8647,9 @@ def editar_factura(request, empresa_slug, factura_id):
                                 "El nuevo total de la factura no puede ser menor que los pagos ya registrados. "
                                 "Primero ajusta el pago o conserva el total cobrado."
                             )
-                        ajustar_inventario_factura_editada(factura, lineas_originales, usuario=request.user)
+                        ajustar_inventario_factura_editada(
+                            factura, lineas_originales, usuario=request.user, plan=plan_edicion.inventario,
+                        )
                         AsientoContable.objects.filter(
                             empresa=factura.empresa,
                             documento_tipo="factura",
