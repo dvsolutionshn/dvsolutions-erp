@@ -1,0 +1,46 @@
+{% if tipo == 'terapias' %}
+    {% for nota in notas %}
+    <article class="{{ tarjeta }}" style="margin-bottom:14px">
+        <h2>{{ nota.titulo }} · {{ nota.fecha|date:'d/m/Y' }}</h2>
+        <p>{{ nota.estado }}{% if nota.profesional %} · {{ nota.profesional }}{% endif %}</p>
+        {% for campo in nota.campos %}
+            <h3>{{ campo.label }}</h3>
+            <p>{{ campo.value|linebreaksbr }}</p>
+        {% endfor %}
+    </article>
+    {% empty %}<p class="{{ tarjeta }}">Todavía no hay terapias registradas.</p>{% endfor %}
+{% else %}
+    {% for programa in programas %}
+    <article class="{{ tarjeta }}" style="margin-bottom:14px">
+        <h2>{% if programa.cirugia %}{{ programa.cirugia }}{% else %}Programa clínico{% endif %}</h2>
+        {% if programa.fecha_cirugia %}<p>Fecha de cirugía {{ programa.fecha_cirugia|date:'d/m/Y' }}</p>{% endif %}
+        {% if tipo == 'camara_hiperbarica' %}
+            {% if programa.programa %}<p>{{ programa.get_programa_display }}{% if programa.programa_otro %} · {{ programa.programa_otro }}{% endif %}</p>{% endif %}
+            {% if programa.indicacion %}<h3>Indicación</h3><p>{{ programa.indicacion|linebreaksbr }}</p>{% endif %}
+            {% if programa.orden_medica %}<h3>Orden médica</h3><p>{{ programa.orden_medica|linebreaksbr }}</p>{% endif %}
+        {% endif %}
+        {% for sesion in programa.sesiones.all %}
+        <details style="padding:10px 0">
+            <summary>Sesión {{ sesion.numero_sesion }}{% if sesion.numero_sesion_adicional %} y {{ sesion.numero_sesion_adicional }}{% endif %} · {{ sesion.fecha_sesion|date:'d/m/Y' }} · {{ sesion.get_estado_display }}</summary>
+            {% if tipo == 'camara_hiperbarica' %}
+                {% if sesion.presion_camara or sesion.tiempo_minutos %}<p>Presión de cámara {{ sesion.presion_camara|default:'—' }} · Duración {{ sesion.tiempo_minutos|default:'—' }} min</p>{% endif %}
+                {% if sesion.presion_arterial_antes or sesion.presion_arterial_despues %}<p>Presión arterial {{ sesion.presion_arterial_antes|default:'—' }} / {{ sesion.presion_arterial_despues|default:'—' }}</p>{% endif %}
+                {% if sesion.saturacion_oxigeno_antes or sesion.saturacion_oxigeno_despues %}<p>Saturación de oxígeno {{ sesion.saturacion_oxigeno_antes|default:'—' }} / {{ sesion.saturacion_oxigeno_despues|default:'—' }}</p>{% endif %}
+                {% if sesion.tolerancia %}<p>Tolerancia {{ sesion.get_tolerancia_display }}</p>{% endif %}
+                {% if sesion.observaciones_previas %}<p>{{ sesion.observaciones_previas|linebreaksbr }}</p>{% endif %}
+                {% if sesion.evolucion_evento_adverso %}<p>{{ sesion.evolucion_evento_adverso|linebreaksbr }}</p>{% endif %}
+            {% else %}
+                <p>{{ sesion.get_fase_display }}{% if sesion.hora_inicio %} · {{ sesion.hora_inicio|time:'h:i A' }}{% endif %}{% if sesion.hora_finalizacion %} – {{ sesion.hora_finalizacion|time:'h:i A' }}{% endif %}</p>
+                <p>PA {{ sesion.presion_arterial|default:'—' }} · FC {{ sesion.frecuencia_cardiaca|default:'—' }} · FR {{ sesion.frecuencia_respiratoria|default:'—' }} · SpO₂ {{ sesion.saturacion_oxigeno|default:'—' }} · Temp. {{ sesion.temperatura|default:'—' }}</p>
+                {% if sesion.escala_dolor is not None %}<p>Dolor {{ sesion.escala_dolor }}/10</p>{% endif %}
+                {% if sesion.estado_paciente_display %}<p>Estado {{ sesion.estado_paciente_display|join:', ' }}</p>{% endif %}
+                {% if sesion.equipos_utilizados_display %}<p>Equipos {{ sesion.equipos_utilizados_display|join:', ' }}</p>{% endif %}
+                {% if sesion.cuidados_realizados_display %}<p>Cuidados {{ sesion.cuidados_realizados_display|join:', ' }}</p>{% endif %}
+                {% if sesion.cuidado_otro %}<p>{{ sesion.cuidado_otro }}</p>{% endif %}
+            {% endif %}
+            {% if sesion.nota_enfermeria %}<h3>Nota de enfermería</h3><p>{{ sesion.nota_enfermeria|linebreaksbr }}</p>{% endif %}
+        </details>
+        {% empty %}<p>Este programa todavía no tiene sesiones registradas.</p>{% endfor %}
+    </article>
+    {% empty %}<p class="{{ tarjeta }}">Todavía no hay programas registrados en esta sección.</p>{% endfor %}
+{% endif %}

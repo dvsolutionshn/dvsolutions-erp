@@ -1,0 +1,7 @@
+{% extends "core/erp_base.html" %}
+{% block title %}{{ seccion_titulo }} · {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente{% endblock %}
+{% block header_title %}{{ seccion_titulo }}{% endblock %}
+{% block header_description %}{{ paciente.nombre }}{% endblock %}
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{{ expediente_url }}">Volver al expediente</a>{% endblock %}
+{% block content %}{% include "clinica/includes/expediente_seccion_lectura.html" with tarjeta="erp-card" %}{% endblock %}

@@ -11,7 +11,9 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import content_disposition_header
 
-from core.clinical_permissions import rol_clinico_granular, rol_clinico_v2
+from core.clinical_permissions import (
+    datos_paciente_limitados, puede_abrir_expediente_limitado, rol_clinico_granular, rol_clinico_v2,
+)
 from .mobile_patients import contexto_pacientes_app, es_pacientes_app, respuesta_pacientes_app, url_paciente_app
 from .models import DocumentoClinicoPaciente
 
@@ -39,7 +41,7 @@ def permiso_anexos_app(request, empresa, subir=False):
 
 
 def autorizar_anexos_app(request, empresa, subir=False):
-    if not es_anexos_app(request, empresa):
+    if not es_anexos_app(request, empresa) and not datos_paciente_limitados(request.user, empresa):
         return
     if not empresa.tiene_modulo_activo("clinica_medica"):
         raise Http404("El módulo clínico no está habilitado para esta empresa.")
@@ -54,9 +56,19 @@ def url_anexo_app(empresa, paciente, clase, categoria=None, subir=False):
     return f"{reverse(RUTAS_ANEXOS[clase][2 if subir else 1], args=args)}?app=1"
 
 
-def url_archivo_anexo_app(empresa, paciente, clase, registro, parte="archivo", descargar=False):
+def puede_descargar_anexos(request, empresa):
+    return permiso_anexos_app(request, empresa) and (
+        not rol_clinico_v2(request.user, empresa)
+        or request.user.tiene_permiso_erp("puede_descargar_anexos_clinicos", empresa)
+    )
+
+
+def url_archivo_anexo_app(empresa, paciente, clase, registro, parte="archivo", descargar=False, *, modo_app=True):
     url = reverse("clinica_archivo_anexo_app", args=[empresa.slug, paciente.pk, clase, registro.pk, parte])
-    return f"{url}?{urlencode({'app': '1', **({'descargar': '1'} if descargar else {})})}"
+    params = {"app": "1"} if modo_app else {}
+    if descargar:
+        params["descargar"] = "1"
+    return f"{url}?{urlencode(params)}" if params else url
 
 
 def evolucion_paciente_app(empresa, paciente, registros):
@@ -67,11 +79,11 @@ def evolucion_paciente_app(empresa, paciente, registros):
     } for registro in registros if registro.empresa_id == empresa.pk and registro.paciente_id == paciente.pk]
 
 
-def _item_anexo_app(empresa, paciente, clase, registro, *, puede_descargar=True):
+def _item_anexo_app(empresa, paciente, clase, registro, *, puede_descargar, limitado):
     parte = "imagen" if clase == "evolucion" and registro.imagen else "video" if clase == "evolucion" else "archivo"
     archivo = getattr(registro, parte)
     extension = Path(archivo.name).suffix.lower() if archivo else ""
-    url = url_archivo_anexo_app(empresa, paciente, clase, registro, parte) if archivo else ""
+    url = url_archivo_anexo_app(empresa, paciente, clase, registro, parte) if archivo and (not limitado or puede_descargar) else ""
     actor = getattr(registro, "subido_por", None) if clase == "examen" else getattr(registro, "creado_por", None)
     fecha = getattr(registro, {"examen": "fecha_examen", "evolucion": "fecha", "consentimiento": "fecha_firma", "documento": "fecha_documento"}[clase])
     metadata = []
@@ -92,14 +104,14 @@ def _item_anexo_app(empresa, paciente, clase, registro, *, puede_descargar=True)
         if registro.cita and registro.cita.empresa_id == empresa.pk and registro.cita.paciente_id == paciente.pk:
             metadata.append({"label": "Cita", "value": registro.cita.fecha_hora})
     print_url = ""
-    if clase == "documento" and registro.categoria == "incapacidad":
+    if clase == "documento" and registro.categoria == "incapacidad" and not limitado:
         print_url = f"{reverse('clinica_incapacidad_imprimir', args=[empresa.slug, paciente.pk, registro.pk])}?app=1"
     return {
         "registro": registro, "titulo": registro.titulo, "fecha": fecha,
         "tipo": registro.get_tipo_display() if clase in {"examen", "evolucion"} else registro.get_categoria_display() if clase == "documento" else "Consentimiento",
         "descripcion": getattr(registro, "descripcion", "") or "",
         "usuario": (actor.get_full_name() or actor.username) if actor else "Usuario no disponible",
-        "metadatos": metadata, "archivo_url": url,
+        "metadatos": metadata, "archivo_url": url, "tiene_archivo": bool(archivo),
         "download_url": url_archivo_anexo_app(empresa, paciente, clase, registro, parte, descargar=True) if archivo and puede_descargar else "",
         "imagen_url": url if extension in {".jpg", ".jpeg", ".png", ".webp"} else "",
         "video_url": url if extension in {".mp4", ".mov", ".webm", ".avi"} else "",
@@ -120,12 +132,12 @@ def contexto_anexos_app(request, empresa, paciente, clase, *, categoria=None, co
         url_paciente_app("clinica_pacientes", empresa, destino=modo_selector)
         if contexto["can_view_patients"] else contexto["app_modules_url"]
     )
+    if puede_abrir_expediente_limitado(request.user, empresa):
+        regreso = url_paciente_app("clinica_paciente_expediente", empresa, paciente.pk)
     rutas = [(key, None, valores[0]) for key, valores in RUTAS_ANEXOS.items() if key != "documento"]
     rutas.extend(("documento", key, titulo) for key, titulo in DocumentoClinicoPaciente.CATEGORIA_CHOICES)
-    puede_descargar = (
-        request.user.tiene_permiso_erp("puede_descargar_anexos_clinicos", empresa)
-        if rol_clinico_v2(request.user, empresa) else can_view
-    )
+    puede_descargar = puede_descargar_anexos(request, empresa)
+    limitado = datos_paciente_limitados(request.user, empresa)
     contexto.update({
         "can_view_annexes": can_view, "can_view_attachments": can_view, "can_upload_annexes": can_upload,
         "mobile_annex_class": clase, "mobile_annex_title": config["titulo"] if config else RUTAS_ANEXOS[clase][0],
@@ -138,12 +150,21 @@ def contexto_anexos_app(request, empresa, paciente, clase, *, categoria=None, co
             "active": clase == key and categoria == cat,
         } for key, cat, titulo in rutas if can_view or can_upload],
         "mobile_annex_items": [
-            _item_anexo_app(empresa, paciente, clase, item, puede_descargar=puede_descargar)
+            _item_anexo_app(empresa, paciente, clase, item, puede_descargar=puede_descargar, limitado=limitado)
             for item in registros
             if item.empresa_id == empresa.pk and item.paciente_id == paciente.pk
         ] if can_view else [],
     })
     return contexto
+
+
+def _regreso_anexos_web(request, empresa, paciente):
+    if puede_abrir_expediente_limitado(request.user, empresa):
+        return reverse("clinica_paciente_expediente", args=[empresa.slug, paciente.pk])
+    if not datos_paciente_limitados(request.user, empresa):
+        return reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.pk])
+    vista = "clinica_pacientes" if request.user.tiene_permiso_erp("puede_ver_pacientes", empresa) else "clinica_dashboard"
+    return reverse(vista, args=[empresa.slug])
 
 
 def render_anexos_app(request, empresa, paciente, clase, web_template, contexto, *, categoria=None, config=None, registros=(), form=False):
@@ -161,6 +182,23 @@ def render_anexos_app(request, empresa, paciente, clase, web_template, contexto,
         template = "clinica/mobile_annex_form.html" if form else "clinica/mobile_annex_list.html"
     else:
         template = web_template
+        contexto["annex_back_url"] = _regreso_anexos_web(request, empresa, paciente)
+        if form and datos_paciente_limitados(request.user, empresa) and not permiso_anexos_app(request, empresa):
+            contexto["cancel_url"] = contexto["annex_back_url"]
+        if registros:
+            limitado = datos_paciente_limitados(request.user, empresa)
+            puede_descargar = not limitado or puede_descargar_anexos(request, empresa)
+            partes = ("imagen", "video") if clase == "evolucion" else ("archivo",)
+            for registro in registros:
+                for parte in partes:
+                    archivo = getattr(registro, parte)
+                    url = ""
+                    if archivo and puede_descargar:
+                        url = (
+                            url_archivo_anexo_app(empresa, paciente, clase, registro, parte, modo_app=False)
+                            if limitado else archivo.url
+                        )
+                    setattr(registro, f"{parte}_url", url)
     return respuesta_anexos_app(request, empresa, render(request, template, contexto))
 
 
@@ -168,6 +206,8 @@ def volver_anexo_app(request, empresa, paciente, clase, categoria=None):
     if es_anexos_app(request, empresa):
         destino = url_anexo_app(empresa, paciente, clase, categoria, subir=not permiso_anexos_app(request, empresa))
         return respuesta_anexos_app(request, empresa, redirect(destino))
+    if datos_paciente_limitados(request.user, empresa) and not permiso_anexos_app(request, empresa):
+        return redirect(_regreso_anexos_web(request, empresa, paciente))
     args = [empresa.slug, paciente.pk] + ([categoria] if clase == "documento" else [])
     return redirect(reverse(RUTAS_ANEXOS[clase][1], args=args))
 

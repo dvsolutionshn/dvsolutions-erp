@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_gastos_adicionales, views_restricciones_citas
+from . import expediente_limitado, views, views_gastos_adicionales, views_restricciones_citas
 
 
 urlpatterns = [
@@ -25,6 +25,7 @@ urlpatterns = [
     path("pacientes/enlace-registro/generar/", views.generar_enlace_registro_paciente, name="clinica_generar_enlace_registro_paciente"),
     path("pacientes/enlaces-registro/", views.control_enlaces_registro_paciente, name="clinica_control_enlaces_registro_paciente"),
     path("pacientes/<int:paciente_id>/", views.paciente_detalle, name="clinica_paciente_detalle"),
+    path("pacientes/<int:paciente_id>/expediente/", expediente_limitado.expediente, name="clinica_paciente_expediente"),
     path("pacientes/<int:paciente_id>/restriccion/", views_restricciones_citas.restringir, name="clinica_restringir_citas_paciente"),
     path("pacientes/<int:paciente_id>/restriccion/habilitar/", views_restricciones_citas.habilitar, name="clinica_habilitar_citas_paciente"),
     path("pacientes/<int:paciente_id>/editar/", views.editar_paciente, name="clinica_editar_paciente"),
@@ -33,6 +34,7 @@ urlpatterns = [
     path("pacientes/<int:paciente_id>/seguimientos/", views.seguimientos_paciente, name="clinica_seguimientos_paciente"),
     path("pacientes/<int:paciente_id>/recordatorios-tratamiento/crear/", views.crear_recordatorios_tratamiento, name="clinica_crear_recordatorios_tratamiento"),
     path("pacientes/<int:paciente_id>/expediente/agregar/", views.crear_evento_expediente, name="clinica_crear_evento_paciente"),
+    path("pacientes/<int:paciente_id>/expediente/<slug:tipo>/", expediente_limitado.consultar_seccion, name="clinica_paciente_expediente_seccion"),
     path("pacientes/<int:paciente_id>/evolucion/", views.evolucion_paciente, name="clinica_evolucion_paciente"),
     path("pacientes/<int:paciente_id>/evolucion/registrar/", views.registrar_foto_evolucion, name="clinica_registrar_foto_evolucion"),
     path("pacientes/<int:paciente_id>/anexos/<slug:clase>/<int:registro_id>/archivo/<slug:parte>/", views.archivo_anexo_app, name="clinica_archivo_anexo_app"),

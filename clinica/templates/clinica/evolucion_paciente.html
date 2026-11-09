@@ -1,13 +1,13 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Evolucion - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}Evolucion clinica visual{% endblock %}
 {% block header_description %}Biblioteca ordenada de fotos, videos, fechas, procedimientos y descripcion del avance del paciente.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
-<a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir foto o video</a>
+<a class="erp-btn-secondary" href="{{ annex_back_url }}">{% if erp_access.datos_paciente_limitados and not erp_access.puede_abrir_expediente_limitado %}Volver{% else %}Volver al expediente{% endif %}</a>
+{% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir foto o video</a>{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -34,7 +34,7 @@
         <div class="evo-patient">
             <div class="erp-kpi-label">Paciente</div>
             <strong>{{ paciente.nombre }}</strong>
-            <span>{{ paciente.identidad|default:"Sin identidad" }} · {{ paciente.edad|default:"-" }} anos · Expediente {{ paciente.expediente_codigo }}</span>
+            {% if not erp_access.datos_paciente_limitados %}<span>{{ paciente.identidad|default:"Sin identidad" }} · {{ paciente.edad|default:"-" }} anos · Expediente {{ paciente.expediente_codigo }}</span>{% endif %}
         </div>
         <span class="evo-status-pill">Evolucion visual clinica</span>
     </div>
@@ -56,23 +56,23 @@
                     <h3>Fotos y videos preoperatorios</h3>
                     <p>Archivos cargados desde la agenda al momento de programar una cirugia.</p>
                 </div>
-                <a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Agregar archivo</a>
+                {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Agregar archivo</a>{% endif %}
             </div>
             <div class="evo-grid">
                 {% for registro in preoperatorios %}
                 <article class="evo-card">
-                    {% if registro.video %}
-                    <button type="button" data-evo-open data-evo-kind="video" data-evo-src="{{ registro.video.url }}" data-evo-title="{{ registro.titulo }}" data-evo-meta="{{ registro.get_tipo_display }} · {{ registro.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ registro.descripcion|default:'' }}">
+                    {% if registro.video_url %}
+                    <button type="button" data-evo-open data-evo-kind="video" data-evo-src="{{ registro.video_url }}" data-evo-title="{{ registro.titulo }}" data-evo-meta="{{ registro.get_tipo_display }} · {{ registro.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ registro.descripcion|default:'' }}">
                         <div class="evo-media">
                             <span class="evo-chip">Antes de operacion</span>
-                            <video muted preload="metadata" src="{{ registro.video.url }}"></video>
+                            <video muted preload="metadata" src="{{ registro.video_url }}"></video>
                             <span class="evo-play">▶</span>
                         </div>
-                    {% else %}
-                    <button type="button" data-evo-open data-evo-kind="image" data-evo-src="{{ registro.imagen.url }}" data-evo-title="{{ registro.titulo }}" data-evo-meta="{{ registro.get_tipo_display }} · {{ registro.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ registro.descripcion|default:'' }}">
+                    {% elif registro.imagen_url %}
+                    <button type="button" data-evo-open data-evo-kind="image" data-evo-src="{{ registro.imagen_url }}" data-evo-title="{{ registro.titulo }}" data-evo-meta="{{ registro.get_tipo_display }} · {{ registro.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ registro.descripcion|default:'' }}">
                         <div class="evo-media">
                             <span class="evo-chip">Antes de operacion</span>
-                            <img src="{{ registro.imagen.url }}" alt="{{ registro.titulo }}">
+                            <img src="{{ registro.imagen_url }}" alt="{{ registro.titulo }}">
                         </div>
                     {% endif %}
                         <div class="evo-card-body">
@@ -80,7 +80,7 @@
                             <span>{{ registro.fecha|date:"d/m/Y H:i" }}</span>
                             {% if registro.descripcion %}<span>{{ registro.descripcion }}</span>{% endif %}
                         </div>
-                    </button>
+                    {% if registro.video_url or registro.imagen_url %}</button>{% endif %}
                 </article>
                 {% endfor %}
             </div>
@@ -94,23 +94,24 @@
                     <h3>Galeria fotografica</h3>
                     <p>Orden cronologico para comparar avances por fecha, tipo y descripcion.</p>
                 </div>
-                <a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir foto</a>
+                {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir foto</a>{% endif %}
             </div>
             {% if fotos %}
             <div class="evo-grid">
                 {% for foto in fotos %}
                 <article class="evo-card">
-                    <button type="button" data-evo-open data-evo-kind="image" data-evo-src="{{ foto.imagen.url }}" data-evo-title="{{ foto.titulo }}" data-evo-meta="{{ foto.get_tipo_display }} · {{ foto.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ foto.descripcion|default:'' }}">
+                    {% if foto.imagen_url %}<button type="button" data-evo-open data-evo-kind="image" data-evo-src="{{ foto.imagen_url }}" data-evo-title="{{ foto.titulo }}" data-evo-meta="{{ foto.get_tipo_display }} · {{ foto.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ foto.descripcion|default:'' }}">
                         <div class="evo-media">
                             <span class="evo-chip">{{ foto.get_tipo_display }}</span>
-                            <img src="{{ foto.imagen.url }}" alt="{{ foto.titulo }}">
+                            <img src="{{ foto.imagen_url }}" alt="{{ foto.titulo }}">
                         </div>
+                    {% endif %}
                         <div class="evo-card-body">
                             <strong>{{ foto.titulo }}</strong>
                             <span>{{ foto.fecha|date:"d/m/Y H:i" }}</span>
                             {% if foto.descripcion %}<span>{{ foto.descripcion }}</span>{% endif %}
                         </div>
-                    </button>
+                    {% if foto.imagen_url %}</button>{% endif %}
                 </article>
                 {% endfor %}
             </div>
@@ -120,7 +121,7 @@
                     <div class="erp-kpi-label">Sin fotos</div>
                     <h3 style="margin:8px 0;color:#102338;">Aun no hay fotografias registradas</h3>
                     <p style="margin:0 0 16px;">Suba la primera foto para comenzar la comparacion visual del paciente.</p>
-                    <a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir primera foto</a>
+                    {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir primera foto</a>{% endif %}
                 </div>
             </div>
             {% endif %}
@@ -133,24 +134,25 @@
                     <h3>Registro audiovisual</h3>
                     <p>Videos separados de las fotos para revisar movilidad, gestos, proceso y controles.</p>
                 </div>
-                <a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir video</a>
+                {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir video</a>{% endif %}
             </div>
             {% if videos %}
             <div class="evo-grid">
                 {% for video in videos %}
                 <article class="evo-card">
-                    <button type="button" data-evo-open data-evo-kind="video" data-evo-src="{{ video.video.url }}" data-evo-title="{{ video.titulo }}" data-evo-meta="{{ video.get_tipo_display }} · {{ video.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ video.descripcion|default:'' }}">
+                    {% if video.video_url %}<button type="button" data-evo-open data-evo-kind="video" data-evo-src="{{ video.video_url }}" data-evo-title="{{ video.titulo }}" data-evo-meta="{{ video.get_tipo_display }} · {{ video.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ video.descripcion|default:'' }}">
                         <div class="evo-media">
                             <span class="evo-chip">{{ video.get_tipo_display }}</span>
-                            <video muted preload="metadata" src="{{ video.video.url }}"></video>
+                            <video muted preload="metadata" src="{{ video.video_url }}"></video>
                             <span class="evo-play">▶</span>
                         </div>
+                    {% endif %}
                         <div class="evo-card-body">
                             <strong>{{ video.titulo }}</strong>
                             <span>{{ video.fecha|date:"d/m/Y H:i" }}</span>
                             {% if video.descripcion %}<span>{{ video.descripcion }}</span>{% endif %}
                         </div>
-                    </button>
+                    {% if video.video_url %}</button>{% endif %}
                 </article>
                 {% endfor %}
             </div>
@@ -160,7 +162,7 @@
                     <div class="erp-kpi-label">Sin videos</div>
                     <h3 style="margin:8px 0;color:#102338;">Aun no hay videos registrados</h3>
                     <p style="margin:0 0 16px;">Puede subir videos MP4, MOV o WebM cuando necesite documentar la evolucion con movimiento.</p>
-                    <a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir primer video</a>
+                    {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir primer video</a>{% endif %}
                 </div>
             </div>
             {% endif %}

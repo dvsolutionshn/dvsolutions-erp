@@ -393,6 +393,50 @@ def rol_clinico_granular(usuario, empresa):
     return rol if rol and rol.activo and rol.usa_permisos_clinicos_granulares else None
 
 
+LECTURAS_EXPEDIENTE_LIMITADO = {
+    "terapias": "puede_ver_terapias",
+    "camara_hiperbarica": "puede_ver_camara_hiperbarica",
+    "terapias_postquirurgicas": "puede_ver_postquirurgicas",
+}
+
+PERMISOS_EXPEDIENTE_LIMITADO = (
+    "puede_ver_planes_tratamiento",
+    "puede_ver_anexos_clinicos",
+    "puede_subir_anexos_clinicos",
+    *LECTURAS_EXPEDIENTE_LIMITADO.values(),
+    "puede_escribir_terapias",
+    "puede_escribir_camara_hiperbarica",
+    "puede_escribir_postquirurgicas",
+)
+
+
+def datos_paciente_limitados(usuario, empresa):
+    return bool(
+        getattr(usuario, "is_authenticated", False)
+        and not usuario.is_superuser
+        and not usuario.es_administrador_empresa
+        and rol_clinico_granular(usuario, empresa)
+        and not usuario.tiene_permiso_erp("puede_ver_datos_generales_paciente", empresa)
+    )
+
+
+def puede_abrir_expediente_limitado(usuario, empresa):
+    return (
+        datos_paciente_limitados(usuario, empresa)
+        and usuario.tiene_permiso_erp("puede_ver_pacientes", empresa)
+        and any(usuario.tiene_permiso_erp(campo, empresa) for campo in PERMISOS_EXPEDIENTE_LIMITADO)
+    )
+
+
+def historial_paciente_limitado(usuario, empresa):
+    """Un permiso de área no habilita el historial completo desde el directorio."""
+    return (
+        datos_paciente_limitados(usuario, empresa)
+        and usuario.tiene_permiso_erp("puede_ver_pacientes", empresa)
+        and not usuario.tiene_permiso_erp("puede_ver_historia_clinica", empresa)
+    )
+
+
 def permiso_facturacion_clinico_granular(path_suffix, method="GET", *, v3=False):
     """Resuelve acciones sólo después de validar el piloto de cuatro clínicas."""
     from .access import permiso_facturacion_accion
@@ -544,7 +588,7 @@ def permisos_gastos_adicionales_desde_ruta(path_suffix, method="GET"):
     return ()
 
 
-def permiso_clinica_granular(path_suffix, method="GET", *, v2=False, v3=False):
+def permiso_clinica_granular(path_suffix, method="GET", *, v2=False, v3=False, historial_limitado=False):
     parts = [part for part in (path_suffix or "").strip("/").split("/") if part]
     if not parts:
         return None
@@ -599,6 +643,15 @@ def permiso_clinica_granular(path_suffix, method="GET", *, v2=False, v3=False):
     action = parts[2:]
     if not action:
         return "puede_ver_datos_generales_paciente"
+    if historial_limitado and (
+        action[0] in {"preconsulta", "historia-clinica"}
+        or action in (["historias"], ["historias", "consolidado"])
+    ):
+        return "__denegar__"
+    if action == ["expediente"]:
+        return "puede_ver_pacientes" if method in {"GET", "HEAD"} else "__denegar__"
+    if len(action) == 2 and action[0] == "expediente" and action[1] in LECTURAS_EXPEDIENTE_LIMITADO:
+        return LECTURAS_EXPEDIENTE_LIMITADO[action[1]] if method in {"GET", "HEAD"} else "__denegar__"
     if action == ["restriccion"]:
         return PERMISOS_CONSULTA_RESTRICCION_CITAS if method in {"GET", "HEAD"} else "puede_restringir_citas_paciente"
     if action == ["restriccion", "habilitar"]:
@@ -626,13 +679,14 @@ def permiso_clinica_granular(path_suffix, method="GET", *, v2=False, v3=False):
             return "puede_enviar_recetas"
         return "puede_ver_recetas"
     if action[0] == "planes-tratamiento":
+        consulta = method in {"GET", "HEAD"}
         if not v3:
             if action == ["planes-tratamiento", "crear", "app"]:
-                return "puede_editar_planes_tratamiento" if method in {"GET", "HEAD"} else "__denegar__"
-            return "puede_editar_planes_tratamiento" if method != "GET" else "puede_ver_planes_tratamiento"
+                return "puede_editar_planes_tratamiento" if consulta else "__denegar__"
+            return "puede_ver_planes_tratamiento" if consulta else "puede_editar_planes_tratamiento"
         if action == ["planes-tratamiento", "crear", "app"]:
-            return "puede_crear_planes_tratamiento" if method in {"GET", "HEAD"} else "__denegar__"
-        return "puede_crear_planes_tratamiento" if method != "GET" else "puede_ver_planes_tratamiento"
+            return "puede_crear_planes_tratamiento" if consulta else "__denegar__"
+        return "puede_ver_planes_tratamiento" if consulta else "puede_crear_planes_tratamiento"
     if action[0] == "historias":
         if "nueva" in action:
             tipo = action[-1]

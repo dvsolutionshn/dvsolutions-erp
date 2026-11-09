@@ -1,13 +1,13 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Examenes - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}Examenes del paciente{% endblock %}
 {% block header_description %}Biblioteca clinica para PDF, fotos, resultados y documentos recibidos del paciente.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
-<a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}">Subir examen</a>
+<a class="erp-btn-secondary" href="{{ annex_back_url }}">{% if erp_access.datos_paciente_limitados and not erp_access.puede_abrir_expediente_limitado %}Volver{% else %}Volver al expediente{% endif %}</a>
+{% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}">Subir examen</a>{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -40,7 +40,7 @@
     <div class="exam-hero-main">
         <div class="exam-patient">
             <strong>{{ paciente.nombre }}</strong>
-            <span>{{ paciente.identidad|default:"Identidad no indicada" }} - {{ paciente.edad|default:"Edad no indicada" }} anos - Expediente {{ paciente.expediente_codigo }}</span>
+            {% if not erp_access.datos_paciente_limitados %}<span>{{ paciente.identidad|default:"Identidad no indicada" }} - {{ paciente.edad|default:"Edad no indicada" }} anos - Expediente {{ paciente.expediente_codigo }}</span>{% endif %}
         </div>
         <span class="exam-status-pill">Archivo clinico de examenes</span>
     </div>
@@ -48,7 +48,7 @@
         <div class="exam-kpi"><span>Total examenes</span><strong>{{ resumen.total }}</strong></div>
         <div class="exam-kpi"><span>PDF cargados</span><strong>{{ resumen.pdf }}</strong></div>
         <div class="exam-kpi"><span>Fotos</span><strong>{{ resumen.imagenes }}</strong></div>
-        <div class="exam-kpi"><span>Paciente</span><strong>{{ paciente.expediente_codigo|default:"-" }}</strong></div>
+        {% if not erp_access.datos_paciente_limitados %}<div class="exam-kpi"><span>Paciente</span><strong>{{ paciente.expediente_codigo|default:"-" }}</strong></div>{% endif %}
     </div>
 </section>
 
@@ -56,13 +56,13 @@
     <div class="exam-list">
         {% for examen in examenes %}
         <article class="exam-card">
-            <a class="exam-preview" href="{{ examen.archivo.url }}" target="_blank" rel="noopener" title="Abrir archivo">
+            {% if examen.archivo_url %}<a class="exam-preview" href="{{ examen.archivo_url }}" target="_blank" rel="noopener" title="Abrir archivo">
                 {% if examen.es_imagen %}
-                <img src="{{ examen.archivo.url }}" alt="{{ examen.titulo }}">
+                <img src="{{ examen.archivo_url }}" alt="{{ examen.titulo }}">
                 {% else %}
                 PDF<br>Resultado
                 {% endif %}
-            </a>
+            </a>{% else %}<div class="exam-preview">Resultado clínico</div>{% endif %}
             <div class="exam-info">
                 <h3>{{ examen.titulo }}</h3>
                 <div class="exam-meta">
@@ -74,7 +74,7 @@
                 {% if examen.descripcion %}<p class="exam-description">{{ examen.descripcion }}</p>{% endif %}
             </div>
             <div class="exam-actions">
-                <a class="erp-btn-secondary" href="{{ examen.archivo.url }}" target="_blank" rel="noopener">Abrir archivo</a>
+                {% if examen.archivo_url %}<a class="erp-btn-secondary" href="{{ examen.archivo_url }}" target="_blank" rel="noopener">Abrir archivo</a>{% endif %}
             </div>
         </article>
         {% empty %}
@@ -83,7 +83,7 @@
                 <div style="font-size:42px;margin-bottom:8px;">LAB</div>
                 <h3 style="margin:8px 0;color:#102338;">Aun no hay examenes cargados</h3>
                 <p style="margin:0 0 14px;">Suba el primer PDF o fotografia para dejarlo integrado al expediente.</p>
-                <a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}">Subir primer examen</a>
+                {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}">Subir primer examen</a>{% endif %}
             </div>
         </div>
         {% endfor %}
@@ -102,14 +102,14 @@
         <div class="exam-guide-card">
             <h3>Nuevo documento</h3>
             <p>Puede subir archivos PDF o imagenes tomadas desde telefono, camara o computadora.</p>
-            <a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}" style="width:100%;justify-content:center;margin-top:14px;">Subir examen</a>
+            {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}" style="width:100%;justify-content:center;margin-top:14px;">Subir examen</a>{% endif %}
         </div>
         <div class="exam-guide-card">
             <h3>Accesos del paciente</h3>
             <div class="exam-check">
                 <span><i>OK</i><a href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}">Plan de consentimiento</a></span>
-                <span><i>OK</i><a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas medicas</a></span>
-                <span><i>OK</i><a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a></span>
+                {% if not erp_access.datos_paciente_limitados %}<span><i>OK</i><a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas medicas</a></span>{% endif %}
+                <span><i>OK</i><a href="{{ annex_back_url }}">{% if erp_access.datos_paciente_limitados and not erp_access.puede_abrir_expediente_limitado %}Volver{% else %}Volver al expediente{% endif %}</a></span>
             </div>
         </div>
     </aside>

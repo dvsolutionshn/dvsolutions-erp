@@ -1,13 +1,13 @@
 ﻿{% extends "core/erp_base.html" %}
 
 {% block title %}Plan de consentimiento - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}Plan de consentimiento{% endblock %}
 {% block header_description %}Biblioteca de PDF firmados, versiones, estados y fechas de consentimiento del paciente.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
-<a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir consentimiento PDF</a>
+<a class="erp-btn-secondary" href="{{ annex_back_url }}">{% if erp_access.datos_paciente_limitados and not erp_access.puede_abrir_expediente_limitado %}Volver{% else %}Volver al expediente{% endif %}</a>
+{% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir consentimiento PDF</a>{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -39,7 +39,7 @@
         <div class="consent-patient">
             <div class="erp-kpi-label">Paciente</div>
             <strong>{{ paciente.nombre }}</strong>
-            <span>{{ paciente.identidad|default:"Sin identidad" }} · {{ paciente.edad|default:"-" }} anos · Expediente {{ paciente.expediente_codigo }}</span>
+            {% if not erp_access.datos_paciente_limitados %}<span>{{ paciente.identidad|default:"Sin identidad" }} · {{ paciente.edad|default:"-" }} anos · Expediente {{ paciente.expediente_codigo }}</span>{% endif %}
         </div>
         <span class="consent-status-pill">Archivo documental clinico</span>
     </div>
@@ -69,9 +69,9 @@
                 </div>
             </div>
             <div class="consent-actions">
-                {% if consentimiento.archivo %}
-                <a class="erp-btn-secondary" href="{{ consentimiento.archivo.url }}" target="_blank" rel="noopener">Abrir PDF</a>
-                {% else %}
+                {% if consentimiento.archivo_url %}
+                <a class="erp-btn-secondary" href="{{ consentimiento.archivo_url }}" target="_blank" rel="noopener">Abrir PDF</a>
+                {% elif not consentimiento.archivo %}
                 <span class="consent-tag pendiente">Sin PDF</span>
                 {% endif %}
             </div>
@@ -82,7 +82,7 @@
                 <div class="erp-kpi-label">Sin documentos</div>
                 <h3 style="margin:8px 0;color:#102338;">Aun no hay planes de consentimiento cargados</h3>
                 <p style="margin:0 0 16px;">Suba el primer PDF firmado para que la doctora pueda consultarlo desde una pantalla ordenada.</p>
-                <a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir primer PDF</a>
+                {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir primer PDF</a>{% endif %}
             </div>
         </div>
         {% endfor %}
@@ -102,8 +102,8 @@
         <div class="consent-guide-card">
             <h3>Acciones rapidas</h3>
             <p style="margin-bottom:12px;">Mantenga el expediente limpio y deje los documentos legales en esta biblioteca.</p>
-            <a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}" style="width:100%;justify-content:center;">Subir nuevo PDF</a>
-            <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}" style="width:100%;justify-content:center;margin-top:8px;">Volver al expediente</a>
+            {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}" style="width:100%;justify-content:center;">Subir nuevo PDF</a>{% endif %}
+            <a class="erp-btn-secondary" href="{{ annex_back_url }}" style="width:100%;justify-content:center;margin-top:8px;">{% if erp_access.datos_paciente_limitados and not erp_access.puede_abrir_expediente_limitado %}Volver{% else %}Volver al expediente{% endif %}</a>
         </div>
     </aside>
 </section>

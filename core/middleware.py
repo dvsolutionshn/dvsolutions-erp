@@ -21,6 +21,7 @@ from core.models import Empresa
 from core.read_only_permissions import evaluar_ruta_solo_lectura, modulo_facturacion_desde_ruta
 from core.clinical_permissions import (
     PERMISOS_ACCESO_HISTORIAL,
+    historial_paciente_limitado,
     permiso_facturacion_clinico_granular,
     permisos_gastos_adicionales_desde_ruta,
     permiso_agenda_granular,
@@ -412,6 +413,7 @@ class EmpresaAccessMiddleware:
                             suffix, request.method,
                             v2=bool(rol_clinico_v2(request.user, empresa)),
                             v3=bool(rol_clinico_v3(request.user, empresa)),
+                            historial_limitado=historial_paciente_limitado(request.user, empresa),
                         )
                         if rol_granular
                         else permiso_clinica_desde_ruta(suffix, request.method)

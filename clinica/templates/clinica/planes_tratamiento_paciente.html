@@ -1,13 +1,23 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Plan y tratamiento - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}Plan y Tratamiento{% endblock %}
 {% block header_description %}Indicaciones clínicas ordenadas cronológicamente, sin sobrescribir planes anteriores.{% endblock %}
 
 {% block topbar_actions %}
+{% if erp_access.datos_paciente_limitados %}
+{% if erp_access.puede_abrir_expediente_limitado %}
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_expediente' empresa.slug paciente.id %}">Volver al expediente</a>
+{% elif erp_access.pacientes %}
+<a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
+{% else %}
+<a class="erp-btn-secondary" href="{% url 'clinica_dashboard' empresa.slug %}">Volver a Clínica</a>
+{% endif %}
+{% else %}
 <a class="erp-btn" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Especialidades</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -39,7 +49,7 @@
         <div>
             <div class="erp-kpi-label">Paciente</div>
             <h3>{{ paciente.nombre }}</h3>
-            <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · {{ paciente.expediente_codigo }}</p>
+            {% if not erp_access.datos_paciente_limitados %}<p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · {{ paciente.expediente_codigo }}</p>{% endif %}
         </div>
         <span class="plan-badge">{{ planes|length }} plan{{ planes|length|pluralize:"es" }}</span>
     </section>

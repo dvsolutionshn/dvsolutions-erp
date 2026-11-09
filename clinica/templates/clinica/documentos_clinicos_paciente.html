@@ -1,13 +1,13 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}{{ config.titulo }} - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}{{ config.titulo }}{% endblock %}
 {% block header_description %}{{ config.descripcion }}{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
-<a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}">{{ config.accion }}</a>
+<a class="erp-btn-secondary" href="{{ annex_back_url }}">{% if erp_access.datos_paciente_limitados and not erp_access.puede_abrir_expediente_limitado %}Volver{% else %}Volver al expediente{% endif %}</a>
+{% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}">{{ config.accion }}</a>{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -42,7 +42,7 @@
     <div class="doc-head">
         <div class="doc-patient">
             <strong>{{ paciente.nombre }}</strong>
-            <span>{{ paciente.identidad|default:"Identidad no indicada" }} - {{ paciente.edad|default:"Edad no indicada" }} anos - Expediente {{ paciente.expediente_codigo }}</span>
+            {% if not erp_access.datos_paciente_limitados %}<span>{{ paciente.identidad|default:"Identidad no indicada" }} - {{ paciente.edad|default:"Edad no indicada" }} anos - Expediente {{ paciente.expediente_codigo }}</span>{% endif %}
         </div>
         <span class="doc-pill">{{ config.estado }}</span>
     </div>
@@ -58,18 +58,20 @@
     <div class="doc-list">
         {% for documento in documentos %}
         <article class="doc-card">
-            {% if documento.archivo %}
-            <a class="doc-preview" href="{{ documento.archivo.url }}" target="_blank" rel="noopener" title="Abrir archivo">
+            {% if documento.archivo_url %}
+            <a class="doc-preview" href="{{ documento.archivo_url }}" target="_blank" rel="noopener" title="Abrir archivo">
                 {% if documento.es_imagen %}
-                <img src="{{ documento.archivo.url }}" alt="{{ documento.titulo }}">
+                <img src="{{ documento.archivo_url }}" alt="{{ documento.titulo }}">
                 {% elif documento.es_pdf %}
                 PDF<br>Clinico
                 {% else %}
                 Archivo<br>Clinico
                 {% endif %}
             </a>
-            {% else %}
+            {% elif not erp_access.datos_paciente_limitados %}
             <div class="doc-preview">Certificado<br>Imprimible</div>
+            {% else %}
+            <div class="doc-preview">Documento clínico</div>
             {% endif %}
             <div class="doc-info">
                 <h3>{{ documento.titulo }}</h3>
@@ -85,8 +87,8 @@
                 {% if documento.descripcion %}<p class="doc-description">{{ documento.descripcion }}</p>{% endif %}
             </div>
             <div class="doc-actions">
-                {% if documento.archivo %}<a class="erp-btn-secondary" href="{{ documento.archivo.url }}" target="_blank" rel="noopener">Abrir archivo</a>{% endif %}
-                {% if categoria == "incapacidad" %}<a class="erp-btn-secondary" href="{% url 'clinica_incapacidad_imprimir' empresa.slug paciente.id documento.id %}" target="_blank" rel="noopener">Imprimir</a>{% endif %}
+                {% if documento.archivo_url %}<a class="erp-btn-secondary" href="{{ documento.archivo_url }}" target="_blank" rel="noopener">Abrir archivo</a>{% endif %}
+                {% if categoria == "incapacidad" and not erp_access.datos_paciente_limitados %}<a class="erp-btn-secondary" href="{% url 'clinica_incapacidad_imprimir' empresa.slug paciente.id documento.id %}" target="_blank" rel="noopener">Imprimir</a>{% endif %}
             </div>
         </article>
         {% empty %}
@@ -95,7 +97,7 @@
                 <div class="doc-empty-icon">DOC</div>
                 <h3 style="margin:8px 0;color:#102338;">Aun no hay registros en {{ config.titulo|lower }}</h3>
                 <p style="margin:0 0 14px;">Agregue el primer documento para dejarlo integrado al expediente del paciente.</p>
-                <a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}">{{ config.accion }}</a>
+                {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}">{{ config.accion }}</a>{% endif %}
             </div>
         </div>
         {% endfor %}
@@ -114,14 +116,14 @@
         <div class="doc-guide-card">
             <h3>Nuevo registro</h3>
             <p>Puede cargar documentos desde computadora o telefono. En incapacidades tambien se genera formato imprimible.</p>
-            <a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}" style="width:100%;justify-content:center;margin-top:14px;">{{ config.accion }}</a>
+            {% if not erp_access.datos_paciente_limitados or erp_access.subir_anexos_clinicos %}<a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}" style="width:100%;justify-content:center;margin-top:14px;">{{ config.accion }}</a>{% endif %}
         </div>
         <div class="doc-guide-card">
             <h3>Expediente</h3>
             <div class="doc-check">
                 <span><i>OK</i><a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Examenes</a></span>
-                <span><i>OK</i><a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas</a></span>
-                <span><i>OK</i><a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a></span>
+                {% if not erp_access.datos_paciente_limitados %}<span><i>OK</i><a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas</a></span>{% endif %}
+                <span><i>OK</i><a href="{{ annex_back_url }}">{% if erp_access.datos_paciente_limitados and not erp_access.puede_abrir_expediente_limitado %}Volver{% else %}Volver al expediente{% endif %}</a></span>
             </div>
         </div>
     </aside>

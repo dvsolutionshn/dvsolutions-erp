@@ -1,0 +1,22 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% block mobile_title %}{{ paciente.nombre }}{% endblock %}
+{% block mobile_back_url %}{{ app_patients_url }}{% endblock %}
+{% block mobile_page_title %}Expediente{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mp-profile">
+  <div class="mp-profile-head">
+    <div class="mp-avatar large">{% if paciente.foto_perfil %}<img src="{{ paciente.foto_perfil.url }}" alt="Fotografía del paciente">{% else %}{{ paciente.nombre|slice:':2'|upper }}{% endif %}</div>
+    <h2>{{ paciente.nombre }}</h2>
+  </div>
+</section>
+<section class="mi-card">
+  <h2>Acciones del expediente</h2>
+  <div class="mp-shortcuts">
+    {% for accion in acciones_expediente %}
+    <a href="{{ accion.url }}"><strong>{{ accion.titulo }}</strong><i aria-hidden="true">›</i></a>
+    {% empty %}
+    <p class="mi-muted">No hay acciones del expediente disponibles para tu usuario.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

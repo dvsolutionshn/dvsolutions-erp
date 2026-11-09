@@ -31,7 +31,15 @@ from django.views.decorators.http import require_GET, require_POST, require_safe
 from weasyprint import HTML
 
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados
-from core.clinical_permissions import permiso_historia_por_tipo, rol_clinico_granular, rol_clinico_v2, rol_clinico_v3
+from core.clinical_permissions import (
+    datos_paciente_limitados,
+    historial_paciente_limitado,
+    permiso_historia_por_tipo,
+    puede_abrir_expediente_limitado,
+    rol_clinico_granular,
+    rol_clinico_v2,
+    rol_clinico_v3,
+)
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
@@ -142,6 +150,7 @@ from .mobile_annexes import (
     autorizar_anexos_app,
     es_anexos_app,
     evolucion_paciente_app,
+    puede_descargar_anexos,
     permiso_anexos_app,
     render_anexos_app,
     respuesta_anexos_app,
@@ -156,7 +165,10 @@ from .mobile_special_histories import (
     preparar_historia_especial_app, render_historia_especial_app,
     url_historia_especial_app, volver_historia_especial_app,
 )
-from .mobile_controls import autorizar_control_app, render_control_app, validar_seleccion_control_app, volver_control_app
+from .mobile_controls import (
+    autorizar_control_app, render_control_app, url_lectura_expediente_limitado,
+    validar_seleccion_control_app, volver_control_app,
+)
 from .mobile_plans import (
     autorizar_planes_app, es_planes_app, listar_planes_app, paciente_plan_app,
     render_plan_form_app, volver_planes_app,
@@ -200,7 +212,7 @@ def _puede_historia_tipo(usuario, empresa, tipo, *, crear=False, editar=False):
             "terapias_postquirurgicas": ("puede_ver_postquirurgicas", "puede_escribir_postquirurgicas"),
         }
         permisos = permisos_especificos.get(tipo)
-        permiso = permisos[1 if editar else 0] if permisos else (
+        permiso = permisos[1 if crear or editar else 0] if permisos else (
             "puede_editar_historia_clinica" if editar else "puede_ver_historia_clinica"
         )
         return usuario.tiene_permiso_erp(permiso, empresa)
@@ -1009,8 +1021,26 @@ def configuracion_producto_clinico(request, empresa_slug):
 def pacientes(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
-    hoy = timezone.localdate()
     q = (request.GET.get("q") or "").strip()
+    if datos_paciente_limitados(request.user, empresa):
+        pacientes_qs = Paciente.objects.filter(empresa=empresa, activo=True).only(
+            "id", "nombre", "foto_perfil",
+        ).order_by("nombre", "id")
+        if q:
+            pacientes_qs = pacientes_qs.filter(nombre__icontains=q)
+        pacientes_lista = Paginator(pacientes_qs, 25).get_page(request.GET.get("page"))
+        respuesta = render_pacientes_app(request, empresa, "clinica/pacientes.html", "clinica/mobile_patient_list.html", {
+            "empresa": empresa,
+            "pacientes": pacientes_lista,
+            "q": q,
+            "vista_pacientes_limitada": True,
+            "puede_abrir_expediente_limitado": puede_abrir_expediente_limitado(request.user, empresa),
+            **contexto_selector_recetas_app(request, empresa),
+        })
+        respuesta["Cache-Control"] = "private, no-store"
+        return respuesta
+
+    hoy = timezone.localdate()
     pacientes_qs = (
         Paciente.objects.filter(empresa=empresa, activo=True)
         .annotate(
@@ -1059,6 +1089,25 @@ def pacientes(request, empresa_slug):
 def pacientes_sugerencias(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
+    if datos_paciente_limitados(request.user, empresa):
+        q = (request.GET.get("q") or "").strip()
+        coincidencias = Paciente.objects.filter(empresa=empresa, activo=True, nombre__icontains=q).order_by(
+            "nombre", "id",
+        ).values("id", "nombre")[:8] if len(q) >= 2 else []
+        resultados = list(coincidencias)
+        if puede_abrir_expediente_limitado(request.user, empresa):
+            for resultado in resultados:
+                paciente_id = resultado["id"]
+                ruta = (
+                    url_paciente_app("clinica_paciente_expediente", empresa, paciente_id)
+                    if es_pacientes_app(request, empresa)
+                    else reverse("clinica_paciente_expediente", args=[empresa.slug, paciente_id])
+                )
+                resultado["url"] = request.build_absolute_uri(ruta)
+        respuesta = JsonResponse({"results": resultados})
+        respuesta["Cache-Control"] = "private, no-store"
+        return respuesta
+
     granular = bool(rol_clinico_granular(request.user, empresa))
     puede_ver_historia = request.user.tiene_permiso_erp(
         "puede_ver_historia_clinica" if granular else "puede_expediente_clinico",
@@ -1482,6 +1531,8 @@ def eliminar_paciente(request, empresa_slug, paciente_id):
 @login_required
 def paciente_detalle(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    if datos_paciente_limitados(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para consultar los datos generales del paciente.")
     autorizar_pacientes_app(request, empresa, "puede_ver_datos_generales_paciente", "puede_pacientes")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     if not es_pacientes_app(request, empresa):
@@ -2696,6 +2747,8 @@ def subir_documento_clinico_paciente(request, empresa_slug, paciente_id, categor
 def imprimir_incapacidad_paciente(request, empresa_slug, paciente_id, documento_id):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_anexos_app(request, empresa)
+    if datos_paciente_limitados(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para imprimir documentos con datos generales del paciente.")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     incapacidad = get_object_or_404(
         DocumentoClinicoPaciente.objects.select_related("profesional", "creado_por"),
@@ -2748,15 +2801,14 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
 
 @login_required
 @require_safe
+@never_cache
 def archivo_anexo_app(request, empresa_slug, paciente_id, clase, registro_id, parte):
     """Lectura del archivo existente, autorizada por empresa y paciente."""
     empresa = _empresa_desde_slug(empresa_slug)
-    if not es_anexos_app(request, empresa):
+    if not es_anexos_app(request, empresa) and not datos_paciente_limitados(request.user, empresa):
         raise Http404("Los archivos protegidos están disponibles desde la app clínica.")
     autorizar_anexos_app(request, empresa)
-    if rol_clinico_v2(request.user, empresa) and not request.user.tiene_permiso_erp(
-        "puede_descargar_anexos_clinicos", empresa
-    ):
+    if not puede_descargar_anexos(request, empresa):
         raise PermissionDenied("No tiene permiso para abrir o descargar anexos clínicos.")
     modelos = {
         "examen": (ExamenPaciente, {"archivo"}),
@@ -2781,6 +2833,8 @@ def historias_especialidad(request, empresa_slug, paciente_id):
     from .mobile_preconsultas import autorizar_preconsulta_app, enlaces_preconsultas_app, es_preconsultas_app
 
     empresa = _empresa_desde_slug(empresa_slug)
+    if historial_paciente_limitado(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para consultar el historial completo.")
     modo_preconsulta_app = es_preconsultas_app(request, empresa)
     if modo_preconsulta_app:
         autorizar_preconsulta_app(request, empresa, paciente_id)
@@ -2846,8 +2900,15 @@ def historias_especialidad(request, empresa_slug, paciente_id):
 def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     modo_app = es_planes_app(request, empresa)
+    limitado = datos_paciente_limitados(request.user, empresa)
+    puede_ver_planes = not limitado or request.user.tiene_permiso_erp("puede_ver_planes_tratamiento", empresa)
     if modo_app:
         autorizar_planes_app(request, empresa, paciente_id)
+    elif limitado and request.method != "POST" and (
+        request.method not in {"GET", "HEAD"}
+        or not puede_ver_planes
+    ):
+        raise PermissionDenied("No tiene permiso para consultar planes clínicos.")
     _requiere_interfaz_clinica(empresa)
     paciente = paciente_plan_app(empresa, paciente_id) if modo_app else get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     puede_crear_plan = request.user.tiene_permiso_erp(
@@ -2883,6 +2944,8 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
         "profesional",
         "creado_por",
     ).order_by("-fecha_creacion", "-id")
+    if limitado:
+        planes = planes.filter(empresa=empresa) if puede_ver_planes else planes.none()
     return render(
         request,
         "clinica/planes_tratamiento_paciente.html",
@@ -2912,6 +2975,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     from .mobile_clinical_read_scope import validar_historias_lectura_app
 
     empresa = _empresa_desde_slug(empresa_slug)
+    if historial_paciente_limitado(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para consultar el historial completo.")
     autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
     formulario_antecedentes_app = preparar_antecedentes_app(request, empresa)
     formulario_especial_app = None if formulario_antecedentes_app else preparar_historia_especial_app(request, empresa)
@@ -3713,6 +3778,9 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
                 if es_pacientes_app(request, empresa):
                     return volver_control_app(request, empresa, paciente, tipo, programa_guardado, sesion_guardada,
                                               sesion_guardada.fase if es_terapia_post else None)
+                destino = url_lectura_expediente_limitado(request, empresa, paciente, tipo)
+                if destino:
+                    return redirect(destino)
                 destino = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.id, tipo])
                 fase_destino = f"&fase={sesion_guardada.fase}" if es_terapia_post else ""
                 return redirect(f"{destino}?programa={programa_guardado.id}{fase_destino}")
@@ -3824,6 +3892,9 @@ def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
     fase = request.POST.get("fase") if request.POST.get("fase") in {"1", "2"} else "1"
     if es_pacientes_app(request, empresa):
         return volver_control_app(request, empresa, paciente, "terapias_postquirurgicas", programa, fase=fase)
+    destino = url_lectura_expediente_limitado(request, empresa, paciente, "terapias_postquirurgicas")
+    if destino:
+        return redirect(destino)
     destino = reverse(
         "clinica_crear_historia_especialidad",
         args=[empresa.slug, paciente.id, "terapias_postquirurgicas"],
@@ -4035,9 +4106,17 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         _guardar_clasificacion_alopecia(historia, form, request.user)
         _actualizar_sexo_paciente_desde_capilar(paciente, form)
         messages.success(request, f"Historia de {historia.get_tipo_display()} guardada correctamente.")
+        destino = url_lectura_expediente_limitado(request, empresa, paciente, tipo)
+        if destino:
+            return respuesta_pacientes_app(request, empresa, redirect(destino))
         if es_historias_app(request, empresa):
             return volver_historia_app(request, empresa, paciente, tipo, historia)
         if acceso_granular and not puede_ver_historia:
+            if datos_paciente_limitados(request.user, empresa):
+                if puede_abrir_expediente_limitado(request.user, empresa):
+                    return redirect("clinica_paciente_expediente", empresa_slug=empresa.slug, paciente_id=paciente.pk)
+                vista = "clinica_pacientes" if request.user.tiene_permiso_erp("puede_ver_pacientes", empresa) else "clinica_dashboard"
+                return redirect(vista, empresa_slug=empresa.slug)
             return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     if puede_ver_historia:
@@ -4094,8 +4173,10 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
     if not _puede_historia_tipo(request.user, empresa, historia.tipo, editar=request.method == "POST"):
         raise PermissionDenied("No tiene permiso para consultar o editar esta clase de historia clínica.")
     autorizar_historias_app(request, empresa, historia.tipo, editar=True)
-    puede_ver_historia = not es_historias_app(request, empresa) or request.user.tiene_permiso_erp(
-        "puede_ver_historia_clinica" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico", empresa,
+    puede_ver_historia = not historial_paciente_limitado(request.user, empresa) and (
+        not es_historias_app(request, empresa) or request.user.tiene_permiso_erp(
+            "puede_ver_historia_clinica" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico", empresa,
+        )
     )
     bloqueada = historia.bloqueada
     if bloqueada and request.method == "POST":
@@ -4128,6 +4209,9 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         _guardar_clasificacion_alopecia(historia, form, request.user)
         _actualizar_sexo_paciente_desde_capilar(paciente, form)
         messages.success(request, "Historia clinica actualizada correctamente.")
+        destino = url_lectura_expediente_limitado(request, empresa, paciente, historia.tipo)
+        if destino:
+            return respuesta_pacientes_app(request, empresa, redirect(destino))
         if es_historias_app(request, empresa):
             return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)

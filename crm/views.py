@@ -26,7 +26,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 
 from core.access import interfaz_clinica_activa
 from core.models import Empresa
-from core.clinical_permissions import rol_acciones_v3, rol_clinico_v2
+from core.clinical_permissions import datos_paciente_limitados, rol_acciones_v3, rol_clinico_v2
 from contabilidad.models import CuentaFinanciera
 from contabilidad.services import asegurar_cuentas_financieras_base_honduras
 from facturacion.models import (
@@ -202,6 +202,23 @@ def _limitar_campos_especiales_cita(request, empresa, form):
 
 def _empresa_desde_slug(empresa_slug):
     return get_object_or_404(Empresa, slug=empresa_slug, activa=True)
+
+
+def _contacto_paciente_cita(paciente, usuario, *, datos_limitados):
+    contacto = {
+        "id": paciente.id,
+        "nombre": paciente.nombre,
+        "no_agendar": paciente.no_agendar,
+        "restriccion_mensaje": mensaje_restriccion(paciente, usuario) if paciente.no_agendar else "",
+    }
+    if not datos_limitados:
+        contacto.update({
+            "documento": paciente.identidad or "",
+            "expediente": paciente.expediente_codigo,
+            "telefono": paciente.whatsapp or paciente.telefono or "",
+            "correo": paciente.correo or "",
+        })
+    return contacto
 
 
 def _proteger_agenda_mobile(request, empresa):
@@ -691,37 +708,40 @@ def _contexto_calendario(
     clientes_busqueda = []
     paciente_id_inicial = form["paciente"].value() if es_clinica and "paciente" in form.fields else None
     cliente_id_inicial = form["cliente"].value() if not es_clinica and "cliente" in form.fields else None
+    datos_limitados = datos_paciente_limitados(request.user, empresa)
+    puede_listar_pacientes = not datos_limitados or request.user.tiene_permiso_erp("puede_ver_pacientes", empresa)
     if es_clinica and "paciente" in form.fields:
+        campo_paciente = form.fields["paciente"]
+        if datos_limitados:
+            campo_paciente.label_from_instance = lambda paciente: paciente.nombre
+        if not puede_listar_pacientes:
+            campo_paciente.queryset = campo_paciente.queryset.filter(pk=form.instance.paciente_id)
         pacientes_busqueda = [
-            {
-                "id": paciente.id,
-                "nombre": paciente.nombre,
-                "documento": paciente.identidad or "",
-                "expediente": paciente.expediente_codigo,
-                "telefono": paciente.whatsapp or paciente.telefono or "",
-                "correo": paciente.correo or "",
-                "no_agendar": paciente.no_agendar,
-                "restriccion_mensaje": mensaje_restriccion(paciente, request.user) if paciente.no_agendar else "",
-            }
-            for paciente in form.fields["paciente"].queryset
+            _contacto_paciente_cita(paciente, request.user, datos_limitados=datos_limitados)
+            for paciente in campo_paciente.queryset
         ]
     if not es_clinica and "cliente" in form.fields:
+        campo_cliente = form.fields["cliente"]
+        if not puede_listar_pacientes:
+            campo_cliente.queryset = campo_cliente.queryset.filter(pk=form.instance.cliente_id)
         clientes_busqueda = [
             {
                 "id": cliente.id,
                 "nombre": cliente.nombre,
-                "documento": cliente.rtn or "",
-                "expediente": "",
-                "telefono": cliente.telefono_whatsapp or cliente.telefono or "",
-                "correo": cliente.correo or "",
+                **({} if datos_limitados else {
+                    "documento": cliente.rtn or "",
+                    "expediente": "",
+                    "telefono": cliente.telefono_whatsapp or cliente.telefono or "",
+                    "correo": cliente.correo or "",
+                }),
             }
-            for cliente in form.fields["cliente"].queryset
+            for cliente in campo_cliente.queryset
         ]
 
     paciente_historial = None
     citas_historial_futuras = []
     citas_historial_pasadas = []
-    if es_clinica and paciente_historial_id:
+    if es_clinica and paciente_historial_id and puede_listar_pacientes:
         try:
             paciente_historial = Paciente.objects.filter(
                 empresa=empresa_agenda,
@@ -781,6 +801,7 @@ def _contexto_calendario(
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
         "agenda_empresa": empresa_agenda,
         "agenda_espejo": agenda_espejo,
+        "datos_paciente_limitados": datos_limitados,
         "vista": vista, "fecha_seleccionada": seleccionada, "titulo_periodo": titulo_periodo,
         "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
         "meses_agenda": meses_agenda,
@@ -2269,22 +2290,25 @@ def agenda_mobile(request, empresa_slug):
     contexto["citas_hoy_total"] = len(citas_hoy)
     contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
     contexto["hospital_mia_app_premium"] = interfaz_clinica_activa(empresa)
-    contexto["pacientes_app_premium"] = contexto["hospital_mia_app_premium"]
+    datos_limitados = contexto["datos_paciente_limitados"]
+    contexto["pacientes_app_premium"] = contexto["hospital_mia_app_premium"] and not datos_limitados
     pacientes_activos_qs = Paciente.objects.filter(empresa=empresa, activo=True)
-    contexto["pacientes_app_total"] = pacientes_activos_qs.count()
-    contexto["pacientes_recientes_app"] = pacientes_activos_qs.filter(
-        empresa=empresa,
-        activo=True,
-    ).order_by("-fecha_actualizacion", "-id")[:4]
+    puede_listar_pacientes = not datos_limitados or (
+        empresa.tiene_modulo_activo("clinica_medica") and request.user.tiene_permiso_erp("puede_ver_pacientes", empresa)
+    )
+    if datos_limitados and puede_listar_pacientes:
+        contexto["pacientes_app_limitados_url"] = f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1"
+    contexto["pacientes_app_total"] = pacientes_activos_qs.count() if puede_listar_pacientes else 0
+    contexto["pacientes_recientes_app"] = [] if datos_limitados else pacientes_activos_qs.order_by("-fecha_actualizacion", "-id")[:4]
     limite_pacientes_app = 320 if contexto["pacientes_app_premium"] else 120
     pacientes_app_qs = list(
         pacientes_activos_qs.select_related("cliente", "empresa")
         .order_by("-fecha_actualizacion", "nombre")[:limite_pacientes_app]
-    )
+    ) if not datos_limitados else []
     pacientes_agenda_por_perfil = {}
     pacientes_agenda_por_identidad = {}
     pacientes_agenda_por_nombre = {}
-    if empresa_agenda.id != empresa.id:
+    if pacientes_app_qs and empresa_agenda.id != empresa.id:
         for paciente_agenda in Paciente.objects.filter(
             empresa=empresa_agenda,
             activo=True,
@@ -2777,33 +2801,22 @@ def buscar_pacientes_cita(request, empresa_slug):
 
     query = " ".join((request.GET.get("q") or "").split())
     pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
+    datos_limitados = datos_paciente_limitados(request.user, empresa_operativa)
     for termino in query.split():
-        pacientes = pacientes.filter(
-            Q(nombre__icontains=termino)
-            | Q(primer_nombre__icontains=termino)
-            | Q(segundo_nombre__icontains=termino)
-            | Q(primer_apellido__icontains=termino)
-            | Q(segundo_apellido__icontains=termino)
-            | Q(identidad__icontains=termino)
-            | Q(expediente_codigo__icontains=termino)
-            | Q(telefono__icontains=termino)
-            | Q(whatsapp__icontains=termino)
-            | Q(correo__icontains=termino)
-        )
-    pacientes = pacientes.order_by("-fecha_creacion", "nombre")[:12]
+        filtro = Q(nombre__icontains=termino)
+        if not datos_limitados:
+            filtro |= (
+                Q(primer_nombre__icontains=termino) | Q(segundo_nombre__icontains=termino)
+                | Q(primer_apellido__icontains=termino) | Q(segundo_apellido__icontains=termino)
+                | Q(identidad__icontains=termino) | Q(expediente_codigo__icontains=termino)
+                | Q(telefono__icontains=termino) | Q(whatsapp__icontains=termino) | Q(correo__icontains=termino)
+            )
+        pacientes = pacientes.filter(filtro)
+    orden = ("nombre", "pk") if datos_limitados else ("-fecha_creacion", "nombre")
     return JsonResponse({
         "results": [
-            {
-                "id": paciente.id,
-                "nombre": paciente.nombre,
-                "documento": paciente.identidad or "",
-                "expediente": paciente.expediente_codigo,
-                "telefono": paciente.whatsapp or paciente.telefono or "",
-                "correo": paciente.correo or "",
-                "no_agendar": paciente.no_agendar,
-                "restriccion_mensaje": mensaje_restriccion(paciente, request.user) if paciente.no_agendar else "",
-            }
-            for paciente in pacientes
+            _contacto_paciente_cita(paciente, request.user, datos_limitados=datos_limitados)
+            for paciente in pacientes.order_by(*orden)[:12]
         ]
     })
 
@@ -2823,6 +2836,10 @@ def buscar_clientes_cita(request, empresa_slug):
 
     query = " ".join((request.GET.get("q") or "").split())
     clientes = Cliente.objects.filter(empresa=empresa, activo=True)
+    if datos_paciente_limitados(request.user, empresa_operativa):
+        for termino in query.split():
+            clientes = clientes.filter(nombre__icontains=termino)
+        return JsonResponse({"results": list(clientes.order_by("nombre", "pk").values("id", "nombre")[:12])})
     for termino in query.split():
         clientes = clientes.filter(
             Q(nombre__icontains=termino)
@@ -2896,17 +2913,15 @@ def crear_paciente_rapido_cita(request, empresa_slug):
         paciente.save()
         _sincronizar_cliente_facturacion_paciente(paciente)
 
-    return JsonResponse({
-        "ok": True,
-        "paciente": {
-            "id": paciente.id,
-            "nombre": paciente.nombre,
+    contacto = {"id": paciente.id, "nombre": paciente.nombre}
+    if not datos_paciente_limitados(request.user, empresa_operativa):
+        contacto.update({
             "expediente": paciente.expediente_codigo,
             "documento": paciente.identidad or "",
             "telefono": paciente.whatsapp or paciente.telefono or "",
             "label": str(paciente),
-        },
-    })
+        })
+    return JsonResponse({"ok": True, "paciente": contacto})
 
 
 @login_required

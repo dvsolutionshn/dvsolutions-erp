@@ -3,8 +3,8 @@
 {% block mobile_title %}Historial de planes{% endblock %}
 {% block mobile_page_title %}Historial de planes{% endblock %}
 {% block mobile_kicker %}Planes e indicaciones{% endblock %}
-{% block mobile_back_url %}{% if can_view_patient and app_patient_detail_url %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
-{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_back_url %}{% if erp_access.puede_abrir_expediente_limitado %}{% url 'clinica_paciente_expediente' empresa.slug paciente.id %}?app=1{% elif can_view_patient and app_patient_detail_url %}{{ app_patient_detail_url }}{% elif erp_access.datos_paciente_limitados and erp_access.pacientes %}{{ app_patients_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
 {% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_plans.css' %}">{% endblock %}
 {% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_plans.js' %}" defer></script>{% endblock %}
 {% block mobile_content %}

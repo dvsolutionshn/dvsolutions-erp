@@ -1,0 +1,18 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Expediente · {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Pacientes{% endblock %}
+{% block header_title %}Expediente{% endblock %}
+{% block header_description %}Elegí la sección que querés abrir.{% endblock %}
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{{ pacientes_url }}">Volver a pacientes</a>{% endblock %}
+
+{% block content %}
+<section class="erp-card" style="display:flex;align-items:center;gap:16px;margin-bottom:18px">
+    {% if paciente.foto_perfil %}<img src="{{ paciente.foto_perfil.url }}" width="64" height="64" alt="" style="object-fit:cover;border-radius:12px">{% endif %}
+    <h2>{{ paciente.nombre }}</h2>
+</section>
+<nav class="erp-grid" aria-label="Secciones del expediente">
+    {% for accion in acciones_expediente %}
+    <a class="erp-card" href="{{ accion.url }}"><strong>{{ accion.titulo }}</strong></a>
+    {% endfor %}
+</nav>
+{% endblock %}

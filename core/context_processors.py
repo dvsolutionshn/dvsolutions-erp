@@ -5,7 +5,10 @@ from django.utils import timezone
 from core.models import ConfiguracionOnix, ConsumoOnix, Empresa
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
-from core.clinical_permissions import TODOS_LOS_PERMISOS_CLINICOS, rol_clinico_granular
+from core.clinical_permissions import (
+    TODOS_LOS_PERMISOS_CLINICOS, datos_paciente_limitados,
+    puede_abrir_expediente_limitado, rol_clinico_granular,
+)
 from core.read_only_permissions import modulo_facturacion_desde_ruta, rol_solo_lectura
 
 
@@ -225,6 +228,8 @@ def erp_access(request):
         "marcar_citas_pagadas": permiso("puede_marcar_citas_pagadas") if permisos_operativos_v2 else permiso("puede_editar_citas" if agenda_granular else "puede_citas"),
         "marcar_citas_cortesia": permiso("puede_marcar_citas_cortesia") if permisos_operativos_v2 else permiso("puede_editar_citas" if agenda_granular else "puede_citas"),
         "ver_datos_generales_paciente": permiso("puede_ver_datos_generales_paciente") if permisos_clinicos_granulares else permiso("puede_pacientes"),
+        "datos_paciente_limitados": datos_paciente_limitados(user, empresa),
+        "puede_abrir_expediente_limitado": puede_abrir_expediente_limitado(user, empresa),
         "crear_pacientes": permiso("puede_crear_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "editar_pacientes": permiso("puede_editar_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "eliminar_pacientes": permiso("puede_eliminar_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),

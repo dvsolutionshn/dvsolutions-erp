@@ -1,6 +1,5 @@
 {% extends "clinica/mobile_annex_base.html" %}
 {% block mobile_title %}{{ mobile_annex_title }}{% endblock %}
-{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
 {% block mobile_content %}
 {% include "clinica/mobile_annex_navigation.html" %}
 <form method="post" action="{{ app_annex_form_url }}" enctype="multipart/form-data" class="ma-compose" id="mobileAnnexForm" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}

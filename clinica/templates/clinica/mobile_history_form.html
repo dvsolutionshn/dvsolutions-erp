@@ -4,7 +4,7 @@
 {% block mobile_back_url %}{{ app_history_back_url }}{% endblock %}
 {% block mobile_kicker %}{{ tipo_nombre }}{% endblock %}
 {% block mobile_page_title %}{% if bloqueada %}Nota finalizada{% elif historia %}Editar historia{% else %}Nueva historia{% endif %}{% endblock %}
-{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
 {% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_histories.css' %}">{% endblock %}
 {% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_histories.js' %}" defer></script>{% endblock %}
 {% block mobile_content %}

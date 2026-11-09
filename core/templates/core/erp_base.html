@@ -399,12 +399,16 @@
             <nav class="erp-nav">
                 {% if erp_access.pacientes %}<a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path and '/dashboard/clinica/pacientes/enlaces-registro/' not in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span><span>Pacientes</span></a>{% endif %}
                 {% if paciente %}
+                {% if erp_access.puede_abrir_expediente_limitado %}
+                <a class="erp-nav-link {% if '/expediente/' in request.path %}is-active{% endif %}" href="{% url 'clinica_paciente_expediente' empresa.slug paciente.id %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="document" only %}</span><span>Expediente</span></a>
+                {% else %}
                 {% if erp_access.ver_historia_clinica %}<a class="erp-nav-link {% if '/historias/' in request.path %}is-active{% endif %}" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="document" only %}</span><span>Historial Clinico</span></a>{% endif %}
                 {% if erp_access.ver_anexos_clinicos %}<a class="erp-nav-link {% if '/examenes/' in request.path or '/documentos/' in request.path or '/consentimientos/' in request.path %}is-active{% endif %}" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="folder" only %}</span><span>Anexos</span></a>{% endif %}
                 {% if erp_access.ver_historia_clinica %}<a class="erp-nav-link {% if '/historias/' in request.path %}is-active{% endif %}" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Especialidades</span></a>{% endif %}
                 {% if erp_access.escribir_enfermeria %}<a class="erp-nav-link" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'enfermeria' %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Registrar Enfermería</span></a>{% endif %}
                 {% if erp_access.escribir_terapias %}<a class="erp-nav-link" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias' %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Registrar Terapia</span></a>{% endif %}
                 {% if erp_access.crear_recordatorios_paciente %}<a class="erp-nav-link {% if '/seguimientos/' in request.path %}is-active{% endif %}" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}#recordatorios-tratamiento"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="calendar" only %}</span><span>Citas / Recordatorios</span></a>{% endif %}
+                {% endif %}
                 {% endif %}
             </nav>
         </div>

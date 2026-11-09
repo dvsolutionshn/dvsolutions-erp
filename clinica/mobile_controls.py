@@ -10,7 +10,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.access import interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
+from core.clinical_permissions import (
+    EMPRESAS_CLINICAS_CON_ROLES, LECTURAS_EXPEDIENTE_LIMITADO, datos_paciente_limitados, historial_paciente_limitado,
+    puede_abrir_expediente_limitado, rol_clinico_granular,
+)
 from crm.forms import (
     ProgramaCamaraHiperbaricaForm, ProgramaTerapiaPostQuirurgicaForm,
     SeleccionUnicaCheckboxField, SesionCamaraHiperbaricaForm, SesionTerapiaPostQuirurgicaForm,
@@ -36,6 +39,17 @@ def _url_control(empresa, paciente, tipo, tablero=False, **parametros):
     return f"{reverse(vista, args=[empresa.slug, paciente.pk, tipo])}?{urlencode({'app': '1', **{key: value for key, value in parametros.items() if value is not None and value != ''}})}"
 
 
+def url_lectura_expediente_limitado(request, empresa, paciente, tipo):
+    if not historial_paciente_limitado(request.user, empresa):
+        return ""
+    permiso = LECTURAS_EXPEDIENTE_LIMITADO.get(tipo)
+    if not permiso or not request.user.tiene_permiso_erp(permiso, empresa):
+        return ""
+    args = [empresa.slug, paciente.pk, tipo]
+    url = reverse("clinica_paciente_expediente_seccion", args=args)
+    return f"{url}?app=1" if es_pacientes_app(request, empresa) else url
+
+
 def controles_disponibles_app(request, empresa, paciente=None):
     if not (empresa.slug in EMPRESAS_CLINICAS_CON_ROLES and interfaz_clinica_activa(empresa)
             and empresa.tiene_modulo_activo("clinica_medica") and request.user.is_authenticated
@@ -53,6 +67,11 @@ def controles_disponibles_app(request, empresa, paciente=None):
 
 def autorizar_control_app(request, empresa, tipo, tablero=False):
     if not es_pacientes_app(request, empresa):
+        if datos_paciente_limitados(request.user, empresa):
+            if tipo not in CONTROLES_APP:
+                raise Http404("Control clínico no válido.")
+            if not request.user.tiene_permiso_erp(CONTROLES_APP[tipo][1], empresa):
+                raise PermissionDenied("No tiene permiso para registrar este control clínico.")
         return
     if tipo not in CONTROLES_APP:
         raise Http404("Control clínico móvil no válido.")
@@ -224,6 +243,12 @@ def contexto_control_app(request, empresa, paciente, tipo, contexto, tablero=Fal
     fase = contexto.get("fase_terapia_actual", 1) if post else None
     url_tablero = _url_control(empresa, paciente, tipo, tablero=True, programa=programa.pk if programa else None, fase=fase)
     url_form = _url_control(empresa, paciente, tipo, programa=programa.pk if programa else None, fase=fase)
+    regreso = base["app_modules_url"] if tablero else url_tablero if puede_tablero else base["app_modules_url"]
+    if datos_paciente_limitados(request.user, empresa):
+        if tablero:
+            regreso = base.get("app_patient_expediente_url") or (base["app_patients_url"] if base["can_view_patients"] else base["app_modules_url"])
+        else:
+            regreso = url_lectura_expediente_limitado(request, empresa, paciente, tipo) or regreso
     base.update({
         "paciente": paciente, "mobile_control_type": {"codigo": tipo, "nombre": CONTROLES_APP[tipo][0]},
         "mobile_control_program": programa, "mobile_control_session": sesion,
@@ -231,7 +256,7 @@ def contexto_control_app(request, empresa, paciente, tipo, contexto, tablero=Fal
         "can_add_control_session": post and puede_registrar,
         "control_readonly": bool(sesion and sesion.bloqueada),
         "app_control_board_url": url_tablero, "app_control_form_url": url_form if tablero else _url_control(empresa, paciente, tipo),
-        "app_control_back_url": base["app_modules_url"] if tablero else url_tablero if puede_tablero else base["app_modules_url"],
+        "app_control_back_url": regreso,
         "app_control_add_session_url": f"{reverse('clinica_agregar_sesion_terapia_postquirurgica', args=[empresa.slug, paciente.pk])}?app=1" if post else "",
         "mobile_control_phases": [{"numero": numero, "nombre": nombre, "active": numero == fase, "url": _url_control(empresa, paciente, tipo, tablero=tablero, programa=programa.pk if programa else None, fase=numero)} for numero, nombre in SesionTerapiaPostQuirurgica.FASE_CHOICES] if post else [],
     })
@@ -283,10 +308,20 @@ def render_control_app(request, empresa, paciente, tipo, template_web, contexto,
         template = "clinica/mobile_control_board.html" if tablero else "clinica/mobile_control_form.html"
     else:
         template = template_web
+        if datos_paciente_limitados(request.user, empresa):
+            if puede_abrir_expediente_limitado(request.user, empresa):
+                regreso = reverse("clinica_paciente_expediente", args=[empresa.slug, paciente.pk])
+            else:
+                vista = "clinica_pacientes" if request.user.tiene_permiso_erp("puede_ver_pacientes", empresa) else "clinica_dashboard"
+                regreso = reverse(vista, args=[empresa.slug])
+            contexto["control_back_url"] = regreso if tablero else (url_lectura_expediente_limitado(request, empresa, paciente, tipo) or regreso)
     return respuesta_pacientes_app(request, empresa, render(request, template, contexto))
 
 
 def volver_control_app(request, empresa, paciente, tipo, programa, sesion=None, fase=None):
+    destino = url_lectura_expediente_limitado(request, empresa, paciente, tipo)
+    if destino:
+        return respuesta_pacientes_app(request, empresa, redirect(destino))
     puede_tablero = permiso_pacientes_app(request, empresa, CONTROLES_APP[tipo][1], "puede_expediente_clinico")
     destino = _url_control(empresa, paciente, tipo, tablero=puede_tablero, programa=programa.pk,
                            fase=fase, sesion=sesion.numero_sesion if sesion and not puede_tablero else None)

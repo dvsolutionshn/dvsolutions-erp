@@ -6,7 +6,11 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from core.access import interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
+from core.clinical_permissions import (
+    EMPRESAS_CLINICAS_CON_ROLES, datos_paciente_limitados, historial_paciente_limitado,
+    puede_abrir_expediente_limitado, rol_clinico_granular,
+)
+from .mobile_controls import url_lectura_expediente_limitado
 from .mobile_patients import (
     autorizar_pacientes_app, contexto_pacientes_app, es_pacientes_app,
     notas_historia_app, permiso_pacientes_app, respuesta_pacientes_app,
@@ -97,6 +101,13 @@ def contexto_historia_app(request, empresa, paciente, tipo, form, historia=None)
         regreso = contexto["app_patient_detail_url"]
     else:
         regreso = contexto["app_modules_url"]
+    if historial_paciente_limitado(request.user, empresa):
+        tipos = [area for area in tipos if area["codigo"] == tipo]
+        regreso = (
+            url_lectura_expediente_limitado(request, empresa, paciente, tipo)
+            or contexto.get("app_patient_expediente_url")
+            or (contexto["app_patients_url"] if contexto["can_view_patients"] else contexto["app_modules_url"])
+        )
     contexto.update({
         "can_edit_history": can_edit,
         "mobile_history_create_types": tipos,
@@ -116,12 +127,23 @@ def render_historia_app(request, empresa, paciente, tipo, contexto):
         template = "clinica/mobile_history_form.html"
     else:
         template = "clinica/historia_especialidad_form.html"
+        if datos_paciente_limitados(request.user, empresa):
+            regreso = url_lectura_expediente_limitado(request, empresa, paciente, tipo)
+            if not regreso and puede_abrir_expediente_limitado(request.user, empresa):
+                regreso = reverse("clinica_paciente_expediente", args=[empresa.slug, paciente.pk])
+            if not regreso:
+                vista = "clinica_pacientes" if request.user.tiene_permiso_erp("puede_ver_pacientes", empresa) else "clinica_dashboard"
+                regreso = reverse(vista, args=[empresa.slug])
+            contexto["historia_back_url"] = regreso
     return respuesta_pacientes_app(request, empresa, render(request, template, contexto))
 
 
 def volver_historia_app(request, empresa, paciente, tipo, historia=None):
     contexto = contexto_pacientes_app(request, empresa, paciente)
-    if contexto["can_view_history"]:
+    lectura = url_lectura_expediente_limitado(request, empresa, paciente, tipo)
+    if lectura:
+        destino = lectura
+    elif contexto["can_view_history"]:
         destino = contexto["app_patient_histories_url"]
     elif historia and permiso_pacientes_app(request, empresa, "puede_editar_historia_clinica", "puede_expediente_clinico"):
         destino = url_historia_form_app(empresa, paciente, tipo, historia)

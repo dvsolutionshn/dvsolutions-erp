@@ -11,6 +11,7 @@ from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa
 from core.clinical_permissions import (
     EMPRESAS_CLINICAS_CON_ROLES,
     PERMISOS_ACCESO_HISTORIAL,
+    puede_abrir_expediente_limitado,
     rol_clinico_granular,
     rol_clinico_v2,
 )
@@ -190,6 +191,8 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
                                         q=request.GET.get("q", ""), **{campo: item["codigo"]}),
             } for item in opciones]
     if paciente:
+        if puede_abrir_expediente_limitado(request.user, empresa) and empresa.tiene_modulo_activo("clinica_medica"):
+            contexto["app_patient_expediente_url"] = url_paciente_app("clinica_paciente_expediente", empresa, paciente.pk)
         contexto["app_patient_general_history_url"] = url_historia_general_app(empresa, paciente) if contexto["can_complete_general_history"] else ""
         contexto["app_patient_followups_url"] = url_paciente_app("clinica_seguimientos_paciente", empresa, paciente.pk)
         contexto["app_patient_plans_url"] = url_paciente_app("clinica_planes_tratamiento_paciente", empresa, paciente.pk)
@@ -301,6 +304,8 @@ def volver_paciente_app(request, empresa, paciente):
     if not es_pacientes_app(request, empresa):
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.pk)
     contexto = contexto_pacientes_app(request, empresa, paciente)
+    if contexto.get("app_patient_expediente_url") and not contexto["can_view_history"]:
+        return redirect(contexto["app_patient_expediente_url"])
     for flag, destino in (
         ("can_view_patient", "app_patient_detail_url"),
         ("can_view_history", "app_patient_read_history_url"),

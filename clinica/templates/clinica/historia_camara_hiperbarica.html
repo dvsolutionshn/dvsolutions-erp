@@ -1,13 +1,13 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Historia de Cámara Hiperbárica - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}Control clínico de Cámara Hiperbárica{% endblock %}
 {% block header_description %}Programa longitudinal de 22 sesiones integrado directamente al expediente del paciente.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'clinica_registrar_control_especial' empresa.slug paciente.id 'camara_hiperbarica' %}{% if programa_camara %}?programa={{ programa_camara.id }}{% endif %}">Registrar sesión sin cita</a>
 <a class="erp-action-link" href="{% url 'agenda_camara_hiperbarica' empresa.slug %}">Abrir módulo de atención</a>
-<a class="erp-action-link" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#controles-especiales">Volver al expediente</a>
+<a class="erp-action-link" href="{% if erp_access.datos_paciente_limitados %}{{ control_back_url }}{% else %}{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#controles-especiales{% endif %}">Volver al expediente</a>
 {% endblock %}
 
 {% block content %}
@@ -19,9 +19,11 @@
 <div class="hbo-history">
   <section class="hbo-patient">
     <div><span class="hbo-label">Paciente</span><strong class="hbo-value">{{ paciente.nombre }}</strong></div>
+    {% if not erp_access.datos_paciente_limitados %}
     <div><span class="hbo-label">Expediente</span><strong class="hbo-value">{{ paciente.expediente_codigo }}</strong></div>
     <div><span class="hbo-label">Identidad</span><strong class="hbo-value">{{ paciente.identidad|default:"No registrada" }}</strong></div>
     <div><span class="hbo-label">Teléfono</span><strong class="hbo-value">{{ paciente.telefono|default:paciente.whatsapp|default:"No registrado" }}</strong></div>
+    {% endif %}
   </section>
 
   <section class="hbo-program-bar">

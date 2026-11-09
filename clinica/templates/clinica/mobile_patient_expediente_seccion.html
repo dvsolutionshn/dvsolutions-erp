@@ -1,0 +1,6 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% block mobile_title %}{{ seccion_titulo }}{% endblock %}
+{% block mobile_page_title %}{{ seccion_titulo }}{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }}</p>{% endblock %}
+{% block mobile_back_url %}{{ expediente_url }}{% endblock %}
+{% block mobile_content %}{% include "clinica/includes/expediente_seccion_lectura.html" with tarjeta="mi-card" %}{% endblock %}

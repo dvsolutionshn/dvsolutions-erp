@@ -2,13 +2,17 @@
 {% load static %}
 
 {% block title %}{{ titulo }} - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}{{ tipo_nombre }} Â· {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}{{ tipo_nombre }}{% if not erp_access.datos_paciente_limitados %} Â· {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}{{ titulo }}{% endblock %}
 {% block header_description %}Registro clinico de {{ paciente.nombre }}. Los cambios quedan asociados al usuario y fecha de actualizacion.{% endblock %}
 
 {% block topbar_actions %}
+{% if erp_access.datos_paciente_limitados %}
+<a class="erp-btn-secondary" href="{{ historia_back_url }}">Volver</a>
+{% else %}
 <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Vista clÃ­nica completa</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>
+{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -40,13 +44,13 @@
 {% block content %}
 <section class="erp-card clinical-form-shell">
     <div class="clinical-banner">
-        <div><div class="erp-kpi-label">Formulario hospitalario</div><h3>{{ tipo_nombre }}</h3><p>{{ paciente.nombre }} Â· Documento {{ paciente.identidad|default:"No indicado" }}</p></div>
-        {% if paciente.es_alergico %}<div class="patient-alert">Alergico: {{ paciente.alergias|default:"Sin detalle" }}</div>{% endif %}
+        <div><div class="erp-kpi-label">Formulario hospitalario</div><h3>{{ tipo_nombre }}</h3><p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} Â· Documento {{ paciente.identidad|default:"No indicado" }}{% endif %}</p></div>
+        {% if not erp_access.datos_paciente_limitados and paciente.es_alergico %}<div class="patient-alert">Alergico: {{ paciente.alergias|default:"Sin detalle" }}</div>{% endif %}
     </div>
     {% if bloqueada %}
     <div class="locked-note">Esta nota de enfermerÃ­a fue finalizada y estÃ¡ bloqueada permanentemente. Su contenido es Ãºnicamente de lectura.</div>
     {% endif %}
-    <div class="preconsult-panel">
+    {% if not erp_access.datos_paciente_limitados %}<div class="preconsult-panel">
         <div class="preconsult-head">
             <div><div class="erp-kpi-label">Historia clinica de {{ tipo_nombre }}</div><h3>Formulario previo e historial</h3><span class="erp-card-muted">Cada envÃ­o se conserva en el expediente del paciente.</span></div>
             <form method="post" action="{% url 'clinica_generar_enlace_preconsulta_tipo' empresa.slug paciente.id tipo %}">
@@ -65,6 +69,7 @@
             {% endfor %}
         </div>
     </div>
+    {% endif %}
     {% if ultima_preconsulta and resumen_preconsulta %}
     <div class="general-summary">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
@@ -240,7 +245,7 @@
         <div class="clinical-actions">
             <span class="erp-card-muted">Guarda como borrador mientras completas la evaluacion o marca Finalizada al concluir.</span>
             <div style="display:flex;gap:10px;">
-                <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Cancelar</a>
+                <a class="erp-btn-secondary" href="{% if erp_access.datos_paciente_limitados %}{{ historia_back_url }}{% else %}{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}{% endif %}">Cancelar</a>
                 {% if not bloqueada %}<button class="erp-btn" type="submit">Guardar historia</button>{% endif %}
             </div>
         </div>

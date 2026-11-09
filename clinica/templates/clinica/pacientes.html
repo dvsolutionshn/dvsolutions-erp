@@ -315,7 +315,9 @@
 {% endblock %}
 
 {% block content %}
-{% if vista_premium_pacientes %}
+{% if vista_pacientes_limitada %}
+    {% include "clinica/includes/directorio_pacientes_limitado.html" %}
+{% elif vista_premium_pacientes %}
 <section class="patients-web-premium">
     <header class="patients-premium-hero">
         <div>

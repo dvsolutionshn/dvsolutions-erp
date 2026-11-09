@@ -775,7 +775,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
       {% if filtro_profesional %}<input type="hidden" name="profesional" value="{{ filtro_profesional }}">{% endif %}
       <input type="hidden" name="paciente_historial" id="patientHistoryId" value="{{ paciente_historial_id }}">
       <div class="patient-history-search" data-patient-history-search>
-        <input id="patientHistorySearchInput" type="search" autocomplete="off" placeholder="Buscar por nombre, identidad, expediente, telefono o correo" value="{% if paciente_historial %}{{ paciente_historial.nombre }}{% endif %}">
+        <input id="patientHistorySearchInput" type="search" autocomplete="off" placeholder="{% if datos_paciente_limitados %}Buscar por nombre{% else %}Buscar por nombre, identidad, expediente, teléfono o correo{% endif %}" value="{% if paciente_historial %}{{ paciente_historial.nombre }}{% endif %}">
         <span class="patient-history-search-icon">⌕</span>
         <div class="patient-history-results" id="patientHistoryResults" role="listbox"></div>
       </div>
@@ -786,7 +786,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
     <div class="patient-history-selected">
       <div>
         <strong>{{ paciente_historial.nombre }}</strong>
-        <span>{{ paciente_historial.identidad|default:"Sin identidad" }}{% if paciente_historial.expediente_codigo %} · Exp. {{ paciente_historial.expediente_codigo }}{% endif %}{% if paciente_historial.telefono %} · {{ paciente_historial.telefono }}{% endif %}</span>
+        {% if not datos_paciente_limitados %}<span>{{ paciente_historial.identidad|default:"Sin identidad" }}{% if paciente_historial.expediente_codigo %} · Exp. {{ paciente_historial.expediente_codigo }}{% endif %}{% if paciente_historial.telefono %} · {{ paciente_historial.telefono }}{% endif %}</span>{% endif %}
       </div>
       <span class="patient-history-count">{{ citas_historial_futuras|length }} futura{{ citas_historial_futuras|length|pluralize:"s" }} · {{ citas_historial_pasadas|length }} pasada{{ citas_historial_pasadas|length|pluralize:"s" }}</span>
     </div>
@@ -1224,7 +1224,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
             {% if field.name == "paciente" and es_clinica %}
             <div class="appointment-patient-picker">
               <div class="appointment-patient-search{% if paciente_busqueda_inicial %} has-selection{% endif %}" data-patient-search-url="{% url 'agenda_buscar_pacientes' empresa.slug %}">
-                <input id="patientSearchInput" type="search" autocomplete="off" placeholder="Buscar por nombre, identidad, expediente, teléfono o correo" value="{% if paciente_busqueda_inicial %}{{ paciente_busqueda_inicial.nombre }}{% endif %}" aria-autocomplete="list" aria-controls="patientSearchResults">
+                <input id="patientSearchInput" type="search" autocomplete="off" placeholder="{% if datos_paciente_limitados %}Buscar por nombre{% else %}Buscar por nombre, identidad, expediente, teléfono o correo{% endif %}" value="{% if paciente_busqueda_inicial %}{{ paciente_busqueda_inicial.nombre }}{% endif %}" aria-autocomplete="list" aria-controls="patientSearchResults">
                 <span class="appointment-patient-search-icon">⌕</span>
                 <div class="appointment-patient-results" id="patientSearchResults" role="listbox"></div>
                 <div class="appointment-patient-native">
@@ -1312,7 +1312,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
               {% if agenda_espejo %}
               <div class="appointment-manage">
                 <div class="appointment-links">
-                  {% if cita.whatsapp_url %}<a class="erp-link" target="_blank" href="{{ cita.whatsapp_url }}">WhatsApp</a>{% endif %}
+                  {% if not datos_paciente_limitados and cita.whatsapp_url %}<a class="erp-link" target="_blank" href="{{ cita.whatsapp_url }}">WhatsApp</a>{% endif %}
                   <span class="erp-field-help">Vista informativa desde Servicios Médicos.</span>
                 </div>
               </div>
@@ -1320,7 +1320,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
               <div class="appointment-manage">
                 <div class="appointment-links">
                   <a class="erp-link" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar</a>
-                  {% if cita.whatsapp_url %}<a class="erp-link" target="_blank" href="{{ cita.whatsapp_url }}">WhatsApp</a>{% endif %}
+                  {% if not datos_paciente_limitados and cita.whatsapp_url %}<a class="erp-link" target="_blank" href="{{ cita.whatsapp_url }}">WhatsApp</a>{% endif %}
                 </div>
                 <form class="appointment-state-form" method="post" action="{% url 'agenda_cita_estado' cita.empresa.slug cita.id %}">
                   {% csrf_token %}

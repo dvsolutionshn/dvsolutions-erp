@@ -28,7 +28,7 @@ DESCRIPCIONES_PERMISOS = {
     "puede_crear_bloqueos_agenda": "Crear bloqueos de disponibilidad para profesionales autorizados.",
     "puede_editar_bloqueos_agenda": "Editar bloqueos de disponibilidad existentes dentro de la empresa.",
     "puede_eliminar_bloqueos_agenda": "Eliminar bloqueos de disponibilidad mediante la acción protegida.",
-    "puede_ver_pacientes": "Consultar el listado y buscar pacientes. Los datos generales, historias y acciones de cada expediente tienen permisos separados.",
+    "puede_ver_pacientes": "Consultar el listado y buscar pacientes. Sin el permiso de datos generales, el listado muestra solo el nombre y la foto y abre las secciones del expediente que estén autorizadas.",
     "puede_ver_datos_generales_paciente": "Abrir los datos generales de un paciente autorizado. No equivale a editar sus datos ni a consultar su historia clínica.",
     "puede_crear_pacientes": "Registrar pacientes y acceder a los flujos de registro autorizados. Los enlaces de registro mantienen sus restricciones adicionales de propietario y empresa.",
     "puede_editar_pacientes": "Modificar los datos generales de pacientes mediante el formulario existente; no concede edición de historias por sí solo.",
