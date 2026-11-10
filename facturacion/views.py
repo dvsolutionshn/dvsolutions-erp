@@ -2386,30 +2386,40 @@ def _parse_vencimiento_lote_rapido(valor):
     return parse_vencimiento_lote_rapido(valor)
 
 
-def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
+def _existencias_lote_para_salida(empresa, producto, bodega, *, incluir_vencidos=False):
+    existencias = ExistenciaLoteBodega.objects.filter(
+        empresa=empresa,
+        lote__producto=producto,
+        lote__activo=True,
+        cantidad__gt=0,
+    )
+    if bodega is not None:
+        existencias = existencias.filter(bodega=bodega)
+    if not incluir_vencidos:
+        existencias = existencias.filter(
+            Q(lote__fecha_vencimiento__isnull=True)
+            | Q(lote__fecha_vencimiento__gte=timezone.localdate())
+        )
+    return existencias
+
+
+def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto, *, para_venta=True):
     config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     usa_fefo = _empresa_usa_control_lotes_fefo(empresa)
     if not usa_fefo and not config.ventas_solo_desde_vitrina:
         return []
     bodega_venta = _obtener_bodega_venta(empresa) if config.ventas_solo_desde_vitrina else None
-    hoy = timezone.localdate()
     faltantes = []
     for item in cantidades_por_producto.values():
         producto = item["producto"]
         cantidad = item["cantidad"]
-        existencias = ExistenciaLoteBodega.objects.filter(
-            empresa=empresa,
-            lote__producto=producto,
-            lote__activo=True,
-            cantidad__gt=0,
-        ).filter(
-            Q(lote__fecha_vencimiento__isnull=True) | Q(lote__fecha_vencimiento__gte=hoy)
+        incluir_vencidos = para_venta and producto.permitir_venta_lotes_vencidos
+        existencias = _existencias_lote_para_salida(
+            empresa, producto, bodega_venta, incluir_vencidos=incluir_vencidos,
         )
-        if bodega_venta:
-            existencias = existencias.filter(bodega=bodega_venta)
         disponible = existencias.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00")
         if cantidad > disponible:
-            ubicacion = "Vitrina" if bodega_venta else "lotes vigentes"
+            ubicacion = "Vitrina" if bodega_venta else ("lotes activos" if incluir_vencidos else "lotes vigentes")
             faltantes.append(
                 f"{producto.nombre}: en {ubicacion} {disponible:.2f}, solicitado {cantidad:.2f}"
             )
@@ -2428,7 +2438,6 @@ def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, u
 
     config = ConfiguracionAvanzadaEmpresa.para_empresa(factura.empresa)
     bodega_venta = _obtener_bodega_venta(factura.empresa) if config.ventas_solo_desde_vitrina else None
-    hoy = timezone.localdate()
     observacion = observacion or "Salida automatica por FEFO desde el lote con vencimiento mas cercano."
     cantidades = cantidades_por_producto
     if cantidades is None:
@@ -2446,21 +2455,16 @@ def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, u
         raise ValidationError("Stock FEFO insuficiente: " + "; ".join(faltantes) + ".")
 
     for item in cantidades.values():
+        producto = item["producto"]
         pendiente = item["cantidad"]
-        existencias = ExistenciaLoteBodega.objects.select_for_update().filter(
-            empresa=factura.empresa,
-            lote__producto=item["producto"],
-            lote__activo=True,
-            cantidad__gt=0,
-        ).filter(
-            Q(lote__fecha_vencimiento__isnull=True) | Q(lote__fecha_vencimiento__gte=hoy)
-        )
-        if bodega_venta:
-            existencias = existencias.filter(bodega=bodega_venta)
-        existencias = existencias.select_related("lote", "bodega").order_by(
-            F("lote__fecha_vencimiento").asc(nulls_last=True),
-            "lote__fecha_creacion",
-            "id",
+        existencias = (
+            _existencias_lote_para_salida(
+                factura.empresa, producto, bodega_venta,
+                incluir_vencidos=producto.permitir_venta_lotes_vencidos,
+            )
+            .select_for_update()
+            .select_related("lote", "bodega")
+            .order_by(F("lote__fecha_vencimiento").asc(nulls_last=True), "lote__fecha_creacion", "id")
         )
         for existencia in existencias:
             if pendiente <= 0:
@@ -2479,7 +2483,7 @@ def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, u
             )
             pendiente -= salida
         if pendiente > 0:
-            raise ValidationError(f"No hay suficiente inventario por lotes para {item['producto'].nombre}.")
+            raise ValidationError(f"No hay suficiente inventario por lotes para {producto.nombre}.")
     return True
 
 
@@ -2491,7 +2495,7 @@ def _registrar_ajuste_salida_fefo(*, empresa, producto, cantidad, referencia, ob
     config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     bodega_venta = _obtener_bodega_venta(empresa) if config.ventas_solo_desde_vitrina else None
     cantidades = {producto.id: {"producto": producto, "cantidad": cantidad}}
-    faltantes = _validar_stock_vitrina_para_lineas(empresa, cantidades)
+    faltantes = _validar_stock_vitrina_para_lineas(empresa, cantidades, para_venta=False)
     if faltantes:
         raise ValidationError("Stock FEFO insuficiente: " + "; ".join(faltantes) + ".")
 
@@ -2550,12 +2554,9 @@ def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None
         producto = item["producto"]
         pendiente = item["cantidad"]
         existencias = (
-            ExistenciaLoteBodega.objects.filter(
-                empresa=factura.empresa,
-                bodega=bodega_venta,
-                lote__producto=producto,
-                lote__activo=True,
-                cantidad__gt=0,
+            _existencias_lote_para_salida(
+                factura.empresa, producto, bodega_venta,
+                incluir_vencidos=producto.permitir_venta_lotes_vencidos,
             )
             .select_related("lote")
             .order_by("lote__fecha_vencimiento", "lote__fecha_creacion", "id")
@@ -6767,6 +6768,27 @@ def editar_producto(request, empresa_slug, producto_id):
     if modo_app:
         validar_relaciones_gestion_producto_app(empresa, producto)
         producto_original = identidad_producto_app(producto)
+    puede_configurar_vencimientos = (
+        not modo_app
+        and producto.controla_inventario
+        and request.user.puede_acceder_empresa(empresa)
+        and request.user.tiene_permiso_erp("puede_configuracion_facturacion", empresa)
+        and (
+            _empresa_usa_control_lotes_fefo(empresa)
+            or ConfiguracionAvanzadaEmpresa.para_empresa(empresa).ventas_solo_desde_vitrina
+        )
+    )
+    if request.method == "POST" and "venta_lotes_vencidos" in request.POST:
+        if not puede_configurar_vencimientos:
+            raise PermissionDenied("No tiene permiso para cambiar el bloqueo de vencimientos.")
+        accion = request.POST["venta_lotes_vencidos"]
+        if accion not in {"permitir", "bloquear"}:
+            return HttpResponse("Acción de vencimientos inválida.", status=400)
+        producto.permitir_venta_lotes_vencidos = accion == "permitir"
+        producto.save(update_fields=["permitir_venta_lotes_vencidos"])
+        messages.success(request, "Se actualizó el bloqueo de vencimientos de este producto.")
+        return redirect("editar_producto_facturacion", empresa_slug=empresa.slug, producto_id=producto.pk)
+
     costo_real_anterior = producto.costo_real_inventario
 
     if request.method == "POST":
@@ -6817,6 +6839,7 @@ def editar_producto(request, empresa_slug, producto_id):
         "distribucion_bodegas": form.distribucion_bodegas() if getattr(form, "mostrar_bodega_inicial", False) else [],
         "lotes_producto": lotes_producto,
         "producto_actual": producto,
+        "puede_configurar_vencimientos": puede_configurar_vencimientos,
         "titulo": "Editar Producto",
         "texto_boton": "Guardar Cambios",
     })

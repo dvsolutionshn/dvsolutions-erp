@@ -282,6 +282,7 @@ class Producto(models.Model):
     nota_fecha = models.CharField(max_length=200, blank=True, null=True)
     foto = models.ImageField(upload_to='productos/fotos/', blank=True, null=True)
     controla_inventario = models.BooleanField(default=True)
+    permitir_venta_lotes_vencidos = models.BooleanField(default=False, db_default=False)
     impuesto_predeterminado = models.ForeignKey(
         TipoImpuesto,
         on_delete=models.SET_NULL,

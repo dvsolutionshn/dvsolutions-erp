@@ -143,7 +143,7 @@ def django_check(release, user, group):
         raise DeploymentError("Python no cargo los modulos de la version preparada.")
 
 
-def activate(release, dropin, timer_before, webhook_before):
+def activate(release, dropin, timer_before, webhook_before, *, commit=FIX_COMMIT):
     dropin.parent.mkdir(parents=True, exist_ok=True)
     if dropin.exists() or dropin.is_symlink():
         raise DeploymentError("El override de inventario ya existe; no se sobrescribio.")
@@ -152,7 +152,7 @@ def activate(release, dropin, timer_before, webhook_before):
         # Only this new drop-in is ever removed on rollback.
         with dropin.open("x", encoding="utf-8") as stream:
             changed = True
-            stream.write(f"# Inventory fix {FIX_COMMIT}\n[Service]\nWorkingDirectory={release}\n")
+            stream.write(f"# Commit {commit}\n[Service]\nWorkingDirectory={release}\n")
         dropin.chmod(0o644)
         run("Recargar servicio", ["systemctl", "daemon-reload"])
         if Path(property_value("WorkingDirectory")) != release:

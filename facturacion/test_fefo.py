@@ -5,19 +5,20 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-from core.models import Empresa
+from core.models import ConfiguracionAvanzadaEmpresa, Empresa
 from .models import (
     BodegaInventario,
     Cliente,
     ExistenciaLoteBodega,
     Factura,
+    InventarioProducto,
     LineaFactura,
     LoteInventario,
     MovimientoLoteBodega,
     Producto,
     TipoImpuesto,
 )
-from .views import _registrar_ajuste_salida_fefo, _registrar_salida_fefo_factura
+from .views import _registrar_ajuste_salida_fefo, _registrar_salida_factura, _registrar_salida_fefo_factura
 
 
 class SalidaFefoTests(TestCase):
@@ -181,4 +182,41 @@ class SalidaFefoTests(TestCase):
         self.assertEqual(
             [(movimiento.lote_id, movimiento.cantidad) for movimiento in movimientos],
             [(lote_primero.id, Decimal("2.00")), (lote_segundo.id, Decimal("1.00"))],
+        )
+
+
+class SalidaVitrinaTests(TestCase):
+    def test_vitrina_sin_fefo_descuenta_lote_vigente_y_conserva_vencido(self):
+        empresa = Empresa.objects.create(nombre="Empresa solo Vitrina", slug="empresa_solo_vitrina")
+        config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+        config.ventas_solo_desde_vitrina = True
+        config.save(update_fields=["ventas_solo_desde_vitrina"])
+        bodega = BodegaInventario.objects.create(empresa=empresa, nombre="Vitrina", tipo="vitrina")
+        producto = Producto.objects.create(empresa=empresa, nombre="Producto Vitrina", precio=100)
+        inventario = InventarioProducto.objects.create(empresa=empresa, producto=producto, existencias=13)
+        hoy = timezone.localdate()
+        lote_vencido = LoteInventario.objects.create(
+            empresa=empresa, producto=producto, numero_lote="VENCIDO", fecha_vencimiento=hoy - timedelta(days=1),
+        )
+        lote_vigente = LoteInventario.objects.create(
+            empresa=empresa, producto=producto, numero_lote="VIGENTE", fecha_vencimiento=hoy + timedelta(days=1),
+        )
+        vencida = ExistenciaLoteBodega.objects.create(empresa=empresa, bodega=bodega, lote=lote_vencido, cantidad=8)
+        vigente = ExistenciaLoteBodega.objects.create(empresa=empresa, bodega=bodega, lote=lote_vigente, cantidad=5)
+        cliente = Cliente.objects.create(empresa=empresa, nombre="Cliente Vitrina")
+        impuesto = TipoImpuesto.objects.create(nombre="Exento Vitrina", porcentaje=0)
+        factura = Factura.objects.create(empresa=empresa, cliente=cliente, estado="borrador")
+        LineaFactura.objects.create(factura=factura, producto=producto, cantidad=2, precio_unitario=100, impuesto=impuesto)
+
+        _registrar_salida_factura(factura)
+
+        vencida.refresh_from_db()
+        vigente.refresh_from_db()
+        inventario.refresh_from_db()
+        self.assertEqual(vencida.cantidad, Decimal("8.00"))
+        self.assertEqual(vigente.cantidad, Decimal("3.00"))
+        self.assertEqual(inventario.existencias, Decimal("11.00"))
+        self.assertEqual(
+            list(MovimientoLoteBodega.objects.filter(factura=factura).values_list("tipo", "bodega_id", "lote_id", "cantidad")),
+            [("salida_factura", bodega.pk, lote_vigente.pk, Decimal("2.00"))],
         )

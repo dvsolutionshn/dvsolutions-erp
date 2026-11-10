@@ -291,6 +291,21 @@
             </div>
         </section>
     </form>
+    {% if puede_configurar_vencimientos %}
+        <form method="post" class="erp-compact-form is-dense">
+            {% csrf_token %}
+            <section class="erp-compact-card is-slim">
+                <h3>Venta de lotes vencidos</h3>
+                {% if producto_actual.permitir_venta_lotes_vencidos %}
+                    <p>La venta de lotes vencidos está permitida para este producto.</p>
+                    <button type="submit" class="erp-btn-secondary" name="venta_lotes_vencidos" value="bloquear">Reactivar bloqueo</button>
+                {% else %}
+                    <p>El bloqueo por vencimiento está activo para este producto.</p>
+                    <button type="submit" class="erp-btn-secondary" name="venta_lotes_vencidos" value="permitir">Permitir venta de lotes vencidos</button>
+                {% endif %}
+            </section>
+        </form>
+    {% endif %}
 </section>
 <script>
 (function(){
