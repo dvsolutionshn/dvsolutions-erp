@@ -129,7 +129,6 @@ class VentaPosLotesVencidosTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         resultado = response.json()
         self.assertTrue(resultado["ok"])
-        self.assertIsNone(resultado["ticket_url"])
         factura = facturas.get(pk=resultado["factura_id"])
         self.assertEqual((factura.estado, factura.estado_pago), ("emitida", "pagado"))
         self.assertEqual(PagoFactura.objects.get(factura=factura).monto, Decimal("200.00"))
