@@ -59,16 +59,23 @@ def buscar_producto(release, nombre):
 
 def aplicar_parche(release, commit):
     diff = subprocess.run([
-        "git", "-C", str(LIVE), "diff", "--no-ext-diff", "--binary", f"{commit}^", commit, "--", *ARCHIVOS,
+        "git", "-C", str(LIVE), "diff", "--no-ext-diff", "--no-textconv", "--color=never",
+        "--src-prefix=a/", "--dst-prefix=b/", "--unified=3", "--binary",
+        f"{commit}^", commit, "--", *ARCHIVOS,
     ], capture_output=True)
     if diff.returncode or not diff.stdout:
         raise DeploymentError("El commit no contiene el parche de vencimientos.")
+
+    # La copia de WhatsApp se empaquetó en Windows. Git compara el diff con LF.
     for opcion in (["--check"], []):
         resultado = subprocess.run(
-            ["git", "apply", *opcion], cwd=release, input=diff.stdout, capture_output=True,
+            ["git", "-c", "core.autocrlf=input", "-c", "core.safecrlf=false", "apply", *opcion],
+            cwd=release, input=diff.stdout, capture_output=True,
         )
         if resultado.returncode:
             raise DeploymentError("El parche no coincide con el código de la versión activa.")
+    if not (release / ARCHIVOS[-1]).is_file():
+        raise DeploymentError("Git no instaló la migración de vencimientos en la copia.")
 
 
 def deploy(revision, nombre):
