@@ -101,7 +101,12 @@ class MobileClinicInterfaceTests(TestCase):
 
     def test_four_companies_both_roles_share_premium_shell_and_original_read_inventory_panel(self):
         for granular in (True, False):
-            self.set_role(granular, puede_inventario=True, puede_editar_productos=True)
+            self.set_role(
+                granular,
+                puede_inventario=True,
+                puede_editar_productos=True,
+                puede_ver_datos_generales_paciente=True,
+            )
             for company in self.empresas.values():
                 page = self.home(company)
                 self.assertTrue(page.context["hospital_mia_app_premium"])
@@ -112,6 +117,10 @@ class MobileClinicInterfaceTests(TestCase):
                 self.assertTrue(page.context["puede_ver_productos_app"])
                 self.assertContains(page, 'id="productos-app"')
                 self.assertContains(page, 'href="#productos-app" data-app-open="productos-app"')
+                self.assertTemplateUsed(page, "crm/mobile_agenda_navigation.html")
+                html = page.content.decode()
+                self.assertEqual(html.count('id="mobileAgendaNavigation"'), 1)
+                self.assertLess(html.index('id="mobileAgendaNavigation"'), html.index("const agendaCentralizada"))
 
     def test_each_company_read_dto_and_edit_map_contain_only_its_existing_products(self):
         self.set_role(puede_inventario=True, puede_editar_productos=True)
@@ -350,12 +359,11 @@ class InstalledClinicEntrySourceTests(SimpleTestCase):
             self.assertNotIn(forbidden, source)
 
     def test_unknown_panel_falls_back_before_hiding_all_screens_and_switch_keeps_original_panel_rules(self):
-        source = (Path(__file__).parent / "templates" / "crm" / "agenda_mobile.html").read_text(encoding="utf-8")
-        start = source.index("const openAppPanel=id=>")
-        end = source.index("const closeAppPanels=", start)
+        source = (Path(__file__).parent / "templates" / "crm" / "mobile_agenda_navigation.html").read_text(encoding="utf-8")
+        start = source.index("function open(id)")
+        end = source.index("window.mobileAgendaNavigation", start)
         function = source[start:end]
-        self.assertLess(function.index("if(!panel||!appScreens.includes(panel))"), function.index("appScreens.forEach"))
-        self.assertIn("closeAppPanels();return;", function)
-        self.assertIn('activeScreen.id===\"agenda-app\"', source)
-        self.assertIn('target.searchParams.set(\"app\",\"agenda\")', source)
-        self.assertIn('activeScreen.id===\"patient-profile-app\"?\"pacientes-app\"', source)
+        self.assertLess(function.index("if (!screens.includes(panel)) return false;"), function.index("showPanel(panel)"))
+        self.assertIn('if (current.id === "agenda-app") target.searchParams.set("app", "agenda");', source)
+        self.assertIn('current.id === "patient-profile-app" ? "pacientes-app"', source)
+        self.assertIn('current.id === "producto-detalle-app" ? "productos-app"', source)

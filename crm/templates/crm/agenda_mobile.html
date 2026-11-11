@@ -761,6 +761,8 @@
   </nav>
 </main>
 
+{% include "crm/mobile_agenda_navigation.html" %}
+
 {% if es_clinica and puede_gestionar_bloqueos %}
 <section class="sheet {% if bloqueo_editando %}open{% endif %}" id="disponibilidad-medica">
   <div class="sheet-card">
@@ -939,58 +941,15 @@
 (() => {
   const editor=document.getElementById("editor");
   const agendaCentralizada={{ agenda_espejo|yesno:"true,false" }};
-  const openSheet=sheet=>sheet&&sheet.classList.add("open");
-  const closeSheet=sheet=>sheet&&sheet.classList.remove("open");
-  document.querySelectorAll("[data-open-editor]").forEach(b=>b.addEventListener("click",()=>openSheet(editor)));
-  const availabilitySheet=document.getElementById("disponibilidad-medica");
-  document.querySelectorAll("[data-open-availability]").forEach(b=>b.addEventListener("click",()=>openSheet(availabilitySheet)));
+  const {open:openAppPanel,openSheet,closeSheet}=window.mobileAgendaNavigation;
   const availabilityForm=document.querySelector("[data-mobile-availability-form]");
   if(availabilityForm){const full=availabilityForm.querySelector("#id_dia_completo"),times=["#id_hora_inicio","#id_hora_inicio_periodo","#id_hora_fin","#id_hora_fin_periodo"].map(selector=>availabilityForm.querySelector(selector));const toggleAvailabilityTimes=()=>{const disabled=Boolean(full?.checked);times.forEach(field=>{if(field)field.disabled=disabled})};full?.addEventListener("change",toggleAvailabilityTimes);toggleAvailabilityTimes()}
   const seriesToggle=document.getElementById("id_crear_serie"),seriesQuantity=document.querySelector('[data-field-name="cantidad_serie"]'),seriesCount=document.getElementById("id_cantidad_serie"),seriesDate=document.getElementById("id_fecha_cita"),seriesHour=document.getElementById("id_hora_cita"),seriesPeriod=document.getElementById("id_periodo_cita"),seriesPreview=document.querySelector("[data-mobile-series-preview]");
   if(seriesToggle&&seriesQuantity){const seriesDates=()=>{if(!seriesDate?.value||!seriesCount?.value)return[];const parts=seriesDate.value.split("-").map(Number),items=[],cursor=new Date(parts[0],parts[1]-1,parts[2]);while(items.length<Number(seriesCount.value)&&items.length<30){if(cursor.getDay()!==0)items.push(new Date(cursor));cursor.setDate(cursor.getDate()+1)}return items};const toggleSeriesQuantity=()=>{const active=seriesToggle.checked;seriesQuantity.style.display=active?"grid":"none";if(!seriesPreview)return;if(!active){seriesPreview.classList.remove("show");seriesPreview.innerHTML="";return}seriesPreview.classList.add("show");seriesPreview.innerHTML="<strong>Vista previa de la serie</strong>"+seriesDates().map((item,index)=>(index+1)+". "+item.toLocaleDateString("es-HN",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"})+" · "+(seriesHour?.value||"--:--")+" "+(seriesPeriod?.value||"")).join("<br>")};[seriesToggle,seriesCount,seriesDate,seriesHour,seriesPeriod].forEach(field=>field?.addEventListener("change",toggleSeriesQuantity));toggleSeriesQuantity()}
-  document.querySelectorAll("[data-close-sheet]").forEach(b=>b.addEventListener("click",()=>closeSheet(b.closest(".sheet"))));
-  document.querySelectorAll("[data-cita-actions]").forEach(b=>b.addEventListener("click",()=>openSheet(document.getElementById(`actions-${b.dataset.citaActions}`))));
-  document.querySelectorAll(".sheet").forEach(s=>s.addEventListener("click",e=>{if(e.target===s)closeSheet(s)}));
-  const mobileHome=document.querySelector(".mobile-home");
-  const appPanels=Array.from(document.querySelectorAll(".app-panel"));
-  const appScreens=Array.from(document.querySelectorAll(".mobile-app-screen"));
   const moneyFormatter=new Intl.NumberFormat("es-HN",{style:"currency",currency:"HNL"});
   const parseJsonScript=id=>{
     try{return JSON.parse(document.getElementById(id)?.textContent||"[]")}catch(error){return []}
   };
-  const openAppPanel=id=>{
-    const patientDirectory=document.querySelector("[data-patients-directory]");
-    if(id==="pacientes-app"&&patientDirectory){window.location.replace(patientDirectory.href);return;}
-    const panel=document.getElementById(id);
-    if(!panel||!appScreens.includes(panel)){closeAppPanels();return;}
-    appScreens.forEach(screen=>screen.classList.toggle("active",screen.id===id));
-    document.querySelectorAll(".bottom [data-app-open]").forEach(link=>link.classList.toggle("active",link.dataset.appOpen===id));
-    history.replaceState(null,"",`#${id}`);
-    requestAnimationFrame(()=>panel.scrollIntoView({behavior:"smooth",block:"start"}));
-  };
-  const closeAppPanels=()=>{
-    appScreens.forEach(screen=>screen.classList.toggle("active",screen.id==="inicio"));
-    document.querySelectorAll(".bottom [data-app-open]").forEach(link=>link.classList.remove("active"));
-    history.replaceState(null,"",window.location.pathname+window.location.search);
-    requestAnimationFrame(()=>mobileHome?.scrollIntoView({behavior:"smooth",block:"start"}));
-  };
-  document.querySelectorAll("[data-app-open]").forEach(link=>link.addEventListener("click",event=>{
-    event.preventDefault();
-    openAppPanel(link.dataset.appOpen);
-  }));
-  document.querySelectorAll("[data-app-close]").forEach(button=>button.addEventListener("click",closeAppPanels));
-  const requestedApp=new URLSearchParams(window.location.search).get("app");
-  if(requestedApp==="agenda")openAppPanel("agenda-app");
-  else if(["#pacientes-app","#factura-app","#facturas-app","#productos-app","#agenda-app","#mas-funciones-app"].includes(window.location.hash))openAppPanel(window.location.hash.slice(1));
-  document.querySelectorAll("[data-company-app-switch]").forEach(link=>link.addEventListener("click",event=>{
-    const activeScreen=appScreens.find(screen=>screen.classList.contains("active"));
-    if(!activeScreen||activeScreen.id==="inicio")return;
-    event.preventDefault();
-    const target=new URL(link.href,window.location.origin);
-    if(activeScreen.id==="agenda-app")target.searchParams.set("app","agenda");
-    else target.hash=`#${activeScreen.id==="patient-profile-app"?"pacientes-app":activeScreen.id==="producto-detalle-app"?"productos-app":activeScreen.id}`;
-    window.location.href=target.toString();
-  }));
   const dayStrip=document.querySelector("[data-day-strip-swipe]");
   if(dayStrip){
     let stripStartX=0,stripStartY=0,stripTracking=false,stripSwiped=false;
@@ -1035,12 +994,11 @@
   }
 
   let installPrompt=null;
-  const installButton=document.getElementById("installButton"),installNote=document.getElementById("installNote"),installSheet=document.getElementById("installSheet");
+  const installNote=document.getElementById("installNote");
   const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent),isAndroid=/android/i.test(navigator.userAgent);
   if(isIOS)document.getElementById("iosChoice").classList.add("recommended");
   if(isAndroid)document.getElementById("androidChoice").classList.add("recommended");
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;installNote.textContent="La app está lista para instalarse en este teléfono.";installNote.classList.add("show")});
-  installButton.addEventListener("click",()=>openSheet(installSheet));
   document.getElementById("installAndroid").addEventListener("click",async()=>{
     const status=document.getElementById("installStatus"),steps=document.getElementById("androidSteps");
     if(installPrompt){

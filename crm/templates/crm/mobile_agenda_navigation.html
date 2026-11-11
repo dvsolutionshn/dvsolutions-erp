@@ -1,0 +1,97 @@
+<script id="mobileAgendaNavigation">
+(() => {
+  // Keep these controls independent of the data, forms and notifications below.
+  const home = document.getElementById("inicio");
+  const screens = Array.from(document.querySelectorAll(".mobile-app-screen"));
+  const bottomLinks = document.querySelectorAll(".bottom [data-app-open]");
+  const companyMenu = document.querySelector(".mobile-company-switch");
+  const deepLinks = ["pacientes-app", "factura-app", "facturas-app", "productos-app", "agenda-app", "mas-funciones-app"];
+  const openSheet = sheet => { if (sheet) sheet.classList.add("open"); };
+  const closeSheet = sheet => { if (sheet) sheet.classList.remove("open"); };
+  const closeCompanyMenu = () => { if (companyMenu) companyMenu.removeAttribute("open"); };
+
+  function updateAddress(url) {
+    try {
+      history.replaceState(null, "", url);
+    } catch (error) {
+      // A browser may throttle history updates. The panel can still open.
+    }
+  }
+
+  function showPanel(panel) {
+    closeCompanyMenu();
+    screens.forEach(screen => screen.classList.toggle("active", screen === panel));
+    bottomLinks.forEach(link => link.classList.toggle("active", link.dataset.appOpen === panel.id));
+    requestAnimationFrame(() => panel.scrollIntoView({behavior: "smooth", block: "start"}));
+  }
+
+  function close() {
+    showPanel(home);
+    const target = new URL(window.location.href);
+    target.hash = "";
+    if (target.searchParams.get("app") === "agenda") target.searchParams.delete("app");
+    updateAddress(target.pathname + target.search);
+  }
+
+  function open(id) {
+    const directory = document.querySelector("[data-patients-directory]");
+    if (id === "pacientes-app" && directory) {
+      window.location.replace(directory.href);
+      return true;
+    }
+    const panel = document.getElementById(id);
+    if (!screens.includes(panel)) return false;
+    showPanel(panel);
+    updateAddress("#" + id);
+    return true;
+  }
+
+  window.mobileAgendaNavigation = {open, openSheet, closeSheet};
+
+  document.addEventListener("click", event => {
+    const element = event.target;
+    if (!(element instanceof Element)) return;
+    if (companyMenu && !companyMenu.contains(element)) closeCompanyMenu();
+
+    const modifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    const openLink = element.closest("[data-app-open]");
+    if (openLink && !modifiedClick) {
+      if (open(openLink.dataset.appOpen)) event.preventDefault();
+      return;
+    }
+    if (element.closest("[data-app-close]")) {
+      close();
+      return;
+    }
+    const companyLink = element.closest("[data-company-app-switch]");
+    if (companyLink && !modifiedClick) {
+      const current = screens.find(screen => screen.classList.contains("active"));
+      if (!current || current === home) return;
+      const target = new URL(companyLink.href, window.location.origin);
+      if (current.id === "agenda-app") target.searchParams.set("app", "agenda");
+      else target.hash = current.id === "patient-profile-app" ? "pacientes-app"
+        : current.id === "producto-detalle-app" ? "productos-app" : current.id;
+      event.preventDefault();
+      window.location.href = target.href;
+      return;
+    }
+    const closeButton = element.closest("[data-close-sheet]");
+    if (closeButton) {
+      closeSheet(closeButton.closest(".sheet"));
+      return;
+    }
+    const appointment = element.closest("[data-cita-actions]");
+    if (appointment) openSheet(document.getElementById("actions-" + appointment.dataset.citaActions));
+    else if (element.closest("[data-open-editor]")) openSheet(document.getElementById("editor"));
+    else if (element.closest("[data-open-availability]")) openSheet(document.getElementById("disponibilidad-medica"));
+    else if (element.closest("#installButton")) openSheet(document.getElementById("installSheet"));
+    else if (element.classList.contains("sheet")) closeSheet(element);
+  });
+
+  // Calendar URLs carry app=agenda; the current valid fragment wins after a tap.
+  const requestedPanel = window.location.hash.slice(1);
+  if (requestedPanel === "inicio") close();
+  else if (!(deepLinks.includes(requestedPanel) && open(requestedPanel))
+           && new URLSearchParams(window.location.search).get("app") === "agenda") open("agenda-app");
+})();
+</script>
