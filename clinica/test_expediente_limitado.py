@@ -217,6 +217,95 @@ class ExpedienteLimitadoTests(TestCase):
                 self.assertNotContains(respuesta, f'href="{lectura}"')
                 self.assert_denegado(self.client.get(lectura))
 
+    def test_enfermeria_separa_lectura_y_registro(self):
+        rol = RolSistema.objects.filter(pk=self.roles[2].pk)
+        nota = HistoriaClinicaEspecialidad.objects.create(
+            empresa=self.empresa, paciente=self.paciente, tipo="enfermeria",
+            observaciones="Nota previa de Enfermería", estado="borrador",
+            diagnostico="Diagnóstico médico reservado",
+        )
+        for app in (False, True):
+            with self.subTest(app=app):
+                expediente = self.url_paciente(self.EXPEDIENTE, app=app)
+                seccion = self.url_paciente(self.SECCION, "enfermeria", app=app)
+                crear = self.url_paciente("clinica_crear_historia_especialidad", "enfermeria", app=app)
+                editar = self.url_paciente("clinica_editar_historia_especialidad", nota.pk, app=app)
+                rol.update(puede_ver_enfermeria=True, puede_escribir_enfermeria=False)
+                self.assertContains(self.client.get(expediente), f'href="{seccion}"')
+                lectura = self.client.get(seccion)
+                self.assertContains(lectura, nota.observaciones)
+                self.assertNotContains(lectura, nota.diagnostico)
+                self.assertNotContains(lectura, f'href="{crear}"')
+                self.assertNotContains(lectura, f'href="{editar}"')
+                self.assert_denegado(self.client.get(crear))
+                self.assert_denegado(self.client.get(editar))
+                rol.update(puede_ver_enfermeria=False, puede_escribir_enfermeria=True)
+                self.assertContains(self.client.get(expediente), f'href="{crear}"')
+                self.assert_denegado(self.client.get(seccion))
+                self.assert_denegado(self.client.get(editar))
+
+    def test_enfermeria_permite_finalizar_borradores_y_bloquea_cambios_y_borrado(self):
+        for empresa in self.empresas.values():
+            paciente = self.pacientes[empresa.slug]
+            for app in (False, True):
+                with self.subTest(empresa=empresa.slug, app=app):
+                    RolSistema.objects.filter(pk__in=[rol.pk for rol in self.roles.values()]).update(
+                        puede_ver_enfermeria=True, puede_escribir_enfermeria=True,
+                    )
+                    def ruta(nombre, *args):
+                        return self.url(nombre, *args, app=app, empresa=empresa, paciente=paciente)
+
+                    seccion = ruta(self.SECCION, "enfermeria")
+                    crear = ruta("clinica_crear_historia_especialidad", "enfermeria")
+                    historial = ruta("clinica_historial_clinico_consolidado")
+                    self.assertContains(self.client.get(seccion), f'href="{crear}"')
+                    datos = {"fecha_atencion": "2026-11-11T10:00", **({"app": "1"} if app else {})}
+                    borrador = f"Borrador de Enfermería {empresa.slug} {app}"
+                    final = f"Nota finalizada de Enfermería {empresa.slug} {app}"
+                    self.assertRedirects(self.client.post(crear, {
+                        **datos, "observaciones": borrador, "estado": "borrador",
+                    }), seccion, fetch_redirect_response=False)
+                    nota = HistoriaClinicaEspecialidad.objects.get(empresa=empresa, paciente=paciente, observaciones=borrador)
+                    editar = ruta("clinica_editar_historia_especialidad", nota.pk)
+                    self.assertContains(self.client.get(seccion), f'href="{editar}"')
+                    self.assertContains(self.client.get(editar), borrador)
+                    self.assertRedirects(self.client.post(editar, {
+                        **datos, "observaciones": final, "estado": "finalizada",
+                    }), seccion, fetch_redirect_response=False)
+                    respuesta = self.client.get(seccion)
+                    self.assertContains(respuesta, final)
+                    self.assertNotContains(respuesta, f'href="{editar}"')
+                    self.assertNotContains(respuesta, "eliminar_historia")
+                    self.assert_denegado(self.client.post(editar, {
+                        **datos, "observaciones": "Intento de reabrir", "estado": "borrador",
+                    }))
+                    self.assert_denegado(self.client.delete(editar), metodo=True)
+                    self.assert_denegado(self.client.post(historial, {"accion": "eliminar_historia", "historia_id": nota.pk}))
+                    nota.refresh_from_db()
+                    self.assertEqual((nota.observaciones, nota.estado), (final, "finalizada"))
+
+    def test_permiso_de_enfermeria_no_abre_notas_de_otro_tipo_o_empresa(self):
+        RolSistema.objects.filter(pk=self.roles[2].pk).update(
+            usa_permisos_clinicos_v2=False, puede_ver_enfermeria=True, puede_escribir_enfermeria=True,
+        )
+        nota_medica = HistoriaClinicaEspecialidad.objects.create(
+            empresa=self.empresa, paciente=self.paciente, tipo="medicina_estetica", observaciones="Nota médica privada",
+        )
+        empresa_ajena = self.empresas[self.SLUGS[1]]
+        paciente_ajeno = self.pacientes[empresa_ajena.slug]
+        nota_ajena = HistoriaClinicaEspecialidad.objects.create(
+            empresa=empresa_ajena, paciente=paciente_ajeno, tipo="enfermeria", observaciones="Nota de otra empresa",
+        )
+        for app in (False, True):
+            with self.subTest(app=app):
+                seccion = self.url_paciente(self.SECCION, "enfermeria", app=app)
+                respuesta = self.client.get(seccion)
+                self.assertNotContains(respuesta, nota_medica.observaciones)
+                self.assertNotContains(respuesta, nota_ajena.observaciones)
+                editar = "clinica_editar_historia_especialidad"
+                self.assert_denegado(self.client.get(self.url_paciente(editar, nota_medica.pk, app=app)))
+                self.assertEqual(self.client.get(self.url_paciente(editar, nota_ajena.pk, app=app)).status_code, 404)
+
     def test_permisos_de_area_no_abren_datos_generales_ni_historia_general(self):
         self.conceder_areas(*self.AREAS)
         for app in (False, True):

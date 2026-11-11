@@ -1,4 +1,16 @@
-{% if tipo == 'terapias' %}
+{% if tipo == 'enfermeria' %}
+    {% if nueva_nota_url %}
+    <p><a class="erp-btn mi-button" href="{{ nueva_nota_url }}">Nueva nota de Enfermería</a></p>
+    {% endif %}
+    {% for nota in notas_enfermeria %}
+    <article class="{{ tarjeta }}" style="margin-bottom:14px">
+        <h2>Nota de Enfermería · {{ nota.historia.fecha_atencion|date:'d/m/Y H:i' }}</h2>
+        <p>{{ nota.historia.get_estado_display }}{% if nota.historia.profesional %} · {{ nota.historia.profesional }}{% endif %}</p>
+        <p>{{ nota.historia.observaciones|default:nota.historia.plan_tratamiento|linebreaksbr }}</p>
+        {% if nota.editar_url %}<a class="erp-btn-secondary mi-button secondary" href="{{ nota.editar_url }}">Editar borrador</a>{% endif %}
+    </article>
+    {% empty %}<p class="{{ tarjeta }}">Todavía no hay notas de Enfermería registradas.</p>{% endfor %}
+{% elif tipo == 'terapias' %}
     {% for nota in notas %}
     <article class="{{ tarjeta }}" style="margin-bottom:14px">
         <h2>{{ nota.titulo }} · {{ nota.fecha|date:'d/m/Y' }}</h2>

@@ -19,6 +19,7 @@ from .models import HistoriaClinicaEspecialidad, Paciente
 
 
 SECCIONES = {
+    "enfermeria": ("Enfermería / Tratamientos", "puede_escribir_enfermeria"),
     "terapias": ("Terapias", "puede_escribir_terapias"),
     "camara_hiperbarica": ("Cámara hiperbárica", "puede_escribir_camara_hiperbarica"),
     "terapias_postquirurgicas": ("Terapias postquirúrgicas", "puede_escribir_postquirurgicas"),
@@ -99,7 +100,21 @@ def consultar_seccion(request, empresa_slug, paciente_id, tipo):
         "seccion_titulo": SECCIONES[tipo][0],
         "expediente_url": _url(request, empresa, "clinica_paciente_expediente", paciente.pk),
     }
-    if tipo == "terapias":
+    if tipo == "enfermeria":
+        permiso_escritura = SECCIONES[tipo][1]
+        puede_escribir = request.user.tiene_permiso_erp(permiso_escritura, empresa)
+        if puede_escribir:
+            contexto["nueva_nota_url"] = _url(request, empresa, "clinica_crear_historia_especialidad", paciente.pk, tipo)
+        historias = HistoriaClinicaEspecialidad.objects.filter(empresa=empresa, paciente=paciente, tipo=tipo)
+        contexto["notas_enfermeria"] = [
+            {
+                "historia": historia,
+                "editar_url": _url(request, empresa, "clinica_editar_historia_especialidad", paciente.pk, historia.pk)
+                if puede_escribir and historia.estado == "borrador" else "",
+            }
+            for historia in historias.select_related("profesional")
+        ]
+    elif tipo == "terapias":
         historias = HistoriaClinicaEspecialidad.objects.filter(empresa=empresa, paciente=paciente, tipo=tipo)
         contexto["notas"] = notas_historia_app(historias.select_related("profesional", "creado_por", "actualizado_por"))
     else:

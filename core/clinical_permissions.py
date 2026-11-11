@@ -394,6 +394,7 @@ def rol_clinico_granular(usuario, empresa):
 
 
 LECTURAS_EXPEDIENTE_LIMITADO = {
+    "enfermeria": "puede_ver_enfermeria",
     "terapias": "puede_ver_terapias",
     "camara_hiperbarica": "puede_ver_camara_hiperbarica",
     "terapias_postquirurgicas": "puede_ver_postquirurgicas",
@@ -404,6 +405,7 @@ PERMISOS_EXPEDIENTE_LIMITADO = (
     "puede_ver_anexos_clinicos",
     "puede_subir_anexos_clinicos",
     *LECTURAS_EXPEDIENTE_LIMITADO.values(),
+    "puede_escribir_enfermeria",
     "puede_escribir_terapias",
     "puede_escribir_camara_hiperbarica",
     "puede_escribir_postquirurgicas",
@@ -700,6 +702,8 @@ def permiso_clinica_granular(path_suffix, method="GET", *, v2=False, v3=False, h
                 "terapias_postquirurgicas": "puede_escribir_postquirurgicas",
             }.get(tipo, "puede_crear_historia_clinica")
         if "editar" in action:
+            if not v2 and historial_limitado and len(action) == 3 and action[1].isdigit() and action[2] == "editar":
+                return ("puede_editar_historia_clinica", "puede_escribir_enfermeria")
             return PERMISOS_EDICION_HISTORIAS if v3 else "puede_editar_historia_clinica"
         return "puede_ver_historia_clinica"
     if action[0] == "historia-clinica":

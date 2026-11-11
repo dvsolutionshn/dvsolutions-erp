@@ -5,7 +5,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models, transaction
+from django.db import models, router, transaction
 from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import get_valid_filename
@@ -926,15 +926,27 @@ class HistoriaClinicaEspecialidad(models.Model):
     def bloqueada(self):
         return self.tipo == "enfermeria" and self.estado == "finalizada"
 
-    def clean(self):
-        super().clean()
+    def _validar_nota_finalizada(self, usando, *, bloquear=False):
         if not self.pk:
             return
-        original = HistoriaClinicaEspecialidad.objects.filter(pk=self.pk).values("tipo", "estado").first()
+        consulta = type(self).objects.using(usando).filter(pk=self.pk)
+        if bloquear:
+            consulta = consulta.select_for_update()
+        original = consulta.values("tipo", "estado").first()
         if original and original["tipo"] == "enfermeria" and original["estado"] == "finalizada":
             raise ValidationError("La nota de enfermeria finalizada esta bloqueada y no puede modificarse.")
 
+    def clean(self):
+        super().clean()
+        self._validar_nota_finalizada(self._state.db)
+
     def save(self, *args, **kwargs):
+        if self.pk and self.tipo == "enfermeria":
+            usando = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+            with transaction.atomic(using=usando):
+                self._validar_nota_finalizada(usando, bloquear=True)
+                self.full_clean()
+                return super().save(*args, **kwargs)
         self.full_clean()
         return super().save(*args, **kwargs)
 

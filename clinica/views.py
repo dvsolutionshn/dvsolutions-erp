@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
-from django.views.decorators.http import require_GET, require_POST, require_safe
+from django.views.decorators.http import require_GET, require_http_methods, require_POST, require_safe
 from weasyprint import HTML
 
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados
@@ -3903,6 +3903,7 @@ def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
 
 
 @login_required
+@require_http_methods(["GET", "HEAD", "POST"])
 def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     from .mobile_clinical_read_scope import validar_historias_lectura_app
 
@@ -4156,12 +4157,29 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     )
 
 
+def _volver_nota_enfermeria_finalizada(request, empresa, paciente, historia):
+    messages.error(request, "La nota de enfermería ya fue finalizada y no puede editarse.")
+    destino = url_lectura_expediente_limitado(request, empresa, paciente, historia.tipo)
+    if destino:
+        return respuesta_pacientes_app(request, empresa, redirect(destino))
+    if es_historias_app(request, empresa):
+        return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
+    return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+
+
 @login_required
+@require_http_methods(["GET", "HEAD", "POST"])
 def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id):
     from .mobile_clinical_read_scope import validar_historias_lectura_app
 
     empresa = _empresa_desde_slug(empresa_slug)
-    autorizar_historias_app(request, empresa, editar=True)
+    historial_limitado = historial_paciente_limitado(request.user, empresa)
+    puede_editar_enfermeria = historial_limitado and all(
+        request.user.tiene_permiso_erp(permiso, empresa)
+        for permiso in ("puede_ver_enfermeria", "puede_escribir_enfermeria")
+    )
+    if not puede_editar_enfermeria:
+        autorizar_historias_app(request, empresa, editar=True)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historia = get_object_or_404(
@@ -4170,20 +4188,32 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         empresa=empresa,
         paciente=paciente,
     )
-    if not _puede_historia_tipo(request.user, empresa, historia.tipo, editar=request.method == "POST"):
-        raise PermissionDenied("No tiene permiso para consultar o editar esta clase de historia clínica.")
-    autorizar_historias_app(request, empresa, historia.tipo, editar=True)
-    puede_ver_historia = not historial_paciente_limitado(request.user, empresa) and (
+    if historial_limitado and historia.tipo == "enfermeria":
+        if not puede_editar_enfermeria or not request.user.puede_acceder_empresa(empresa):
+            raise PermissionDenied("No tiene permiso para editar notas de enfermería.")
+        autorizar_pacientes_app(request, empresa, "puede_escribir_enfermeria", "puede_expediente_clinico")
+    else:
+        # El permiso de enfermería no sustituye el permiso de edición del catálogo anterior.
+        if historial_limitado and not rol_clinico_v2(request.user, empresa) and not request.user.tiene_permiso_erp(
+            "puede_editar_historia_clinica", empresa,
+        ):
+            raise PermissionDenied("No tiene permiso para editar esta clase de historia clínica.")
+        if not _puede_historia_tipo(request.user, empresa, historia.tipo, editar=request.method == "POST"):
+            raise PermissionDenied("No tiene permiso para consultar o editar esta clase de historia clínica.")
+        autorizar_historias_app(request, empresa, historia.tipo, editar=True)
+    puede_ver_historia = not historial_limitado and (
         not es_historias_app(request, empresa) or request.user.tiene_permiso_erp(
             "puede_ver_historia_clinica" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico", empresa,
         )
     )
     bloqueada = historia.bloqueada
     if bloqueada and request.method == "POST":
-        messages.error(request, "La nota de enfermeria ya fue finalizada y no puede editarse.")
-        if es_historias_app(request, empresa):
-            return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
-        return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        return _volver_nota_enfermeria_finalizada(request, empresa, paciente, historia)
+    texto_anterior = (
+        {"observaciones": historia.plan_tratamiento}
+        if historia.tipo == "enfermeria" and not historia.observaciones and historia.plan_tratamiento
+        else None
+    )
     form = HistoriaClinicaEspecialidadForm(
         request.POST or None,
         empresa=empresa,
@@ -4191,6 +4221,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         tipo=historia.tipo,
         paciente=paciente,
         instance=historia,
+        initial=texto_anterior,
     )
     validar_edicion_generica_app(request, empresa, historia, form)
     if bloqueada:
@@ -4202,19 +4233,30 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         .order_by("-fecha_completada", "-fecha_creacion")
         .first() if puede_ver_historia else None
     )
-    if request.method == "POST" and form.is_valid():
-        historia = form.save(commit=False)
-        historia.actualizado_por = request.user
-        historia.save()
-        _guardar_clasificacion_alopecia(historia, form, request.user)
-        _actualizar_sexo_paciente_desde_capilar(paciente, form)
-        messages.success(request, "Historia clinica actualizada correctamente.")
-        destino = url_lectura_expediente_limitado(request, empresa, paciente, historia.tipo)
-        if destino:
-            return respuesta_pacientes_app(request, empresa, redirect(destino))
-        if es_historias_app(request, empresa):
-            return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
-        return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    if request.method == "POST":
+        if form.is_valid():
+            historia = form.save(commit=False)
+            historia.actualizado_por = request.user
+            try:
+                historia.save()
+            except ValidationError as error:
+                if historia.tipo != "enfermeria":
+                    raise
+                form.add_error(None, ValidationError(error.messages))
+            else:
+                _guardar_clasificacion_alopecia(historia, form, request.user)
+                _actualizar_sexo_paciente_desde_capilar(paciente, form)
+                messages.success(request, "Historia clinica actualizada correctamente.")
+                destino = url_lectura_expediente_limitado(request, empresa, paciente, historia.tipo)
+                if destino:
+                    return respuesta_pacientes_app(request, empresa, redirect(destino))
+                if es_historias_app(request, empresa):
+                    return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
+                return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        if historia.tipo == "enfermeria":
+            historia.refresh_from_db(fields=["estado"])
+            if historia.bloqueada:
+                return _volver_nota_enfermeria_finalizada(request, empresa, paciente, historia)
     if puede_ver_historia:
         validar_historias_lectura_app(request, empresa, paciente)
     historias_previas = (
