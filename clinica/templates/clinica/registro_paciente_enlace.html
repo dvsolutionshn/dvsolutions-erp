@@ -7,7 +7,7 @@
 
 {% block topbar_actions %}
 {% if puede_controlar_enlaces_pacientes %}<a class="erp-btn-secondary" href="{% url 'clinica_control_enlaces_registro_paciente' empresa.slug %}">Ver control de enlaces</a>{% endif %}
-<a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
+<a class="erp-btn-secondary" href="{% if volver_url %}{{ volver_url }}{% else %}{% url 'clinica_pacientes' empresa.slug %}{% endif %}">Volver a pacientes</a>
 {% endblock %}
 
 {% block content %}

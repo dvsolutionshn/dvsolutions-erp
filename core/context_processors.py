@@ -231,6 +231,13 @@ def erp_access(request):
         "datos_paciente_limitados": datos_paciente_limitados(user, empresa),
         "puede_abrir_expediente_limitado": puede_abrir_expediente_limitado(user, empresa),
         "crear_pacientes": permiso("puede_crear_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
+        "generar_enlace_paciente_nuevo": bool(
+            interfaz_clinica and clinica_activa and rol_piloto and permiso("puede_generar_enlace_paciente_nuevo")
+        ),
+        "enviar_enlace_historia_clinica": bool(
+            interfaz_clinica and clinica_activa and rol_piloto
+            and permiso("puede_ver_pacientes") and permiso("puede_enviar_enlace_historia_clinica")
+        ),
         "editar_pacientes": permiso("puede_editar_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "eliminar_pacientes": permiso("puede_eliminar_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "crear_recordatorios_paciente": permiso("puede_crear_recordatorios_paciente") if permisos_clinicos_granulares else permiso("puede_pacientes"),

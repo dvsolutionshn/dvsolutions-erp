@@ -3,7 +3,12 @@
 {% block header_kicker %}Pacientes{% endblock %}
 {% block header_title %}Expediente{% endblock %}
 {% block header_description %}Elegí la sección que querés abrir.{% endblock %}
-{% block topbar_actions %}<a class="erp-btn-secondary" href="{{ pacientes_url }}">Volver a pacientes</a>{% endblock %}
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{{ pacientes_url }}">Volver a pacientes</a>
+{% if erp_access.enviar_enlace_historia_clinica %}
+{% include "clinica/includes/enviar_enlace_historia_clinica.html" with clase_formulario="erp-inline-form" clase_boton="erp-btn-secondary" %}
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <section class="erp-card" style="display:flex;align-items:center;gap:16px;margin-bottom:18px">

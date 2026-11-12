@@ -9,6 +9,9 @@
     <h2>{{ paciente.nombre }}</h2>
   </div>
 </section>
+{% if erp_access.enviar_enlace_historia_clinica %}
+{% include "clinica/includes/enviar_enlace_historia_clinica.html" with modo_app=True clase_formulario="mi-card" clase_boton="mi-button secondary" %}
+{% endif %}
 <section class="mi-card">
   <h2>Acciones del expediente</h2>
   <div class="mp-shortcuts">

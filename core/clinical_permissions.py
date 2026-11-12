@@ -41,6 +41,7 @@ PERMISOS_CLINICOS = (
         ("puede_ver_pacientes", "Ver listado y buscar pacientes"),
         ("puede_ver_datos_generales_paciente", "Ver datos generales del paciente"),
         ("puede_crear_pacientes", "Crear pacientes"),
+        ("puede_generar_enlace_paciente_nuevo", "Compartir enlace para paciente nuevo"),
         ("puede_editar_pacientes", "Editar datos generales"),
         ("puede_eliminar_pacientes", "Eliminar pacientes"),
         ("puede_crear_recordatorios_paciente", "Agendar recordatorios"),
@@ -52,6 +53,7 @@ PERMISOS_CLINICOS = (
         ("puede_ver_historia_clinica", "Ver historia clínica y diagnósticos"),
         ("puede_crear_historia_clinica", "Crear historia clínica y diagnósticos"),
         ("puede_editar_historia_clinica", "Editar historia clínica"),
+        ("puede_enviar_enlace_historia_clinica", "Enviar enlace de historia clínica"),
         ("puede_ver_antecedentes_clinicos", "Ver antecedentes"),
         ("puede_editar_antecedentes_clinicos", "Editar antecedentes"),
         ("puede_ver_examen_fisico", "Ver examen físico"),
@@ -401,6 +403,7 @@ LECTURAS_EXPEDIENTE_LIMITADO = {
 }
 
 PERMISOS_EXPEDIENTE_LIMITADO = (
+    "puede_enviar_enlace_historia_clinica",
     "puede_ver_planes_tratamiento",
     "puede_ver_anexos_clinicos",
     "puede_subir_anexos_clinicos",
@@ -437,6 +440,22 @@ def historial_paciente_limitado(usuario, empresa):
         and usuario.tiene_permiso_erp("puede_ver_pacientes", empresa)
         and not usuario.tiene_permiso_erp("puede_ver_historia_clinica", empresa)
     )
+
+
+def permiso_enlace_paciente_desde_ruta(path_suffix, method):
+    if method != "POST":
+        return None
+    parts = path_suffix.strip("/").split("/")
+    if parts == ["pacientes", "enlace-registro", "generar"]:
+        return "puede_generar_enlace_paciente_nuevo"
+    if len(parts) < 4 or parts[0] != "pacientes" or not parts[1].isdigit() or parts[2] != "preconsulta":
+        return None
+    action = parts[3:]
+    if action in (["generar"], ["generar", "general"]) or (
+        len(action) == 2 and action[0].isdigit() and action[1] == "enviar-whatsapp"
+    ):
+        return "puede_enviar_enlace_historia_clinica"
+    return None
 
 
 def permiso_facturacion_clinico_granular(path_suffix, method="GET", *, v3=False):

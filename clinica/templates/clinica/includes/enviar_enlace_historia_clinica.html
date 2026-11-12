@@ -1,0 +1,5 @@
+<form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}"{% if clase_formulario %} class="{{ clase_formulario }}"{% endif %}>
+    {% csrf_token %}
+    {% if modo_app %}<input type="hidden" name="app" value="1">{% endif %}
+    <button class="{{ clase_boton }}" type="submit">Enviar historia clínica</button>
+</form>

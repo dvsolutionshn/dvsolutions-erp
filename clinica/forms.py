@@ -2114,26 +2114,32 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         empresa=None,
         modo_basico_paciente_nuevo=False,
         omitir_pasos_iniciales=False,
+        sin_datos_previos=False,
         **kwargs,
     ):
         self.paciente = paciente
         self.empresa = empresa or getattr(paciente, "empresa", None)
         self.modo_basico_paciente_nuevo = modo_basico_paciente_nuevo
         self.omitir_pasos_iniciales = omitir_pasos_iniciales
+        self.sin_datos_previos = sin_datos_previos
         super().__init__(*args, **kwargs)
-        self._valores_modelo_historicos = {
-            campo: getattr(self.instance, campo, "")
-            for campo in [
-                "funciones_organicas", "funciones_detalle", "dieta", "ejercicio",
-                "alergias", "medicamentos_habituales_detalle",
-            ]
-        }
+        self._valores_modelo_historicos = {}
+        if self.sin_datos_previos:
+            self.initial.clear()
+        else:
+            self._valores_modelo_historicos = {
+                campo: getattr(self.instance, campo, "")
+                for campo in [
+                    "funciones_organicas", "funciones_detalle", "dieta", "ejercicio",
+                    "alergias", "medicamentos_habituales_detalle",
+                ]
+            }
         if paciente is None:
             self.fields["foto_perfil"].required = False
             self.fields["foto_perfil"].help_text = (
                 "Opcional. Si la camara o la foto falla, puede enviar el formulario y la fotografia se completa en recepcion."
             )
-        if paciente and (not self.is_bound or self.omitir_pasos_iniciales):
+        if paciente and not self.sin_datos_previos and (not self.is_bound or self.omitir_pasos_iniciales):
             for campo in [
                 "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
                 "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "direccion",
@@ -2162,7 +2168,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         })
         datos_generales = (
             self.instance.datos_generales
-            if self.instance and isinstance(self.instance.datos_generales, dict)
+            if not self.sin_datos_previos and self.instance and isinstance(self.instance.datos_generales, dict)
             else {}
         )
         formulario_general = datos_generales.get("formulario_general", {}) or {}
@@ -2180,7 +2186,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                     if campo == "motivo_categoria" and isinstance(valor, str):
                         valor = [valor]
                     self.fields[campo].initial = valor
-        if not self.is_bound and not self.modo_basico_paciente_nuevo:
+        if not self.is_bound and not self.modo_basico_paciente_nuevo and not self.sin_datos_previos:
             estado_funciones = self.instance.funciones_organicas if self.instance else ""
             for campo, _etiqueta in self.FUNCIONES_ORGANICAS_CAMPOS:
                 if not formulario_general.get(campo):
@@ -2301,6 +2307,13 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             return (getattr(self.paciente, "identidad", None) or "").strip()
         if not identidad.isdigit():
             raise forms.ValidationError("Utilice solamente numeros, sin espacios ni guiones.")
+        if self.sin_datos_previos:
+            identidad_paciente = "".join(
+                caracter for caracter in (getattr(self.paciente, "identidad", "") or "") if caracter.isdigit()
+            )
+            if identidad_paciente and identidad != identidad_paciente:
+                raise forms.ValidationError("Verifique el número de identidad.")
+            return identidad
         if self.empresa and Paciente.objects.filter(
             empresa=self.empresa,
             identidad=identidad,
@@ -2491,7 +2504,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "informante", "informante_detalle", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
             "referido_por", "referido_por_detalle",
         ]
-        datos = dict(self.instance.datos_generales) if self.instance and isinstance(self.instance.datos_generales, dict) else {}
+        datos = {}
+        if not self.sin_datos_previos and self.instance and isinstance(self.instance.datos_generales, dict):
+            datos = dict(self.instance.datos_generales)
         datos.update({campo: self.cleaned_data.get(campo) for campo in campos})
         if datos.get("fecha_nacimiento"):
             datos["fecha_nacimiento"] = datos["fecha_nacimiento"].isoformat()

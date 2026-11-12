@@ -970,6 +970,7 @@ class PreconsultaClinica(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="preconsultas_clinicas")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="preconsultas")
     tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default="general")
+    sin_datos_previos = models.BooleanField(default=False, db_default=False)
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
     token_preview = models.CharField(max_length=16)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")

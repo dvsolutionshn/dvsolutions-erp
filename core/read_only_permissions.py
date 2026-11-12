@@ -77,6 +77,7 @@ PERMISOS_MODULO = {
         "puede_clinica", "puede_pacientes", "puede_expediente_clinico", "puede_tratamientos_clinicos",
         "puede_configuracion_clinica", "puede_ver_pacientes", "puede_ver_datos_generales_paciente",
         "puede_crear_pacientes", "puede_editar_pacientes", "puede_eliminar_pacientes",
+        "puede_generar_enlace_paciente_nuevo", "puede_enviar_enlace_historia_clinica",
         "puede_crear_recordatorios_paciente", "puede_restringir_citas_paciente",
         "puede_habilitar_citas_paciente", "puede_ver_motivo_restriccion_paciente",
         "puede_ver_historia_clinica", "puede_crear_historia_clinica", "puede_editar_historia_clinica",

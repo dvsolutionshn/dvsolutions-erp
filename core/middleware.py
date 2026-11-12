@@ -26,6 +26,7 @@ from core.clinical_permissions import (
     permisos_gastos_adicionales_desde_ruta,
     permiso_agenda_granular,
     permiso_clinica_granular,
+    permiso_enlace_paciente_desde_ruta,
     rol_acciones_v3,
     rol_clinico_granular,
     rol_clinico_v2,
@@ -408,6 +409,9 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     rol_granular = rol_clinico_granular(request.user, empresa)
+                    permiso_enlace = permiso_enlace_paciente_desde_ruta(suffix, request.method) if rol_granular else None
+                    if permiso_enlace and request.user.tiene_permiso_erp(permiso_enlace, empresa):
+                        return self.get_response(request)
                     permiso = (
                         permiso_clinica_granular(
                             suffix, request.method,

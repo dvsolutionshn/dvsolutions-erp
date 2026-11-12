@@ -243,9 +243,10 @@
           </div>
         </header>
         <div class="patients-premium-controls">
-          {% if empresa.slug == "hospital_mia" and erp_access.pacientes %}
+          {% if erp_access.generar_enlace_paciente_nuevo or empresa.slug == "hospital_mia" and erp_access.crear_pacientes %}
           <form class="patient-invite-form" id="patientInviteForm" method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}">
             {% csrf_token %}
+            <input type="hidden" name="app" value="1">
             <button class="patient-invite-button" id="patientInviteButton" type="submit">Generar y copiar link de paciente nuevo</button>
             <div class="patient-invite-status" id="patientInviteStatus" role="status" aria-live="polite"></div>
             <input class="patient-invite-link" id="patientInviteLink" type="text" readonly hidden aria-label="Enlace de registro del paciente">
@@ -287,9 +288,10 @@
           </div>
           <button class="app-panel-close" type="button" data-app-close>← Inicio</button>
         </div>
-        {% if empresa.slug == "hospital_mia" and erp_access.pacientes %}
+        {% if erp_access.generar_enlace_paciente_nuevo or empresa.slug == "hospital_mia" and erp_access.crear_pacientes %}
         <form class="patient-invite-form basic" id="patientInviteForm" method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}">
           {% csrf_token %}
+          <input type="hidden" name="app" value="1">
           <button class="patient-invite-button" id="patientInviteButton" type="submit">Generar y copiar link de paciente nuevo</button>
           <div class="patient-invite-status" id="patientInviteStatus" role="status" aria-live="polite"></div>
           <input class="patient-invite-link" id="patientInviteLink" type="text" readonly hidden aria-label="Enlace de registro del paciente">
