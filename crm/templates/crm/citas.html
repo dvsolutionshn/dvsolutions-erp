@@ -4,7 +4,7 @@
 {% block header_kicker %}Módulo de citas{% endblock %}
 {% block header_title %}Calendario de Citas{% endblock %}
 {% block header_description %}Vista mensual, semanal y diaria de la agenda de {{ empresa.nombre }}.{% endblock %}
-{% block topbar_actions %}{% if not agenda_solo_consulta %}<a class="erp-action-link" href="#editor" data-open-editor-top>+ Crear cita</a>{% if puede_crear_bloqueos %}<a class="erp-action-link" href="#disponibilidad-medica">Bloquear horario</a>{% endif %}{% endif %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
+{% block topbar_actions %}{% if agenda_permisos_accion.crear %}<a class="erp-action-link" href="#editor" data-open-editor-top>+ Crear cita</a>{% endif %}{% if puede_crear_bloqueos and not agenda_solo_consulta %}<a class="erp-action-link" href="#disponibilidad-medica">Bloquear horario</a>{% endif %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
 
 {% block content %}
 {% load static %}
@@ -878,7 +878,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
         </div>
         {% else %}
         {% for cita in dia.citas %}
-        <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if not agenda_solo_consulta %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}" data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if not agenda_solo_consulta %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
+        <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if agenda_permisos_accion.cancelar and not agenda_espejo %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}"{% endif %}{% if agenda_permisos_accion.reagendar and not agenda_espejo %} data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %}{% if agenda_permisos_accion.editar and not agenda_espejo %} data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if agenda_ver_detalles_clinicos %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}"{% endif %}{% if not agenda_solo_consulta %} data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}</span>
           <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
@@ -890,7 +890,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
         {% endif %}
         <div class="calendar-modal-source">
           {% for cita in dia.citas %}
-          <button type="button" class="calendar-modal-item color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if not agenda_solo_consulta %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}" data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if not agenda_solo_consulta %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
+          <button type="button" class="calendar-modal-item color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if agenda_permisos_accion.cancelar and not agenda_espejo %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}"{% endif %}{% if agenda_permisos_accion.reagendar and not agenda_espejo %} data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %}{% if agenda_permisos_accion.editar and not agenda_espejo %} data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if agenda_ver_detalles_clinicos %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}"{% endif %}{% if not agenda_solo_consulta %} data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
             <div class="calendar-modal-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
             <div class="calendar-modal-info">
               <strong>{{ cita.display_cliente }}</strong>
@@ -920,7 +920,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
       <div class="week-head"><strong>{{ dia.fecha|date:"D d" }}</strong><span>{{ dia.fecha|date:"F" }}</span></div>
       <div class="week-events">
         {% for cita in dia.citas %}
-        <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if not agenda_solo_consulta %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}" data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if not agenda_solo_consulta %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
+        <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if agenda_permisos_accion.cancelar and not agenda_espejo %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}"{% endif %}{% if agenda_permisos_accion.reagendar and not agenda_espejo %} data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %}{% if agenda_permisos_accion.editar and not agenda_espejo %} data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if agenda_ver_detalles_clinicos %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}"{% endif %}{% if not agenda_solo_consulta %} data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}{% if not es_clinica %} · {{ cita.duracion_minutos }} min{% endif %}</span>
           <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
@@ -945,7 +945,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
       </article>
       {% endfor %}
       {% for cita in dia.citas %}
-      <article class="day-event color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if not agenda_solo_consulta %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}" data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if not agenda_solo_consulta %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
+      <article class="day-event color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}{% if not agenda_solo_consulta %} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_solo_consulta or agenda_espejo %}1{% else %}0{% endif %}"{% if agenda_permisos_accion.cancelar and not agenda_espejo %} data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}"{% endif %}{% if agenda_permisos_accion.reagendar and not agenda_espejo %} data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}"{% endif %}{% if agenda_permisos_accion.editar and not agenda_espejo %} data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor"{% endif %} data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}"{% if agenda_ver_detalles_clinicos %} data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}"{% endif %}{% if not agenda_solo_consulta %} data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}"{% endif %}>
         <div class="day-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
         <div class="day-content">
           <strong>{{ cita.titulo }}</strong>
@@ -1168,7 +1168,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
   </script>
   {% endif %}
 
-  {% if not agenda_solo_consulta %}
+  {% if agenda_permisos_accion.crear or cita_editando and agenda_permisos_accion.editar %}
   <details id="editor" class="erp-form-card editor" {% if cita_editando or form.errors %}open{% endif %}>
     <summary class="editor-title">
       <div>
@@ -1233,7 +1233,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
                   {{ field }}
                 </div>
               </div>
-              <button class="appointment-patient-new" type="button" data-open-patient-modal>+ Nuevo paciente</button>
+              {% if not solo_tarjetas_pacientes %}<button class="appointment-patient-new" type="button" data-open-patient-modal>+ Nuevo paciente</button>{% endif %}
             </div>
             {% elif field.name == "servicio_clinico" and permite_crear_tipo_consulta %}
             <div class="appointment-service-picker">
@@ -1268,7 +1268,9 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
   </script>
 
   {{ servicios_clinicos_meta|json_script:"appointmentServicesMeta" }}
+  {% endif %}
 
+  {% if agenda_ver_detalles_clinicos %}
   <div hidden>
     {% for cita in citas %}
     <template id="appointment-media-{{ cita.id }}" data-attention-url="{{ cita.atencion_url }}" data-attention-label="{{ cita.atencion_label }}">
@@ -1322,16 +1324,19 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
               {% else %}
               <div class="appointment-manage">
                 <div class="appointment-links">
-                  <a class="erp-link" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar</a>
+                  {% if agenda_permisos_accion.editar %}<a class="erp-link" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar</a>{% endif %}
                   {% if not datos_paciente_limitados and cita.whatsapp_url %}<a class="erp-link" target="_blank" href="{{ cita.whatsapp_url }}">WhatsApp</a>{% endif %}
                 </div>
+                {% if agenda_permisos_accion.estado %}
                 <form class="appointment-state-form" method="post" action="{% url 'agenda_cita_estado' cita.empresa.slug cita.id %}">
                   {% csrf_token %}
                   <input type="hidden" name="vista" value="{{ vista }}">
                   <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
-                  <select name="estado">{% for codigo,nombre in estados_cita %}<option value="{{ codigo }}" {% if cita.estado == codigo %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select>
+                  <select name="estado">{% for codigo,nombre in estados_cita %}{% if codigo != 'cancelada' or agenda_permisos_accion.cancelar or cita.estado == codigo %}<option value="{{ codigo }}" {% if cita.estado == codigo %}selected{% endif %}>{{ nombre }}</option>{% endif %}{% endfor %}</select>
                   <button type="submit">Actualizar</button>
                 </form>
+                {% endif %}
+                {% if agenda_permisos_accion.eliminar %}
                 <details class="appointment-delete">
                   <summary>Eliminar cita</summary>
                   <form class="appointment-delete-form" method="post" action="{% url 'agenda_cita_eliminar' cita.empresa.slug cita.id %}" onsubmit="return confirm('¿Confirmas que deseas eliminar definitivamente esta cita?');">
@@ -1343,6 +1348,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
                     <button type="submit">Confirmar eliminación</button>
                   </form>
                 </details>
+                {% endif %}
               </div>
               {% endif %}
             </td>
@@ -1357,7 +1363,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
   </section>
 </div>
 
-{% if es_clinica and not agenda_solo_consulta %}
+{% if es_clinica and not agenda_solo_consulta and not solo_tarjetas_pacientes %}
 <dialog class="patient-quick-modal" id="patientQuickModal">
   <form id="patientQuickForm">
     {% csrf_token %}
@@ -1523,7 +1529,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
     return '<div class="appointment-readonly-field '+(wide ? "wide" : "")+'"><span>'+escapeHtml(label)+'</span><strong class="'+(wide ? "appointment-readonly-note" : "")+'">'+escapeHtml(value)+'</strong></div>';
   }
 
-  {% if not agenda_solo_consulta %}
+  {% if agenda_permisos_accion.reagendar %}
   function rescheduleControls(currentValue){
     const parts = String(currentValue || "").split("T");
     const dateValue = parts[0] || "";
@@ -1575,7 +1581,11 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
     ) : [
       '<div class="appointment-readonly-actions">',
         attentionUrl ? '<a class="appointment-action-attention" href="'+escapeHtml(attentionUrl)+'">'+escapeHtml(attentionLabel || "Abrir atención clínica")+'</a>' : '',
-        '<a class="appointment-action-edit" href="'+escapeHtml(data.editUrl || "#editor")+'">Editar cita completa</a>',
+        {% if agenda_permisos_accion.editar %}
+        data.editUrl ? '<a class="appointment-action-edit" href="'+escapeHtml(data.editUrl)+'">Editar cita completa</a>' : '',
+        {% endif %}
+        {% if agenda_permisos_accion.cancelar %}
+        data.cancelUrl ? [
         '<form class="appointment-action-box appointment-action-cancel" method="post" action="'+escapeHtml(data.cancelUrl || "")+'" onsubmit="return confirm(\'¿Confirmas cancelar esta cita y avisar por WhatsApp?\');">',
           '<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">',
           '<input type="hidden" name="vista" value="{{ vista }}">',
@@ -1584,6 +1594,10 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
           '<input name="motivo" type="text" placeholder="Motivo opcional">',
           '<button type="submit">Cancelar y avisar WhatsApp</button>',
         '</form>',
+        ].join("") : '',
+        {% endif %}
+        {% if agenda_permisos_accion.reagendar %}
+        data.rescheduleUrl ? [
         '<form class="appointment-action-box appointment-action-reschedule" method="post" action="'+escapeHtml(data.rescheduleUrl || "")+'">',
           '<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">',
           '<input type="hidden" name="vista" value="{{ vista }}">',
@@ -1592,6 +1606,8 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
           rescheduleControls(data.currentDatetime),
           '<button type="submit">Reagendar y avisar WhatsApp</button>',
         '</form>',
+        ].join("") : '',
+        {% endif %}
       '</div>',
     ].join("");
     {% endif %}
@@ -1604,17 +1620,19 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
           field("Doctor / profesional", data.appointmentProfessional),
           field("Fecha", data.appointmentDate),
           field("Hora", data.appointmentTime),
-          {% if not agenda_solo_consulta %}
+          {% if agenda_ver_detalles_clinicos %}
           field("Fin estimado", data.appointmentSurgeryEnd),
           field("Detalle de cirugia", data.appointmentSurgeryDetail, true),
           field("Fotos adjuntas", data.appointmentSurgeryPhotos ? data.appointmentSurgeryPhotos + " archivo(s)" : ""),
+          {% endif %}
+          {% if not agenda_solo_consulta %}
           field("Pago", data.appointmentPaid),
           field("Condición", trigger.classList.contains("is-courtesy") ? "Cortesía" : ""),
           {% endif %}
           field("Color de agenda", data.appointmentType),
           field("Acento profesional", data.appointmentProtype),
           field("Duracion", data.appointmentDuration),
-          {% if not agenda_solo_consulta %}field("Notas de la cita", data.appointmentNote, true),{% endif %}
+          {% if agenda_ver_detalles_clinicos %}field("Notas de la cita", data.appointmentNote, true),{% endif %}
         '</div>',
         {% if not agenda_solo_consulta %}
         mediaHtml ? '<div class="appointment-readonly-media"><h4>Fotos y videos de cirugía</h4>'+mediaHtml+'</div>' : '',

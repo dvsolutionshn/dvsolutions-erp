@@ -1,0 +1,8 @@
+{% if paciente.telefono or paciente.whatsapp or paciente.celular_2 or paciente.correo %}
+<div class="{{ clase_contacto }}">
+    {% if paciente.telefono %}<span><strong>Teléfono</strong> {{ paciente.telefono }}</span>{% endif %}
+    {% if paciente.whatsapp and paciente.whatsapp != paciente.telefono %}<span><strong>WhatsApp</strong> {{ paciente.whatsapp }}</span>{% endif %}
+    {% if paciente.celular_2 and paciente.celular_2 != paciente.telefono and paciente.celular_2 != paciente.whatsapp %}<span><strong>Otro teléfono</strong> {{ paciente.celular_2 }}</span>{% endif %}
+    {% if paciente.correo %}<span><strong>Correo</strong> {{ paciente.correo }}</span>{% endif %}
+</div>
+{% endif %}

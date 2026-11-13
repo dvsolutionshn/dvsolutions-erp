@@ -17,6 +17,7 @@ from django.test import RequestFactory, SimpleTestCase, TestCase, override_setti
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from clinica.models import Paciente
 from core.models import Empresa, RolSistema, Usuario, UsuarioEmpresaPermiso
 from facturacion.forms import ProductoForm
 from facturacion.models import Producto
@@ -315,6 +316,50 @@ class MobileClinicInterfaceTests(TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertEqual(page.context["clinical_installed_app_url"], reverse("agenda_mobile_modules_screen", args=[self.empresa.slug]))
         self.assertFalse(page.has_header("Location"))
+
+    def test_patient_cards_profile_opens_the_directory_without_clinical_payload(self):
+        self.set_role(
+            solo_tarjetas_pacientes=True, puede_ver_pacientes=True,
+            puede_ver_datos_generales_paciente=True, puede_crear_citas=True,
+            puede_punto_venta=True, puede_crear_facturas=True,
+        )
+        pacientes = {
+            empresa.slug: Paciente.objects.create(
+                empresa=empresa, nombre=f"Paciente de Recepción {empresa.slug}",
+                expediente_codigo="PAC-QA-001", identidad=f"08011999000{indice:02d}",
+                telefono=f"998877{indice:02d}", alergias="Dato clínico reservado QA",
+            )
+            for indice, empresa in enumerate(self.empresas.values(), start=1)
+        }
+        for slug, empresa in self.empresas.items():
+            with self.subTest(empresa=slug):
+                paciente = pacientes[slug]
+                page = self.home(empresa)
+                self.assertTrue(page.context["solo_tarjetas_pacientes"])
+                self.assertFalse(page.context["agenda_espejo"])
+                self.assertEqual(page.context["agenda_empresa"], empresa)
+                self.assertFalse(page.context["pacientes_app_premium"])
+                self.assertEqual(page.context["pacientes_app_payload"], [])
+                self.assertNotContains(page, 'id="mobileAppPatientsData"')
+                self.assertNotContains(page, 'id="patient-profile-app"')
+                self.assertNotContains(page, 'id="pacientes-app"')
+                self.assertNotContains(page, paciente.alergias)
+                markup = _ClinicInterfaceMarkup(page.content)
+                directory = f'{reverse("clinica_pacientes", args=[empresa.slug])}?app=1'
+                self.assertTrue(any(
+                    attrs.get("href") == directory and "data-patients-directory" in attrs
+                    for tag, attrs in markup.nodes if tag == "a"
+                ))
+                self.assertContains(page, 'data-open-editor aria-label="Crear cita"')
+                self.assertContains(page, 'id="mobilePatientSearch"')
+                self.assertContains(page, 'id="quickInvoiceForm"')
+                contacts = json.loads(markup.scripts["mobilePatientsData"])
+                appointment_contact = next(contact for contact in contacts if contact["id"] == paciente.id)
+                self.assertEqual(appointment_contact["telefono"], paciente.telefono)
+                self.assertNotIn("alergias", appointment_contact)
+                self.assertFalse({contact["id"] for contact in contacts} & {
+                    other.pk for other_slug, other in pacientes.items() if other_slug != slug
+                })
 
     def test_external_erp_dashboard_does_not_get_clinical_installed_redirect_or_data(self):
         page = self.immutable(reverse("dashboard", args=[self.externa.slug]))

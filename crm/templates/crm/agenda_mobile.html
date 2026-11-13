@@ -156,12 +156,12 @@
         <button type="button" id="installButton">Instalar</button>
       </div>
       <div class="mobile-home-grid">
-        {% if not datos_paciente_limitados or pacientes_app_limitados_url %}
+        {% if pacientes_app_limitados_url or not datos_paciente_limitados and not solo_tarjetas_pacientes %}
         <a class="mobile-home-card patients" {% if pacientes_app_limitados_url %}href="{{ pacientes_app_limitados_url }}" data-patients-directory{% else %}href="#pacientes-app" data-app-open="pacientes-app"{% endif %}>
           <div class="mobile-home-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/><path d="M19 20c0-1.8-1.1-3.2-2.7-3.8"/><path d="M17 6.3a3 3 0 0 1 0 5.4"/></svg></div>
           <div class="mobile-home-copy">
             <strong>Pacientes</strong>
-            <span>{% if datos_paciente_limitados %}Buscar pacientes por nombre y consultar las secciones autorizadas.{% else %}Buscar expedientes, revisar historial y entrar rápido a la información clínica.{% endif %}</span>
+            <span>{% if solo_tarjetas_pacientes %}Buscar por nombre o identidad y consultar datos generales.{% elif datos_paciente_limitados %}Buscar pacientes por nombre y consultar las secciones autorizadas.{% else %}Buscar expedientes, revisar historial y entrar rápido a la información clínica.{% endif %}</span>
             <em>{{ pacientes_app_total }} paciente{{ pacientes_app_total|pluralize:"s" }}</em>
           </div>
           <div class="mobile-home-go">›</div>
@@ -202,7 +202,7 @@
           <div class="mobile-home-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M4 10h16"/><path d="M9 14h.01"/><path d="M12 14h.01"/><path d="M15 14h.01"/></svg></div>
           <div class="mobile-home-copy">
             <strong>Calendario de citas</strong>
-            <span>{% if agenda_solo_consulta %}Consultar citas por día, semana, mes o año.{% else %}Ver la agenda, crear atenciones y revisar detalles por día, semana, mes o año.{% endif %}</span>
+            <span>{% if agenda_permisos_accion.crear %}Ver la agenda, crear atenciones y revisar detalles por día, semana, mes o año.{% else %}Consultar citas por día, semana, mes o año.{% endif %}</span>
             <em>{{ citas_hoy_total }} hoy</em>
           </div>
           <div class="mobile-home-go">↓</div>
@@ -227,7 +227,7 @@
       {% endif %}
     </section>
     {% include "crm/mobile_modules_panel.html" %}
-    {% if not datos_paciente_limitados %}
+    {% if not datos_paciente_limitados and not solo_tarjetas_pacientes %}
     <section class="app-panel mobile-app-screen" id="pacientes-app">
       <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Pacientes</span></div>
       {% if pacientes_app_premium %}
@@ -587,7 +587,7 @@
     <header class="premium-calendar-top">
       <div class="premium-calendar-top-row">
         <div><small>Agenda clínica</small><h2>{{ titulo_periodo }}</h2></div>
-        {% if not agenda_solo_consulta %}<button class="premium-calendar-create" type="button" data-open-editor>+ Nueva cita</button>{% endif %}
+        {% if agenda_permisos_accion.crear %}<button class="premium-calendar-create" type="button" data-open-editor>+ Nueva cita</button>{% endif %}
       </div>
     </header>
     {% endif %}
@@ -694,7 +694,7 @@
       </article>
       {% endif %}
       {% endfor %}
-      {% else %}<div class="premium-empty-state"><b>No hay citas en este período</b><span>Cambie la fecha o los filtros{% if not agenda_solo_consulta %}, o programe una nueva atención{% endif %}.</span></div>{% endif %}
+      {% else %}<div class="premium-empty-state"><b>No hay citas en este período</b><span>Cambie la fecha o los filtros{% if agenda_permisos_accion.crear %}, o programe una nueva atención{% endif %}.</span></div>{% endif %}
     </section>
     {% elif vista == "anio" %}
     <div class="section-head"><div><small>Resumen anual</small><h2>{{ fecha_seleccionada.year }}</h2></div></div>
@@ -741,7 +741,7 @@
         <button class="more" type="button" data-cita-actions="{{ cita.id }}" aria-label="{% if agenda_solo_consulta %}Ver detalle de la cita{% else %}Ver acciones de la cita{% endif %}">•••</button>
       </article>
       {% endfor %}
-      {% if not citas and not bloqueos %}<div class="empty">No hay citas ni bloqueos para este día.{% if not agenda_solo_consulta %}<br>Toca el botón <strong>+</strong> para programar una.{% endif %}</div>{% endif %}
+      {% if not citas and not bloqueos %}<div class="empty">No hay citas ni bloqueos para este día.{% if agenda_permisos_accion.crear %}<br>Toca el botón <strong>+</strong> para programar una.{% endif %}</div>{% endif %}
     </section>
     {% endif %}
     {% if es_clinica and puede_gestionar_bloqueos and not agenda_solo_consulta %}<button class="availability-mobile-trigger" type="button" data-open-availability>Bloquear horario / No disponible</button>{% endif %}
@@ -751,13 +751,13 @@
   <nav class="bottom"{% if agenda_solo_consulta %} style="display:flex;justify-content:space-around;align-items:center"{% endif %}>
     {% if hospital_mia_app_premium %}
     <button class="nav-item" type="button" data-app-close><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10M10 20v-6h4v6"/></svg></b><span>Inicio</span></button>
-    {% if not datos_paciente_limitados or pacientes_app_limitados_url %}<a class="nav-item" {% if pacientes_app_limitados_url %}href="{{ pacientes_app_limitados_url }}"{% else %}href="#pacientes-app" data-app-open="pacientes-app"{% endif %}><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>{% endif %}
-    {% if not agenda_solo_consulta %}<button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>{% endif %}
+    {% if pacientes_app_limitados_url or not datos_paciente_limitados and not solo_tarjetas_pacientes %}<a class="nav-item" {% if pacientes_app_limitados_url %}href="{{ pacientes_app_limitados_url }}"{% else %}href="#pacientes-app" data-app-open="pacientes-app"{% endif %}><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>{% endif %}
+    {% if agenda_permisos_accion.crear %}<button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>{% endif %}
     <a class="nav-item" href="#agenda-app" data-app-open="agenda-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></b><span>Citas</span></a>
     <a class="nav-item" href="#factura-app" data-app-open="factura-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-3-1.5-2 1-2-1-2 1-3-1.5V5a2 2 0 0 1 2-2Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></b><span>Facturar</span></a>
     {% else %}
-    {% if not datos_paciente_limitados or pacientes_app_limitados_url %}<a class="nav-item" {% if pacientes_app_limitados_url %}href="{{ pacientes_app_limitados_url }}"{% else %}href="#pacientes-app" data-app-open="pacientes-app"{% endif %}><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>{% endif %}
-    {% if not agenda_solo_consulta %}<button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>{% endif %}
+    {% if pacientes_app_limitados_url or not datos_paciente_limitados and not solo_tarjetas_pacientes %}<a class="nav-item" {% if pacientes_app_limitados_url %}href="{{ pacientes_app_limitados_url }}"{% else %}href="#pacientes-app" data-app-open="pacientes-app"{% endif %}><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>{% endif %}
+    {% if agenda_permisos_accion.crear %}<button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>{% endif %}
     {% if agenda_solo_consulta %}<a class="nav-item" href="#agenda-app" data-app-open="agenda-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></b><span>Citas</span></a>{% endif %}
     <a class="nav-item" href="#factura-app" data-app-open="factura-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-3-1.5-2 1-2-1-2 1-3-1.5V5a2 2 0 0 1 2-2Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></b><span>Facturar</span></a>
     {% endif %}
@@ -791,7 +791,7 @@
 </section>
 {% endif %}
 
-{% if not agenda_solo_consulta %}
+{% if agenda_permisos_accion.crear or cita_editando and agenda_permisos_accion.editar %}
 <section class="sheet {% if form.errors or cita_editando %}open{% endif %}" id="editor">
   <div class="sheet-card">
     <div class="sheet-grip"></div>
@@ -826,7 +826,7 @@
             </div>
             <div class="mobile-patient-selected" id="mobilePatientSelected" aria-live="polite"></div>
           </div>
-          {% if field.name == "paciente" %}
+          {% if field.name == "paciente" and not solo_tarjetas_pacientes %}
           <button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>
           {% endif %}
           <div class="errors">{{ field.errors }}</div>
@@ -843,7 +843,7 @@
           <div class="errors">{{ field.errors }}</div>
         </div>
         {% elif field.name != "hora_cita" and field.name != "periodo_cita" and field.name != "cirugia_periodo_fin" and field.name != "detalles_agenda" %}
-        <div class="field {% if field.name == 'observacion' or field.name == 'cirugia_detalle' or field.name == 'fotos_cirugia' %}wide{% endif %}" data-field-name="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.name == "paciente" %}<button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>{% endif %}<div class="errors">{{ field.errors }}</div></div>
+        <div class="field {% if field.name == 'observacion' or field.name == 'cirugia_detalle' or field.name == 'fotos_cirugia' %}wide{% endif %}" data-field-name="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}<div class="errors">{{ field.errors }}</div></div>
         {% endif %}
       {% endfor %}
       {% if detalles_agenda_hospital_mia %}{{ form.detalles_agenda }}{% if empresa.tipo_solucion == 'clinica' %}{% include "crm/_detalles_agenda_hospital_mia.html" with detalles_agenda_app_segura=True %}{% else %}{% include "crm/_detalles_agenda_hospital_mia.html" %}{% endif %}{% endif %}
@@ -868,11 +868,12 @@
         <div class="mobile-detail-item"><span>Fecha</span><strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong></div>
         <div class="mobile-detail-item"><span>Hora</span><strong>{{ cita.fecha_hora|date:"h:i A" }}</strong></div>
         {% if cita.cirugia_fin_estimada %}<div class="mobile-detail-item"><span>Fin estimado</span><strong>{{ cita.cirugia_fin_estimada|date:"h:i A" }}</strong></div>{% endif %}
-        {% if agenda_solo_consulta %}
         <div class="mobile-detail-item"><span>Estado</span><strong>{{ cita.get_estado_display }}</strong></div>
-        {% else %}
+        {% if not agenda_solo_consulta %}
         {% if cita.pagada %}<div class="mobile-detail-item"><span>Pago</span><strong>Pagada</strong></div>{% endif %}
         {% if cita.cortesia %}<div class="mobile-detail-item"><span>Condición</span><strong>Cortesía</strong></div>{% endif %}
+        {% endif %}
+        {% if agenda_ver_detalles_clinicos %}
         {% if cita.cirugia_detalle %}<div class="mobile-detail-item wide"><span>Detalle de cirugía</span><strong class="mobile-detail-note">{{ cita.cirugia_detalle }}</strong></div>{% endif %}
         {% if cita.observacion and not cita.cirugia_detalle %}<div class="mobile-detail-item wide"><span>Notas</span><strong class="mobile-detail-note">{{ cita.observacion }}</strong></div>{% endif %}
         {% if cita.fotos_cirugia.all %}
@@ -898,15 +899,43 @@
     </div>
     {% if not agenda_solo_consulta %}
     <div class="actions-menu">
-      {% if cita.atencion_url %}<a class="action-link attention" href="{{ cita.atencion_url }}">{{ cita.atencion_label }}</a>{% endif %}
+      {% if agenda_ver_detalles_clinicos and cita.atencion_url %}<a class="action-link attention" href="{{ cita.atencion_url }}">{{ cita.atencion_label }}</a>{% endif %}
       {% if agenda_espejo %}
       {% if not datos_paciente_limitados and cita.whatsapp_url %}<a class="action-link whatsapp" href="{{ cita.whatsapp_url }}" target="_blank" rel="noopener">Escribir por WhatsApp</a>{% endif %}
       <div class="mobile-swipe-tip">Esta cita pertenece a Hospital Mía. Su edición y seguimiento se administran desde la app de Hospital Mía.</div>
       {% else %}
-      <a class="action-link" href="?fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar información</a>
+      {% if agenda_permisos_accion.editar %}<a class="action-link" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar información</a>{% endif %}
       {% if not datos_paciente_limitados and cita.whatsapp_url %}<a class="action-link whatsapp" href="{{ cita.whatsapp_url }}" target="_blank" rel="noopener">Escribir por WhatsApp</a>{% endif %}
-      <form method="post" action="{% url 'agenda_cita_estado' cita.empresa.slug cita.id %}">{% csrf_token %}<input type="hidden" name="return_to" value="mobile"><input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}"><select name="estado">{% for codigo,nombre in estados_cita %}<option value="{{ codigo }}" {% if cita.estado == codigo %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select><button type="submit">Actualizar</button></form>
+      {% if agenda_permisos_accion.estado %}<form method="post" action="{% url 'agenda_cita_estado' cita.empresa.slug cita.id %}">{% csrf_token %}<input type="hidden" name="return_to" value="mobile"><input type="hidden" name="vista" value="{{ vista }}"><input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}"><select name="estado" aria-label="Estado de la cita">{% for codigo,nombre in estados_cita %}{% if codigo != 'cancelada' or agenda_permisos_accion.cancelar or cita.estado == codigo %}<option value="{{ codigo }}" {% if cita.estado == codigo %}selected{% endif %}>{{ nombre }}</option>{% endif %}{% endfor %}</select><button type="submit">Actualizar</button></form>{% endif %}
+      {% if agenda_permisos_accion.reagendar %}
+      <details>
+        <summary class="action-link">Reagendar cita</summary>
+        <form method="post" action="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="return_to" value="mobile">
+          <input type="hidden" name="vista" value="{{ vista }}">
+          <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+          <label>Nueva fecha y hora <input type="datetime-local" name="nueva_fecha_hora" value="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}" required></label>
+          <button type="submit">Confirmar nueva fecha</button>
+        </form>
+      </details>
+      {% endif %}
+      {% if agenda_permisos_accion.cancelar and cita.estado != 'cancelada' %}
+      <details>
+        <summary class="action-link">Cancelar cita</summary>
+        <form method="post" action="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}" onsubmit="return confirm('¿Cancelar esta cita?');">
+          {% csrf_token %}
+          <input type="hidden" name="return_to" value="mobile">
+          <input type="hidden" name="vista" value="{{ vista }}">
+          <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+          <label>Motivo opcional <input type="text" name="motivo"></label>
+          <button type="submit">Confirmar cancelación</button>
+        </form>
+      </details>
+      {% endif %}
+      {% if agenda_permisos_accion.eliminar %}
       <div class="danger-block"><form method="post" action="{% url 'agenda_cita_eliminar' cita.empresa.slug cita.id %}" onsubmit="return confirm('¿Eliminar definitivamente esta cita?');">{% csrf_token %}<input type="hidden" name="return_to" value="mobile"><input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}"><input name="motivo_eliminacion" minlength="5" required placeholder="Motivo de eliminación"><button type="submit">Eliminar</button></form></div>
+      {% endif %}
       {% endif %}
     </div>
     {% endif %}
@@ -935,13 +964,13 @@
   </div>
 </section>
 
-{% if paciente_rapido_form and not agenda_solo_consulta %}
+{% if paciente_rapido_form and not agenda_solo_consulta and not solo_tarjetas_pacientes %}
 <dialog class="patient-dialog" id="patientDialog"><div class="patient-body"><div class="sheet-head"><div><small>Nuevo expediente</small><h2>Crear paciente</h2></div><button class="close" type="button" id="closePatientDialog">×</button></div><form id="patientForm">{% csrf_token %}<div class="form-grid">{% for field in paciente_rapido_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}<div class="errors" data-error="{{ field.name }}"></div></div>{% endfor %}</div><div class="patient-actions"><button class="secondary" type="button" id="cancelPatient">Cancelar</button><button class="save" style="width:auto;margin:0;padding:0 18px" type="submit">Guardar paciente</button></div></form></div></dialog>
 {% endif %}
 
 {{ proximas_app|json_script:"upcomingAppointments" }}
 {% if not agenda_solo_consulta %}{{ agenda_contactos_busqueda|json_script:"mobilePatientsData" }}{% endif %}
-{{ pacientes_app_payload|json_script:"mobileAppPatientsData" }}
+{% if not solo_tarjetas_pacientes %}{{ pacientes_app_payload|json_script:"mobileAppPatientsData" }}{% endif %}
 {{ productos_app_payload|json_script:"mobileAppProductsData" }}
 {{ inventario_productos_app_payload|json_script:"mobileInventoryProductsData" }}
 {{ inventario_productos_app_editar_urls|json_script:"mobileInventoryProductEditUrls" }}

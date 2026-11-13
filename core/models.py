@@ -220,6 +220,7 @@ class RolSistema(models.Model):
     puede_marcar_citas_pagadas = models.BooleanField(default=False)
     puede_marcar_citas_cortesia = models.BooleanField(default=False)
     puede_ver_pacientes = models.BooleanField(default=False)
+    solo_tarjetas_pacientes = models.BooleanField(default=False, db_default=False)
     puede_buscar_pacientes_por_identidad = models.BooleanField(default=False, db_default=False)
     puede_ver_datos_generales_paciente = models.BooleanField(default=False)
     puede_crear_pacientes = models.BooleanField(default=False)

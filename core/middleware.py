@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.utils import translation
 
 from core.access import (
@@ -22,6 +22,7 @@ from core.read_only_permissions import evaluar_ruta_solo_lectura, modulo_factura
 from core.clinical_permissions import (
     PERMISOS_ACCESO_HISTORIAL,
     historial_paciente_limitado,
+    pacientes_solo_tarjetas,
     permiso_facturacion_clinico_granular,
     permisos_gastos_adicionales_desde_ruta,
     permiso_agenda_granular,
@@ -380,6 +381,13 @@ class EmpresaAccessMiddleware:
                     return redirect("empresa_login", slug=empresa.slug)
 
                 suffix = "/".join(parts[3:])
+                if parts[3:4] in (["pacientes"], ["expediente"], ["tratamientos"], ["gastos-adicionales"]):
+                    if pacientes_solo_tarjetas(request.user, empresa) and (
+                        suffix not in {"pacientes", "pacientes/sugerencias"} or request.method not in {"GET", "HEAD"}
+                    ):
+                        respuesta = render(request, "clinica/acceso_paciente_denegado.html", status=403)
+                        respuesta["Cache-Control"] = "private, no-store"
+                        return respuesta
                 if parts[3:4] == ["gastos-adicionales"]:
                     if not gastos_adicionales_habilitados(empresa):
                         messages.error(request, "Gastos Adicionales no está habilitado para esta empresa.")

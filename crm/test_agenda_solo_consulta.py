@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from clinica.models import Paciente
+from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 
 from .models import CitaCirugiaFoto, CitaCliente
@@ -83,3 +83,48 @@ class AgendaSoloConsultaTests(TestCase):
                 respuesta = self.client.get(self.url(vista), {"editar": self.cita.pk})
                 self.assertContains(respuesta, 'name="cita_id"')
                 self.assertFalse(respuesta.context["agenda_solo_consulta"])
+
+    def test_recepcion_puede_gestionar_sin_ver_ni_sobrescribir_notas_clinicas(self):
+        RolSistema.objects.filter(pk=self.rol.pk).update(
+            solo_tarjetas_pacientes=True, puede_crear_citas=True, puede_editar_citas=True,
+            puede_reagendar_citas=True, puede_cancelar_citas=True,
+        )
+        self.client.force_login(self.usuario)
+        fecha = timezone.localdate(self.cita.fecha_hora).isoformat()
+        for vista in ("agenda_citas", "agenda_mobile"):
+            with self.subTest(vista=vista):
+                respuesta = self.client.get(self.url(vista), {"vista": "dia", "fecha": fecha, "editar": self.cita.pk})
+                self.assertContains(respuesta, 'name="cita_id"')
+                self.assertContains(respuesta, self.url("agenda_cita_reagendar_whatsapp", self.cita.pk))
+                self.assertContains(respuesta, self.url("agenda_cita_cancelar_whatsapp", self.cita.pk))
+                for privado in (self.cita.observacion, self.cita.cirugia_detalle, self.foto.imagen.url):
+                    self.assertNotContains(respuesta, privado)
+                self.assertNotContains(respuesta, self.url("agenda_cita_eliminar", self.cita.pk))
+        respuesta = self.client.post(self.url("agenda_cita_eliminar", self.cita.pk), {"motivo_eliminacion": "Prueba"})
+        self.assertIn(respuesta.status_code, (302, 403))
+        self.cita.refresh_from_db()
+
+    def test_editar_por_app_requiere_el_permiso_de_editar_y_conserva_notas(self):
+        RolSistema.objects.filter(pk=self.rol.pk).update(solo_tarjetas_pacientes=True, puede_crear_citas=True)
+        servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta operativa QA")
+        profesional = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Profesional QA")
+        datos = {
+            "cita_id": self.cita.pk, "paciente": self.cita.paciente_id, "servicio_clinico": servicio.pk,
+            "profesional_salud": profesional.pk, "fecha_hora": "2030-01-15T10:00",
+            "observacion": "Dato no autorizado", "cirugia_detalle": "Dato no autorizado",
+        }
+        self.client.force_login(self.usuario)
+        url = self.url("agenda_mobile")
+        denegada = self.client.post(url, datos)
+        self.assertIn(denegada.status_code, (302, 403))
+        self.cita.refresh_from_db()
+        self.assertIsNone(self.cita.servicio_clinico_id)
+
+        RolSistema.objects.filter(pk=self.rol.pk).update(puede_crear_citas=False, puede_editar_citas=True)
+        guardada = self.client.post(url, datos)
+        self.assertEqual(guardada.status_code, 302)
+        self.cita.refresh_from_db()
+        self.assertEqual(self.cita.servicio_clinico_id, servicio.pk)
+        self.assertEqual(self.cita.observacion, "Nota de cita reservada QA")
+        self.assertEqual(self.cita.cirugia_detalle, "Detalle de cirugía reservado QA")
+        self.assertTrue(CitaClinica.objects.filter(pk=self.cita.cita_clinica_id).exists())

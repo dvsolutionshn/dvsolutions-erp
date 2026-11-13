@@ -29,6 +29,7 @@ DESCRIPCIONES_PERMISOS = {
     "puede_editar_bloqueos_agenda": "Editar bloqueos de disponibilidad existentes dentro de la empresa.",
     "puede_eliminar_bloqueos_agenda": "Eliminar bloqueos de disponibilidad mediante la acción protegida.",
     "puede_ver_pacientes": "Consultar el listado y buscar pacientes. Sin el permiso de datos generales, el listado muestra solo el nombre y la foto y abre las secciones del expediente que estén autorizadas.",
+    "solo_tarjetas_pacientes": "Limita el directorio a tarjetas con datos generales y de contacto. Requiere acceso al listado de pacientes.",
     "puede_buscar_pacientes_por_identidad": "Buscar por el número de identidad completo desde el directorio de pacientes. Los resultados conservan los datos que autorice el rol.",
     "puede_ver_datos_generales_paciente": "Abrir los datos generales de un paciente autorizado. No equivale a editar sus datos ni a consultar su historia clínica.",
     "puede_crear_pacientes": "Registrar pacientes desde el ERP.",

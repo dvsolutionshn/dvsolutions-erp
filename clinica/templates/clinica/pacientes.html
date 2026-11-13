@@ -1,11 +1,12 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Pacientes - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Expediente Clinico{% endblock %}
+{% block header_kicker %}{% if vista_pacientes_solo_tarjetas %}Directorio{% else %}Expediente Clinico{% endif %}{% endblock %}
 {% block header_title %}Pacientes{% endblock %}
-{% block header_description %}Base maestra de pacientes con datos generales, contacto, riesgos y acceso directo al expediente.{% endblock %}
+{% block header_description %}{% if vista_pacientes_solo_tarjetas %}Consultá los datos generales y de contacto de los pacientes.{% else %}Base maestra de pacientes con datos generales, contacto, riesgos y acceso directo al expediente.{% endif %}{% endblock %}
 
 {% block topbar_actions %}
+{% if not vista_pacientes_solo_tarjetas %}
 {% if erp_access.generar_enlace_paciente_nuevo or empresa.slug == "hospital_mia" and erp_access.crear_pacientes %}
 <form method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}" style="display:inline;">
     {% csrf_token %}
@@ -13,6 +14,7 @@
 </form>
 {% endif %}
 {% if erp_access.crear_pacientes %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>{% endif %}
+{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -315,7 +317,9 @@
 {% endblock %}
 
 {% block content %}
-{% if vista_pacientes_limitada %}
+{% if vista_pacientes_solo_tarjetas %}
+    {% include "clinica/includes/directorio_pacientes_tarjetas.html" %}
+{% elif vista_pacientes_limitada %}
     {% include "clinica/includes/directorio_pacientes_limitado.html" %}
 {% elif vista_premium_pacientes %}
 <section class="patients-web-premium">

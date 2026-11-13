@@ -513,8 +513,12 @@ def _contexto_calendario(
     vista_predeterminada="mes",
     empresa_agenda=None,
 ):
+    from core.clinical_permissions import pacientes_solo_tarjetas
+
     empresa_agenda = empresa_agenda or _empresa_origen_agenda(empresa)
     agenda_solo_consulta = _agenda_solo_consulta(request.user, empresa)
+    agenda_permisos_accion = _permisos_accion_agenda(request.user, empresa)
+    agenda_ver_detalles_clinicos = _agenda_ver_detalles_clinicos(request.user, empresa, empresa_agenda)
     es_clinica = bool(
         empresa_agenda.tipo_solucion == "clinica"
         or empresa_agenda.tiene_modulo_activo("clinica_medica")
@@ -568,7 +572,7 @@ def _contexto_calendario(
         .select_related("cliente", "producto", "paciente", "servicio_clinico", "profesional_salud")
         .order_by("fecha_hora")
     )
-    if not agenda_solo_consulta:
+    if agenda_ver_detalles_clinicos:
         citas_qs = citas_qs.prefetch_related("fotos_cirugia")
     if agenda_espejo and empresa.slug == "serviciosmedicos":
         citas_qs = citas_qs.filter(Q(profesional_salud__nombre__icontains="Luis") | Q(responsable__icontains="Luis"))
@@ -762,7 +766,7 @@ def _contexto_calendario(
             .select_related("paciente", "cliente", "servicio_clinico", "producto", "profesional_salud")
             .order_by("fecha_hora")
         )
-        if not agenda_solo_consulta:
+        if agenda_ver_detalles_clinicos:
             citas_historial_qs = citas_historial_qs.prefetch_related("fotos_cirugia")
         citas_historial = [
             _preparar_acceso_atencion_cita(cita) for cita in citas_historial_qs
@@ -807,6 +811,9 @@ def _contexto_calendario(
         "agenda_empresa": empresa_agenda,
         "agenda_espejo": agenda_espejo,
         "agenda_solo_consulta": agenda_solo_consulta,
+        "agenda_permisos_accion": agenda_permisos_accion,
+        "agenda_ver_detalles_clinicos": agenda_ver_detalles_clinicos,
+        "solo_tarjetas_pacientes": pacientes_solo_tarjetas(request.user, empresa),
         "datos_paciente_limitados": datos_limitados,
         "vista": vista, "fecha_seleccionada": seleccionada, "titulo_periodo": titulo_periodo,
         "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
@@ -1549,6 +1556,39 @@ def enviar_campania_whatsapp_api(request, empresa_slug, campania_id):
     return redirect("crm_ver_campania", empresa_slug=empresa.slug, campania_id=campania.id)
 
 
+def _permisos_accion_agenda(usuario, empresa):
+    from core.clinical_permissions import rol_clinico_granular
+    from core.read_only_permissions import rol_solo_lectura
+
+    campos = {
+        "crear": "puede_crear_citas", "editar": "puede_editar_citas",
+        "reagendar": "puede_reagendar_citas", "cancelar": "puede_cancelar_citas",
+        "estado": "puede_cambiar_estado_citas", "eliminar": "puede_eliminar_citas",
+    }
+    if rol_solo_lectura(usuario, empresa, "agenda"):
+        return dict.fromkeys(campos, False)
+    if not (rol_clinico_granular(usuario, empresa) or rol_acciones_v3(usuario, empresa)):
+        return dict.fromkeys(campos, True)
+    if not rol_acciones_v3(usuario, empresa):
+        for accion in ("reagendar", "cancelar", "estado"):
+            campos[accion] = "puede_editar_citas"
+    return {accion: usuario.tiene_permiso_erp(campo, empresa) for accion, campo in campos.items()}
+
+
+def _agenda_ver_detalles_clinicos(usuario, empresa, empresa_agenda):
+    from core.clinical_permissions import pacientes_solo_tarjetas
+
+    return (
+        not _agenda_solo_consulta(usuario, empresa)
+        and not pacientes_solo_tarjetas(usuario, empresa)
+        and (
+            empresa.pk == empresa_agenda.pk
+            or usuario.puede_acceder_empresa(empresa_agenda)
+            and not pacientes_solo_tarjetas(usuario, empresa_agenda)
+        )
+    )
+
+
 def _agenda_solo_consulta(usuario, empresa):
     from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
     from core.read_only_permissions import rol_solo_lectura
@@ -1571,16 +1611,38 @@ def _agenda_solo_consulta(usuario, empresa):
 
 
 def _formulario_agenda(request, empresa, empresa_agenda=None):
+    from core.clinical_permissions import pacientes_solo_tarjetas
+
     empresa_agenda = empresa_agenda or empresa
     solo_consulta = _agenda_solo_consulta(request.user, empresa)
     if solo_consulta and request.method not in {"GET", "HEAD", "OPTIONS"}:
         raise PermissionDenied("Tu rol solo puede consultar las citas.")
-    cita_id = None if solo_consulta else request.POST.get("cita_id") or request.GET.get("editar")
+    permisos = _permisos_accion_agenda(request.user, empresa)
+    if empresa.pk != empresa_agenda.pk and pacientes_solo_tarjetas(request.user, empresa):
+        permisos = dict.fromkeys(permisos, False)
+    if request.method == "POST":
+        cita_id = request.POST.get("cita_id")
+        if not permisos["editar" if cita_id else "crear"]:
+            raise PermissionDenied("Tu rol no tiene permiso para guardar esta cita.")
+    else:
+        cita_id = request.GET.get("editar") if permisos["editar"] and not solo_consulta else None
     objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
+    if request.method == "POST":
+        estado_anterior = objeto.estado if objeto else "pendiente"
+        estado_nuevo = request.POST.get("estado") or estado_anterior
+        if estado_nuevo != estado_anterior and not permisos["cancelar" if estado_nuevo == "cancelada" else "estado"]:
+            raise PermissionDenied("Tu rol no tiene permiso para cambiar el estado de esta cita.")
     form = CitaClienteForm(
         request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto, usuario=request.user,
+        ocultar_datos_clinicos=not _agenda_ver_detalles_clinicos(request.user, empresa, empresa_agenda),
     )
     _limitar_campos_especiales_cita(request, empresa, form)
+    if not permisos["estado"] and not permisos["cancelar"]:
+        form.fields.pop("estado", None)
+    elif "estado" in form.fields and not permisos["cancelar"] and (not objeto or objeto.estado != "cancelada"):
+        form.fields["estado"].choices = [
+            (valor, etiqueta) for valor, etiqueta in form.fields["estado"].choices if valor != "cancelada"
+        ]
     return form, objeto
 
 
@@ -1601,6 +1663,8 @@ def citas(request, empresa_slug):
 
 @login_required
 def agenda_citas(request, empresa_slug):
+    from core.clinical_permissions import pacientes_solo_tarjetas
+
     empresa = _empresa_desde_slug(empresa_slug)
     if not _agenda_solo_consulta(request.user, empresa):
         _asegurar_pacientes_empresas_clinicas(empresa)
@@ -1613,7 +1677,10 @@ def agenda_citas(request, empresa_slug):
         else:
             messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
             return redirect("agenda_citas", empresa_slug=empresa.slug)
-    return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
+    origen = empresa if pacientes_solo_tarjetas(request.user, empresa) else None
+    return render(request, "crm/citas.html", _contexto_calendario(
+        empresa, request, form, modo_agenda=True, empresa_agenda=origen,
+    ))
 
 
 @login_required
@@ -2168,11 +2235,13 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
 
 
 def agenda_mobile(request, empresa_slug):
+    from core.clinical_permissions import pacientes_solo_tarjetas
+
     empresa = _empresa_desde_slug(empresa_slug)
     acceso_denegado = _proteger_agenda_mobile(request, empresa)
     if acceso_denegado:
         return acceso_denegado
-    empresa_agenda = _empresa_origen_agenda_mobile(empresa)
+    empresa_agenda = empresa if pacientes_solo_tarjetas(request.user, empresa) else _empresa_origen_agenda_mobile(empresa)
     if not _agenda_solo_consulta(request.user, empresa):
         _asegurar_pacientes_empresas_clinicas(empresa)
         if empresa_agenda.id != empresa.id:
@@ -2325,20 +2394,21 @@ def agenda_mobile(request, empresa_slug):
     contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
     contexto["hospital_mia_app_premium"] = interfaz_clinica_activa(empresa)
     datos_limitados = contexto["datos_paciente_limitados"]
-    contexto["pacientes_app_premium"] = contexto["hospital_mia_app_premium"] and not datos_limitados
+    directorio_externo = datos_limitados or contexto["solo_tarjetas_pacientes"]
+    contexto["pacientes_app_premium"] = contexto["hospital_mia_app_premium"] and not directorio_externo
     pacientes_activos_qs = Paciente.objects.filter(empresa=empresa, activo=True)
-    puede_listar_pacientes = not datos_limitados or (
+    puede_listar_pacientes = not directorio_externo or (
         empresa.tiene_modulo_activo("clinica_medica") and request.user.tiene_permiso_erp("puede_ver_pacientes", empresa)
     )
-    if datos_limitados and puede_listar_pacientes:
+    if directorio_externo and puede_listar_pacientes:
         contexto["pacientes_app_limitados_url"] = f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1"
     contexto["pacientes_app_total"] = pacientes_activos_qs.count() if puede_listar_pacientes else 0
-    contexto["pacientes_recientes_app"] = [] if datos_limitados else pacientes_activos_qs.order_by("-fecha_actualizacion", "-id")[:4]
+    contexto["pacientes_recientes_app"] = [] if directorio_externo else pacientes_activos_qs.order_by("-fecha_actualizacion", "-id")[:4]
     limite_pacientes_app = 320 if contexto["pacientes_app_premium"] else 120
     pacientes_app_qs = list(
         pacientes_activos_qs.select_related("cliente", "empresa")
         .order_by("-fecha_actualizacion", "nombre")[:limite_pacientes_app]
-    ) if not datos_limitados else []
+    ) if not directorio_externo else []
     pacientes_agenda_por_perfil = {}
     pacientes_agenda_por_identidad = {}
     pacientes_agenda_por_nombre = {}
@@ -2822,6 +2892,8 @@ self.addEventListener("message", event => {{
 
 @login_required
 def buscar_pacientes_cita(request, empresa_slug):
+    from core.clinical_permissions import pacientes_solo_tarjetas
+
     empresa_operativa = _empresa_desde_slug(empresa_slug)
     if not request.user.puede_acceder_empresa(empresa_operativa):
         return JsonResponse({"results": [], "error": "Acceso no autorizado."}, status=403)
@@ -2831,7 +2903,10 @@ def buscar_pacientes_cita(request, empresa_slug):
         or request.user.tiene_alguna_permision_clinica_empresa(empresa_operativa)
     ):
         return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
-    empresa = _empresa_origen_agenda_mobile(empresa_operativa)
+    empresa = (
+        empresa_operativa if pacientes_solo_tarjetas(request.user, empresa_operativa)
+        else _empresa_origen_agenda_mobile(empresa_operativa)
+    )
 
     query = " ".join((request.GET.get("q") or "").split())
     pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
@@ -2915,9 +2990,13 @@ def buscar_clientes_cita(request, empresa_slug):
 @login_required
 @require_POST
 def crear_paciente_rapido_cita(request, empresa_slug):
+    from core.clinical_permissions import pacientes_solo_tarjetas
+
     empresa_operativa = _empresa_desde_slug(empresa_slug)
     if not request.user.puede_acceder_empresa(empresa_operativa):
         return JsonResponse({"ok": False, "error": "Acceso no autorizado."}, status=403)
+    if pacientes_solo_tarjetas(request.user, empresa_operativa):
+        return JsonResponse({"ok": False, "error": "Tu rol solo puede consultar tarjetas de pacientes."}, status=403)
     if not (
         request.user.tiene_permiso_erp("puede_citas", empresa_operativa)
         or request.user.tiene_alguna_permision_facturacion_empresa(empresa_operativa)
@@ -3146,9 +3225,11 @@ def _enviar_aviso_cita_whatsapp(cita, *, aviso):
 
 
 def _redirect_agenda_accion(request, empresa):
-    vista = request.POST.get("vista", "mes")
+    movil = request.POST.get("return_to") == "mobile"
+    vista = request.POST.get("vista", "dia" if movil else "mes")
     fecha = request.POST.get("fecha", timezone.localdate().isoformat())
-    return redirect(f"{reverse('agenda_citas', args=[empresa.slug])}?vista={vista}&fecha={fecha}")
+    destino = reverse("agenda_mobile" if movil else "agenda_citas", args=[empresa.slug])
+    return redirect(f"{destino}?{urlencode({'vista': vista, 'fecha': fecha})}")
 
 
 @login_required
@@ -3215,7 +3296,8 @@ def reagendar_cita_whatsapp(request, empresa_slug, cita_id):
     except WhatsAppAPIError as exc:
         messages.warning(request, f"Cita reagendada, pero no se pudo enviar WhatsApp: {exc}")
     local = timezone.localtime(cita.fecha_hora)
-    return redirect(f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={local.date().isoformat()}")
+    vista = "agenda_mobile" if request.POST.get("return_to") == "mobile" else "agenda_citas"
+    return redirect(f"{reverse(vista, args=[empresa.slug])}?vista=dia&fecha={local.date().isoformat()}")
 
 
 @login_required
@@ -3224,6 +3306,8 @@ def actualizar_estado_cita(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
     cita = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id)
     estado = request.POST.get("estado")
+    if estado == "cancelada" and not _permisos_accion_agenda(request.user, empresa)["cancelar"]:
+        raise PermissionDenied("Tu rol no tiene permiso para cancelar citas.")
     estados_validos = {codigo for codigo, _ in CitaCliente.ESTADO_CHOICES}
     if estado not in estados_validos:
         messages.error(request, "El estado solicitado no es válido.")

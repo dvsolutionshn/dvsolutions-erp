@@ -39,6 +39,7 @@ PERMISOS_CLINICOS = (
     )),
     ("Pacientes", (
         ("puede_ver_pacientes", "Ver listado y buscar pacientes"),
+        ("solo_tarjetas_pacientes", "Sólo consultar tarjetas de pacientes"),
         ("puede_buscar_pacientes_por_identidad", "Buscar pacientes por número de identidad"),
         ("puede_ver_datos_generales_paciente", "Ver datos generales del paciente"),
         ("puede_crear_pacientes", "Crear pacientes"),
@@ -426,6 +427,16 @@ def datos_paciente_limitados(usuario, empresa):
     )
 
 
+def pacientes_solo_tarjetas(usuario, empresa):
+    return bool(
+        getattr(usuario, "is_authenticated", False)
+        and not usuario.is_superuser
+        and not usuario.es_administrador_empresa
+        and rol_clinico_granular(usuario, empresa)
+        and usuario.tiene_permiso_erp("solo_tarjetas_pacientes", empresa)
+    )
+
+
 def puede_abrir_expediente_limitado(usuario, empresa):
     return (
         datos_paciente_limitados(usuario, empresa)
@@ -765,7 +776,9 @@ def permiso_agenda_granular(path_suffix, method="GET", data=None, *, v3=False):
         # los metadatos de módulos no requieren poder consultar el calendario.
         return None if method == "GET" else "__denegar__"
     if parts[0] == "app":
-        return "puede_crear_citas" if method != "GET" else "puede_ver_calendario"
+        if method in {"GET", "HEAD"}:
+            return "puede_ver_calendario"
+        return "puede_editar_citas" if data.get("cita_id") else "puede_crear_citas"
     if parts[0] == "camara-hiperbarica":
         return "puede_ver_camara_hiperbarica"
     if parts[0] == "terapias-post-quirurgicas":

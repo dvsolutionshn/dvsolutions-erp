@@ -35,6 +35,7 @@ from core.clinical_permissions import (
     PERMISOS_ACCESO_HISTORIAL,
     datos_paciente_limitados,
     historial_paciente_limitado,
+    pacientes_solo_tarjetas,
     permiso_historia_por_tipo,
     puede_abrir_expediente_limitado,
     rol_clinico_granular,
@@ -1024,6 +1025,35 @@ def pacientes(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
     q = (request.GET.get("q") or "").strip()
+    if pacientes_solo_tarjetas(request.user, empresa):
+        pacientes_qs = _buscar_tarjetas_pacientes(empresa, q).only(
+            "id", "nombre", "foto_perfil", "identidad", "fecha_nacimiento", "sexo",
+            "telefono", "whatsapp", "celular_2", "correo",
+        )
+        contexto = {
+            "empresa": empresa,
+            "pacientes": Paginator(pacientes_qs, 25).get_page(request.GET.get("page")),
+            "q": q,
+            "vista_pacientes_solo_tarjetas": True,
+        }
+        template = "clinica/pacientes.html"
+        if es_pacientes_app(request, empresa):
+            from crm.mobile_modules import inicio_app_disponible, url_modulos_app
+
+            inicio = reverse("agenda_mobile", args=[empresa.slug])
+            contexto.update({
+                "modo_app": True,
+                "app_base_url": inicio,
+                "app_invoices_url": f"{inicio}#facturas-app",
+                "app_modules_url": url_modulos_app(request, empresa),
+                "app_home_disponible": inicio_app_disponible(request, empresa),
+                "app_patients_url": url_paciente_app("clinica_pacientes", empresa),
+            })
+            template = "clinica/mobile_patient_cards.html"
+        respuesta = render(request, template, contexto)
+        respuesta["Cache-Control"] = "private, no-store"
+        return respuesta
+
     if datos_paciente_limitados(request.user, empresa):
         pacientes_qs = Paciente.objects.filter(empresa=empresa, activo=True).only(
             "id", "nombre", "foto_perfil",
@@ -1093,10 +1123,37 @@ def pacientes(request, empresa_slug):
     })
 
 
+def _buscar_tarjetas_pacientes(empresa, consulta):
+    pacientes_qs = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre", "id")
+    if not consulta:
+        return pacientes_qs
+    filtro = Q(nombre__icontains=consulta) | Q(identidad__icontains=consulta) | Q(correo__icontains=consulta)
+    filtro |= Q(telefono__icontains=consulta) | Q(whatsapp__icontains=consulta) | Q(celular_2__icontains=consulta)
+    return pacientes_qs.filter(filtro | (filtro_identidad_paciente(consulta) or Q()))
+
+
 @login_required
 def pacientes_sugerencias(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
+    if pacientes_solo_tarjetas(request.user, empresa):
+        q = (request.GET.get("q") or "").strip()
+        resultados = [
+            {
+                "id": paciente.id,
+                "nombre": paciente.nombre,
+                "documento": paciente.identidad or "",
+                "telefono": paciente.whatsapp or paciente.telefono or "",
+                "correo": paciente.correo or "",
+            }
+            for paciente in _buscar_tarjetas_pacientes(empresa, q).only(
+                "id", "nombre", "identidad", "whatsapp", "telefono", "correo",
+            )[:8]
+        ] if len(q) >= 2 else []
+        respuesta = JsonResponse({"results": resultados})
+        respuesta["Cache-Control"] = "private, no-store"
+        return respuesta
+
     if datos_paciente_limitados(request.user, empresa):
         q = (request.GET.get("q") or "").strip()
         filtro = (

@@ -1,0 +1,39 @@
+<section class="patients-web-premium" aria-label="Tarjetas de pacientes">
+    <div class="patients-premium-body">
+        <form method="get" class="patient-search-panel" action="{% url 'clinica_pacientes' empresa.slug %}">
+            <div class="patient-search-box">
+                <input class="patient-search-input" type="search" name="q" value="{{ q }}" placeholder="Nombre, identidad o teléfono" aria-label="Buscar paciente" autocomplete="off">
+            </div>
+            <button class="erp-btn" type="submit">Buscar</button>
+            {% if q %}<a class="patient-search-chip" href="{% url 'clinica_pacientes' empresa.slug %}">Limpiar</a>{% endif %}
+        </form>
+        <div class="patients-premium-grid">
+            {% for paciente in pacientes %}
+            <article class="premium-patient-card-web">
+                <div class="premium-patient-card-head">
+                    <div class="premium-patient-avatar">
+                        {% if paciente.foto_perfil %}<img src="{{ paciente.foto_perfil.url }}" alt="" loading="lazy">
+                        {% else %}<span aria-hidden="true">{{ paciente.nombre|slice:':2'|upper }}</span>{% endif %}
+                    </div>
+                    <div class="premium-patient-identity"><h3>{{ paciente.nombre }}</h3></div>
+                </div>
+                <div class="premium-patient-badges">
+                    {% if paciente.identidad %}<span class="premium-patient-badge">ID {{ paciente.identidad }}</span>{% endif %}
+                    {% if paciente.edad is not None %}<span class="premium-patient-badge">{{ paciente.edad }} años</span>{% endif %}
+                    {% if paciente.sexo != "no_indicado" %}<span class="premium-patient-badge">{{ paciente.get_sexo_display }}</span>{% endif %}
+                </div>
+                {% include "clinica/includes/contacto_tarjeta_paciente.html" with clase_contacto="premium-patient-contact" %}
+            </article>
+            {% empty %}
+            <div class="patients-premium-empty">No encontramos pacientes con ese criterio.</div>
+            {% endfor %}
+        </div>
+        {% if pacientes.has_other_pages %}
+        <nav class="patient-search-actions" aria-label="Páginas de pacientes">
+            {% if pacientes.has_previous %}<a class="erp-btn-secondary" href="?q={{ q|urlencode }}&amp;page={{ pacientes.previous_page_number }}">Anterior</a>{% endif %}
+            <span>{{ pacientes.number }} de {{ pacientes.paginator.num_pages }}</span>
+            {% if pacientes.has_next %}<a class="erp-btn-secondary" href="?q={{ q|urlencode }}&amp;page={{ pacientes.next_page_number }}">Siguiente</a>{% endif %}
+        </nav>
+        {% endif %}
+    </div>
+</section>

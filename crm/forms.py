@@ -650,6 +650,7 @@ class CitaClienteForm(forms.ModelForm):
         empresa = kwargs.pop("empresa", None)
         self.usuario = kwargs.pop("usuario", None)
         self.empresa = empresa
+        self.ocultar_datos_clinicos = kwargs.pop("ocultar_datos_clinicos", False)
         super().__init__(*args, **kwargs)
         if empresa:
             self.instance.empresa = empresa
@@ -818,6 +819,10 @@ class CitaClienteForm(forms.ModelForm):
         if not self.cirugia_extendida_activa:
             for nombre in ["cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia"]:
                 self.fields.pop(nombre, None)
+        if self.ocultar_datos_clinicos:
+            for nombre in ("observacion", "cirugia_detalle", "fotos_cirugia"):
+                self.fields.pop(nombre, None)
+                self.initial.pop(nombre, None)
         if not self.detalles_agenda_activos:
             self.fields.pop("detalles_agenda", None)
         if self.es_clinica:
@@ -837,7 +842,8 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["profesional_salud"].label = "Doctor / profesional"
             self.fields["profesional_salud"].required = True
             self.fields["profesional_salud"].error_messages["required"] = "Selecciona el doctor o profesional que atendera la cita."
-            self.fields["observacion"].label = "Motivo o notas de la cita"
+            if "observacion" in self.fields:
+                self.fields["observacion"].label = "Motivo o notas de la cita"
             self.fields["pagada"].label = "Cita pagada"
             self.fields["cortesia"].label = "Cita de cortesía"
             self.fields["enviar_confirmacion_whatsapp"].label = "Enviar confirmación por WhatsApp al guardar"
@@ -1178,7 +1184,7 @@ class CitaClienteForm(forms.ModelForm):
                     fin_bloque = fin_estimada
 
         if self.cirugia_extendida_activa and self._servicio_es_cirugia(servicio):
-            if not (cleaned_data.get("cirugia_detalle") or "").strip():
+            if not self.ocultar_datos_clinicos and not (cleaned_data.get("cirugia_detalle") or "").strip():
                 self.add_error("cirugia_detalle", "Describe el tipo de cirugia o el procedimiento.")
             if not hora_fin:
                 self.add_error("cirugia_hora_fin", "Selecciona la hora final estimada.")
@@ -1187,7 +1193,8 @@ class CitaClienteForm(forms.ModelForm):
             if fin_estimada and fin_estimada > inicio:
                 fin_bloque = fin_estimada
         else:
-            cleaned_data["cirugia_detalle"] = ""
+            if not self.ocultar_datos_clinicos:
+                cleaned_data["cirugia_detalle"] = ""
             cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada
 
         if not self.errors and crear_serie:
