@@ -118,6 +118,7 @@ from .models import (
     TratamientoPaciente,
     asegurar_profesionales_agenda_base,
 )
+from .busqueda_pacientes import filtro_identidad_paciente
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from .mobile_patients import (
     autorizar_pacientes_app,
@@ -1027,13 +1028,20 @@ def pacientes(request, empresa_slug):
         pacientes_qs = Paciente.objects.filter(empresa=empresa, activo=True).only(
             "id", "nombre", "foto_perfil",
         ).order_by("nombre", "id")
-        if q:
-            pacientes_qs = pacientes_qs.filter(nombre__icontains=q)
-        pacientes_lista = Paginator(pacientes_qs, 25).get_page(request.GET.get("page"))
+        puede_buscar_identidad = request.user.tiene_permiso_erp("puede_buscar_pacientes_por_identidad", empresa)
+        identidad = filtro_identidad_paciente(q) if puede_buscar_identidad else None
+        if identidad is not None:
+            pacientes_lista = pacientes_qs.filter(identidad)
+        else:
+            if q:
+                pacientes_qs = pacientes_qs.filter(nombre__icontains=q)
+            pacientes_lista = Paginator(pacientes_qs, 25).get_page(request.GET.get("page"))
         respuesta = render_pacientes_app(request, empresa, "clinica/pacientes.html", "clinica/mobile_patient_list.html", {
             "empresa": empresa,
             "pacientes": pacientes_lista,
-            "q": q,
+            "q": q if identidad is None else "",
+            "busqueda_activa": bool(q),
+            "puede_buscar_identidad": puede_buscar_identidad,
             "vista_pacientes_limitada": True,
             "puede_abrir_expediente_limitado": puede_abrir_expediente_limitado(request.user, empresa),
             **contexto_selector_recetas_app(request, empresa),
@@ -1056,9 +1064,8 @@ def pacientes(request, empresa_slug):
         .order_by("cumple_mes", "dia_nacimiento", "primer_nombre", "primer_apellido", "nombre")
     )
     if q:
-        pacientes_qs = pacientes_qs.filter(
-            Q(nombre__icontains=q) | Q(expediente_codigo__icontains=q) | Q(identidad__icontains=q) | Q(telefono__icontains=q)
-        )
+        filtro = Q(nombre__icontains=q) | Q(expediente_codigo__icontains=q) | Q(identidad__icontains=q) | Q(telefono__icontains=q)
+        pacientes_qs = pacientes_qs.filter(filtro | (filtro_identidad_paciente(q) or Q()))
     cumpleaneros_mes = pacientes_qs.filter(fecha_nacimiento__month=hoy.month).count()
     pacientes_lista = list(pacientes_qs)
     vista_premium_pacientes = interfaz_clinica_activa(empresa)
@@ -1092,7 +1099,11 @@ def pacientes_sugerencias(request, empresa_slug):
     autorizar_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
     if datos_paciente_limitados(request.user, empresa):
         q = (request.GET.get("q") or "").strip()
-        coincidencias = Paciente.objects.filter(empresa=empresa, activo=True, nombre__icontains=q).order_by(
+        filtro = (
+            filtro_identidad_paciente(q)
+            if request.user.tiene_permiso_erp("puede_buscar_pacientes_por_identidad", empresa) else None
+        ) or Q(nombre__icontains=q)
+        coincidencias = Paciente.objects.filter(filtro, empresa=empresa, activo=True).order_by(
             "nombre", "id",
         ).values("id", "nombre")[:8] if len(q) >= 2 else []
         resultados = list(coincidencias)
@@ -1118,16 +1129,16 @@ def pacientes_sugerencias(request, empresa_slug):
     if len(q) < 2:
         return respuesta_pacientes_app(request, empresa, JsonResponse({"results": []}))
 
+    filtro = (
+        Q(identidad__icontains=q)
+        | Q(nombre__icontains=q)
+        | Q(expediente_codigo__icontains=q)
+        | Q(telefono__icontains=q)
+        | Q(whatsapp__icontains=q)
+        | Q(correo__icontains=q)
+    )
     pacientes_qs = (
-        Paciente.objects.filter(empresa=empresa, activo=True)
-        .filter(
-            Q(identidad__icontains=q)
-            | Q(nombre__icontains=q)
-            | Q(expediente_codigo__icontains=q)
-            | Q(telefono__icontains=q)
-            | Q(whatsapp__icontains=q)
-            | Q(correo__icontains=q)
-        )
+        Paciente.objects.filter(filtro | (filtro_identidad_paciente(q) or Q()), empresa=empresa, activo=True)
         .order_by("identidad", "nombre")[:8]
     )
     results = [
@@ -2191,6 +2202,7 @@ def manuales_pdf(request, empresa_slug):
             "manuales": manuales,
             "historial": historial,
             "puede_enviar_manuales": _puede_enviar_manuales_receta(request.user, empresa),
+            "contacto_manual_restringido": datos_paciente_limitados(request.user, empresa),
         },
         **(_permisos_manuales_app(request, empresa) if es_manuales_app(request, empresa) else {}),
     )
@@ -2316,7 +2328,10 @@ def enviar_manuales_pdf(request, empresa_slug):
         messages.error(request, "Seleccione WhatsApp, WhatsApp Web o correo como método de envío.")
         return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
 
-    if canal == EnvioManualPDF.CANAL_CORREO:
+    contacto_restringido = datos_paciente_limitados(request.user, empresa)
+    if canal == EnvioManualPDF.CANAL_WHATSAPP_MANUAL and contacto_restringido:
+        destinatario = ""
+    elif canal == EnvioManualPDF.CANAL_CORREO:
         destinatario = (paciente.correo or "").strip()
         if not destinatario:
             messages.error(request, f"{paciente.nombre} no tiene correo electrónico registrado.")
@@ -2413,6 +2428,8 @@ def enviar_manuales_pdf(request, empresa_slug):
         _registrar_resultado_envio_manual(envio, estado, detalle)
         if enviados:
             messages.warning(request, f"Se enviaron {enviados} de {len(manuales)} manuales. Revise la conexión e intente completar el envío.")
+        elif contacto_restringido:
+            messages.error(request, "No se pudo completar el envío por WhatsApp. Revisá la conexión o compartí los enlaces manualmente.")
         else:
             messages.error(request, f"No se pudo completar el envío por WhatsApp: {detalle}")
     else:

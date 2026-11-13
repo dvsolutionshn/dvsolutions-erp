@@ -60,6 +60,7 @@
   const form = document.getElementById('mobileManualSendForm');
   const sheet = document.getElementById('manualSendSheet');
   if (!form || !sheet) return;
+  const contactoRestringido = form.dataset.contactoRestringido === 'true';
   const patientId = document.getElementById('manualPatientId');
   const channel = document.getElementById('manualSendChannel');
   const patientSearch = document.getElementById('manualPatientSearch');
@@ -81,15 +82,17 @@
     const hasPatient = Boolean(patientId.value);
     patientCard.hidden = !hasPatient;
     patientName.textContent = patient?.nombre || 'Paciente seleccionado';
-    patientDetails.textContent = patient ? [patient.expediente ? `Exp. ${patient.expediente}` : '', patient.telefono || 'Sin teléfono registrado', patient.correo || 'Sin correo registrado'].filter(Boolean).join(' · ') : 'Los datos del contacto no están disponibles para este perfil.';
+    patientDetails.textContent = patient && !contactoRestringido
+      ? [patient.expediente ? `Exp. ${patient.expediente}` : '', patient.telefono || 'Sin teléfono registrado', patient.correo || 'Sin correo registrado'].filter(Boolean).join(' · ')
+      : 'El sistema utilizará el contacto registrado para los envíos directos.';
     channelOptions.hidden = !hasPatient;
     const warnings = [];
-    if (patient && !patient.telefono) warnings.push('No tiene teléfono o WhatsApp registrado.');
-    if (patient && !patient.correo) warnings.push('No tiene correo registrado.');
+    if (patient && !contactoRestringido && !patient.telefono) warnings.push('No tiene teléfono o WhatsApp registrado.');
+    if (patient && !contactoRestringido && !patient.correo) warnings.push('No tiene correo registrado.');
     contactWarning.textContent = warnings.join(' ');
     contactWarning.hidden = !hasPatient || warnings.length === 0;
     document.querySelectorAll('[data-manual-channel]').forEach((button) => {
-      button.disabled = !hasPatient || (patient !== null && !(button.dataset.manualChannel === 'correo' ? patient.correo : patient.telefono));
+      button.disabled = !hasPatient || (patient !== null && !contactoRestringido && !(button.dataset.manualChannel === 'correo' ? patient.correo : patient.telefono));
     });
   };
   if (patient?.id) patientId.value = patient.id;
@@ -105,7 +108,12 @@
     const help = { whatsapp_manual: 'Se abrirá WhatsApp con los enlaces seguros de los documentos. Revisa el mensaje y confirma el envío en WhatsApp. El registro quedará como preparado manualmente.', whatsapp: 'Se enviarán los documentos mediante la configuración de WhatsApp de esta empresa.', correo: 'Se adjuntarán los PDF al correo registrado del paciente.' };
     document.querySelector('[data-manual-confirm-channel]').textContent = titles[channel.value];
     document.querySelector('[data-manual-confirm-patient]').textContent = patient?.nombre || 'Paciente seleccionado';
-    document.querySelector('[data-manual-confirm-recipient]').textContent = patient ? (channel.value === 'correo' ? patient.correo : patient.telefono) : 'El sistema utilizará el contacto registrado; este perfil no puede consultarlo.';
+    const elegirDestinatario = contactoRestringido && channel.value === 'whatsapp_manual';
+    document.querySelector('[data-manual-confirm-recipient]').textContent = elegirDestinatario
+      ? 'Elegí al destinatario en WhatsApp.'
+      : patient && !contactoRestringido
+        ? (channel.value === 'correo' ? patient.correo : patient.telefono)
+        : 'El sistema utilizará el contacto registrado.';
     document.querySelector('[data-manual-confirm-help]').textContent = help[channel.value];
     document.getElementById('confirmManualSend').textContent = channel.value === 'whatsapp_manual' ? 'Abrir WhatsApp' : 'Confirmar envío';
     chooseStep.hidden = true; confirmStep.hidden = false; errorBox.hidden = true;

@@ -39,6 +39,7 @@ PERMISOS_CLINICOS = (
     )),
     ("Pacientes", (
         ("puede_ver_pacientes", "Ver listado y buscar pacientes"),
+        ("puede_buscar_pacientes_por_identidad", "Buscar pacientes por número de identidad"),
         ("puede_ver_datos_generales_paciente", "Ver datos generales del paciente"),
         ("puede_crear_pacientes", "Crear pacientes"),
         ("puede_generar_enlace_paciente_nuevo", "Compartir enlace para paciente nuevo"),
@@ -480,6 +481,8 @@ def permiso_facturacion_clinico_granular(path_suffix, method="GET", *, v3=False)
             if len(parts) > 1 and parts[1] == "regalias": return "puede_registrar_salidas_inventario"
             if len(parts) > 2 and parts[1:3] in (["farmaceutico", "traslados"], ["farmaceutico", "traslado-rapido"]):
                 return "puede_transferir_inventario"
+        if first == "productos" and len(parts) > 1 and parts[1] in {"codigos-barras", "categorias-farmaceuticas"}:
+            return "puede_editar_productos"
         if first == "productos" and len(parts) > 2 and parts[2] == "eliminar": return "puede_eliminar_productos"
         if first.isdigit() and len(parts) > 1:
             action = parts[1]
@@ -537,10 +540,8 @@ def permiso_facturacion_clinico_granular(path_suffix, method="GET", *, v3=False)
             return "puede_transferir_inventario"
     if first == "productos" and len(parts) > 2 and parts[2] == "eliminar":
         return "puede_eliminar_productos"
-    if first == "productos" and "codigos-barras" in parts:
-        return "puede_productos"
-    if first == "productos" and "categorias-farmaceuticas" in parts:
-        return "puede_editar_productos" if unsafe else None
+    if first == "productos" and len(parts) > 1 and parts[1] in {"codigos-barras", "categorias-farmaceuticas"}:
+        return "puede_editar_productos"
     if first == "inventario" and len(parts) == 1 and unsafe:
         return "puede_inventario"
     if first == "clientes" and "eliminar" in parts:

@@ -8,6 +8,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from core.access import manuales_pdf_habilitados
+from core.clinical_permissions import datos_paciente_limitados
 from .mobile_patients import (
     contexto_pacientes_app, es_pacientes_app, permiso_pacientes_app,
     respuesta_pacientes_app, url_paciente_app,
@@ -43,6 +44,7 @@ def id_manual_app(valor):
 
 def contexto_manuales_app(request, empresa, *, can_view, can_send, can_admin, manuales=(), historial=(), manual=None):
     contexto = contexto_pacientes_app(request, empresa)
+    contacto_restringido = datos_paciente_limitados(request.user, empresa)
     puede_buscar = permiso_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
     puede_preseleccionar = puede_buscar or permiso_pacientes_app(
         request, empresa, "puede_ver_datos_generales_paciente", "puede_pacientes",
@@ -58,6 +60,7 @@ def contexto_manuales_app(request, empresa, *, can_view, can_send, can_admin, ma
         "can_view_manuals": can_view, "can_send_manuals": can_send,
         "can_admin_manuals": can_admin, "can_search_manual_patients": puede_buscar,
         "can_preselect_manual_patient": puede_preseleccionar,
+        "contacto_manual_restringido": contacto_restringido,
         "app_manuals_url": url_manual_app("clinica_manuales_pdf", empresa),
         "app_manual_send_page_url": url_manual_app("clinica_manuales_pdf_app_enviar", empresa),
         "app_manual_send_url": url_manual_app("clinica_enviar_manuales_pdf", empresa),
@@ -68,8 +71,10 @@ def contexto_manuales_app(request, empresa, *, can_view, can_send, can_admin, ma
         "mobile_manual_patient_id": paciente.pk if paciente else paciente_id or "",
         "mobile_manual_patient": {
             "id": paciente.pk, "nombre": paciente.nombre,
-            "expediente": paciente.expediente_codigo, "documento": paciente.identidad or "",
-            "telefono": paciente.whatsapp or paciente.telefono or "", "correo": paciente.correo or "",
+            **({} if contacto_restringido else {
+                "expediente": paciente.expediente_codigo, "documento": paciente.identidad or "",
+                "telefono": paciente.whatsapp or paciente.telefono or "", "correo": paciente.correo or "",
+            }),
         } if paciente else None,
         "mobile_manual_canal": datos.get("canal", ""),
     })
@@ -88,7 +93,8 @@ def contexto_manuales_app(request, empresa, *, can_view, can_send, can_admin, ma
             "fecha": envio.fecha_envio,
             "paciente": envio.paciente.nombre if envio.paciente.empresa_id == empresa.pk else "Paciente no disponible",
             "usuario": (envio.enviado_por.get_full_name() or envio.enviado_por.username) if envio.enviado_por else "Usuario no disponible",
-            "canal": envio.get_canal_display(), "destinatario": envio.destinatario if envio.paciente.empresa_id == empresa.pk else "",
+            "canal": envio.get_canal_display(),
+            "destinatario": envio.destinatario if not contacto_restringido and envio.paciente.empresa_id == empresa.pk else "",
             "estado": envio.estado, "estado_label": envio.get_estado_display(),
             "manuales": [item.titulo for item in envio.manuales.all() if item.empresa_id == empresa.pk],
         } for envio in historial]
@@ -130,8 +136,10 @@ def volver_manuales_app(request, empresa, *, can_view, error=False, admin=False,
 
 
 def whatsapp_manual_app(request, empresa, destinatario, texto):
-    destino = (
-        f"https://wa.me/{destinatario}?text={quote(texto)}" if es_manuales_app(request, empresa)
-        else f"https://web.whatsapp.com/send?phone={destinatario}&text={quote(texto)}"
-    )
+    if not destinatario:
+        destino = f"https://api.whatsapp.com/send?text={quote(texto)}"
+    elif es_manuales_app(request, empresa):
+        destino = f"https://wa.me/{destinatario}?text={quote(texto)}"
+    else:
+        destino = f"https://web.whatsapp.com/send?phone={destinatario}&text={quote(texto)}"
     return respuesta_manuales_app(request, empresa, redirect(destino))

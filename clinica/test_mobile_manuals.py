@@ -331,10 +331,12 @@ class MobileManualsIntegrationTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 if can_read:
                     self.assertContains(response, self.paciente.nombre)
+                if permisos.get("puede_ver_datos_generales_paciente"):
                     self.assertContains(response, self.paciente.correo)
                 else:
-                    self.assertNotContains(response, self.paciente.nombre)
                     self.assertNotContains(response, self.paciente.correo)
+                if not can_read:
+                    self.assertNotContains(response, self.paciente.nombre)
                 self.assertEqual(response.context["can_preselect_manual_patient"], can_read)
                 self.assertEqual(response.context["can_search_manual_patients"], bool(permisos.get("puede_ver_pacientes")))
                 suggestions = self.client.get(reverse("clinica_pacientes_sugerencias", args=[self.empresa.slug]), {"app": "1", "q": "Paciente"})
@@ -464,6 +466,37 @@ class MobileManualsIntegrationTests(TestCase):
         send.assert_not_called()
         envio = EnvioManualPDF.objects.get()
         self.assertEqual((envio.canal, envio.estado, envio.enviado_por_id), ("whatsapp_manual", "preparado", self.usuario.pk))
+
+    def test_limited_patient_contacts_stay_private_when_sharing_manuals(self):
+        self.asignar_rol(puede_ver_manuales_pdf=True, puede_enviar_manuales_pdf=True, puede_ver_pacientes=True)
+        numero_registrado = f"504{self.paciente.telefono}"
+        envio = EnvioManualPDF.objects.create(
+            empresa=self.empresa, paciente=self.paciente, destinatario=numero_registrado, canal="whatsapp",
+        )
+        envio.manuales.add(self.manual)
+        composer = self.composer(manuales=[self.manual.pk], paciente_id=self.paciente.pk)
+        self.assertEqual(composer.context["mobile_manual_patient"], {"id": self.paciente.pk, "nombre": self.paciente.nombre})
+        self.assertNotContains(composer, self.paciente.telefono)
+        for mobile in (False, True):
+            with self.subTest(mobile=mobile):
+                lista = self.client.get(self.url("clinica_manuales_pdf", mobile=mobile))
+                self.assertNotContains(lista, self.paciente.telefono)
+                datos = self.datos(canal="whatsapp_manual")
+                if not mobile:
+                    del datos["app"]
+                respuesta = self.client.post(self.url("clinica_enviar_manuales_pdf", mobile=mobile), datos)
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertTrue(respuesta.url.startswith("https://api.whatsapp.com/send?text="))
+                self.assertNotIn(self.paciente.telefono, unquote(respuesta.url))
+                self.assertEqual(EnvioManualPDF.objects.first().destinatario, "")
+        ConfiguracionCRM.objects.create(empresa=self.empresa, whatsapp_activo=True)
+        with patch("clinica.views.subir_documento_whatsapp", return_value="media-id"), \
+             patch("clinica.views.enviar_documento_whatsapp") as enviar:
+            respuesta = self.client.post(self.url("clinica_enviar_manuales_pdf"), self.datos(canal="whatsapp"))
+        self.assert_return_app(respuesta)
+        enviar.assert_called_once()
+        self.assertEqual(enviar.call_args.args[1], numero_registrado)
+        self.assertNotContains(self.client.get(respuesta.url), numero_registrado)
 
     def test_legacy_manual_read_union_and_distinct_configuration_and_expediente_permissions(self):
         for flag, can_admin, can_send in (("puede_pacientes", False, False), ("puede_configuracion_clinica", True, False), ("puede_expediente_clinico", False, True)):

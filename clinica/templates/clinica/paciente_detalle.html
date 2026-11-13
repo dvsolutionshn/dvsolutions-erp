@@ -17,7 +17,7 @@
 <a class="erp-btn" href="{% url 'clinica_completar_historia_clinica_paciente' empresa.slug paciente.id %}">Terminar expediente</a>
 {% endif %}
 {% endif %}
-<a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>
+{% if erp_access.editar_pacientes %}<a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>{% endif %}
 {% if paciente.no_agendar %}
     {% if erp_access.habilitar_citas_paciente %}<a class="erp-btn-secondary" href="{% url 'clinica_habilitar_citas_paciente' empresa.slug paciente.id %}">Habilitar nuevamente para citas</a>{% endif %}
 {% elif erp_access.restringir_citas_paciente %}
@@ -181,7 +181,14 @@
                 <div class="patient-info-item"><span>Documento</span><strong>{{ paciente.identidad|default:"-" }}</strong></div>
                 <div class="patient-info-item"><span>Edad</span><strong>{% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</strong></div>
                 <div class="patient-info-item"><span>Sexo</span><strong>{{ paciente.get_sexo_display|default:"No indicado" }}</strong></div>
-                <div class="patient-info-item"><span>Telefono</span><strong>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</strong></div>
+                <div class="patient-info-item"><span>Teléfono</span><strong>{{ paciente.telefono|default:"-" }}</strong></div>
+                {% if paciente.whatsapp %}<div class="patient-info-item"><span>WhatsApp</span><strong>{{ paciente.whatsapp }}</strong></div>{% endif %}
+                {% if paciente.celular_2 %}<div class="patient-info-item"><span>Otro teléfono</span><strong>{{ paciente.celular_2 }}</strong></div>{% endif %}
+                {% if paciente.fecha_nacimiento %}<div class="patient-info-item"><span>Fecha de nacimiento</span><strong>{{ paciente.fecha_nacimiento|date:"d/m/Y" }}</strong></div>{% endif %}
+                <div class="patient-info-item"><span>Estado civil</span><strong>{{ paciente.get_estado_civil_display }}</strong></div>
+                {% if paciente.correo %}<div class="patient-info-item"><span>Correo</span><strong>{{ paciente.correo }}</strong></div>{% endif %}
+                {% if paciente.direccion %}<div class="patient-info-item"><span>Dirección</span><strong>{{ paciente.direccion }}</strong></div>{% endif %}
+                {% if paciente.contacto_emergencia or paciente.telefono_emergencia %}<div class="patient-info-item"><span>Contacto de emergencia</span><strong>{{ paciente.contacto_emergencia|default:"" }}{% if paciente.telefono_emergencia %}<br>{{ paciente.telefono_emergencia }}{% endif %}</strong></div>{% endif %}
                 {% if erp_access.ver_historia_clinica %}<div class="patient-info-item"><span>RH</span><strong>{{ paciente.rh|default:"No indicado" }}</strong></div>{% endif %}
             </div>
         </div>

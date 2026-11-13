@@ -234,6 +234,7 @@ def erp_access(request):
         "generar_enlace_paciente_nuevo": bool(
             interfaz_clinica and clinica_activa and rol_piloto and permiso("puede_generar_enlace_paciente_nuevo")
         ),
+        "gestionar_categorias_productos": permiso("puede_editar_productos" if rol_piloto else "puede_productos"),
         "enviar_enlace_historia_clinica": bool(
             interfaz_clinica and clinica_activa and rol_piloto
             and permiso("puede_ver_pacientes") and permiso("puede_enviar_enlace_historia_clinica")

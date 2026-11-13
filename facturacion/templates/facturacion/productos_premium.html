@@ -6,8 +6,8 @@
 {% block header_title %}Productos y Servicios{% endblock %}
 {% block header_description %}Organiza por separado los productos fisicos y los servicios del catalogo comercial, fiscal y operativo.{% endblock %}
 {% block topbar_actions %}
-<a class="erp-action-link" href="{% url 'codigos_barras_productos' empresa.slug %}">Asignar codigos</a>
-<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto / Servicio</a>
+{% if puede_gestionar_catalogo %}<a class="erp-action-link" href="{% url 'codigos_barras_productos' empresa.slug %}">Asignar códigos</a>{% endif %}
+{% if erp_access.crear_productos %}<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto / Servicio</a>{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -15,6 +15,8 @@
 .erp-product-table{
     min-width:1260px;
 }
+.erp-product-details summary{cursor:pointer;color:var(--brand)}
+.erp-product-details p{margin:6px 0 0;overflow-wrap:anywhere}
 .erp-autocomplete{
     position:relative;
     z-index:80;
@@ -334,12 +336,14 @@
                     </a>
                 </div>
             </div>
+            {% if puede_gestionar_catalogo %}
             <div class="erp-catalog-actions" aria-label="Acciones del catalogo">
             {% if erp_access.usa_inventario_farmaceutico %}
                 <a class="erp-catalog-action" href="{% url 'categorias_farmaceuticas' empresa.slug %}">Categorias</a>
             {% endif %}
                 <a class="erp-catalog-action" href="{% url 'codigos_barras_productos' empresa.slug %}">Codigos de barras</a>
             </div>
+            {% endif %}
         </div>
         <form method="get" class="erp-list-filter-grid erp-catalog-filter-grid">
             <input type="hidden" name="tipo" value="{{ tipo_item }}">
@@ -396,7 +400,14 @@
                                 {% endif %}
                                 <div class="erp-doc-cell">
                                     <div class="erp-doc-title">{{ producto.nombre }}</div>
-                                    <div class="erp-doc-subtext">{{ producto.descripcion|default:"Sin descripcion comercial"|truncatechars:88 }}</div>
+                                    {% if producto.descripcion %}
+                                    <details class="erp-product-details">
+                                        <summary>Ver descripción</summary>
+                                        <p class="erp-doc-subtext">{{ producto.descripcion|linebreaksbr }}</p>
+                                    </details>
+                                    {% else %}
+                                    <div class="erp-doc-subtext">Sin descripción comercial</div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </td>

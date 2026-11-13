@@ -45,7 +45,7 @@
         <div class="manual-modal" id="patientDialog" hidden>
             <section class="manual-dialog" role="dialog" aria-modal="true" aria-labelledby="patientDialogTitle">
                 <header class="manual-dialog-head">
-                    <div><h3 id="patientDialogTitle">Seleccionar paciente</h3><p>Busque por nombre, identidad, expediente, teléfono o correo.</p></div>
+                    <div><h3 id="patientDialogTitle">Seleccionar paciente</h3><p>{% if contacto_manual_restringido %}Busque por nombre{% if erp_access.buscar_pacientes_por_identidad %} o número de identidad{% endif %}.{% else %}Busque por nombre, identidad, expediente, teléfono o correo.{% endif %}</p></div>
                     <button class="manual-close" type="button" id="closePatientDialog" aria-label="Cerrar">×</button>
                 </header>
                 <div class="manual-dialog-body">
@@ -66,7 +66,7 @@
                         <button class="manual-channel is-whatsapp" type="submit" name="canal" value="whatsapp" id="sendWhatsapp">Enviar por API</button>
                         <button class="manual-channel is-email" type="submit" name="canal" value="correo" id="sendEmail">Enviar por correo</button>
                     </div>
-                    <p class="manual-manual-help" id="manualWhatsappHelp" hidden>El mensaje incluirá enlaces seguros para descargar cada PDF. El paciente solo debe tocar el enlace; estarán disponibles durante 7 días.</p>
+                    <p class="manual-manual-help" id="manualWhatsappHelp" hidden>{% if contacto_manual_restringido %}Elegí al destinatario en WhatsApp al compartir los enlaces.{% else %}El mensaje incluirá enlaces seguros para descargar cada PDF. El paciente solo debe tocar el enlace; estarán disponibles durante 7 días.{% endif %}</p>
                 </div>
             </section>
         </div>
@@ -82,7 +82,7 @@
             <article class="manual-history-row">
                 <div><strong>{{ envio.paciente.nombre }}</strong><span>{{ envio.fecha_envio|date:"d/m/Y H:i" }} · {{ envio.get_canal_display }}</span></div>
                 <div class="manual-history-manuals">{% for manual in envio.manuales.all %}<span class="manual-history-chip">{{ manual.titulo }}</span>{% endfor %}</div>
-                <div><strong>{{ envio.enviado_por.get_full_name|default:envio.enviado_por.username|default:"Usuario no disponible" }}</strong><span>{{ envio.destinatario }}</span></div>
+                <div><strong>{% if envio.enviado_por %}{{ envio.enviado_por.get_full_name|default:envio.enviado_por.username }}{% else %}Usuario no disponible{% endif %}</strong>{% if not contacto_manual_restringido and envio.destinatario %}<span>{{ envio.destinatario }}</span>{% endif %}</div>
                 <span class="manual-status is-{{ envio.estado }}">{{ envio.get_estado_display }}</span>
             </article>
             {% empty %}<div class="manual-empty">Todavía no hay envíos registrados.</div>{% endfor %}
@@ -110,6 +110,7 @@
     const warning = document.getElementById("patientChannelWarning");
     const whatsappButton = document.getElementById("sendWhatsapp");
     const whatsappWebButton = document.getElementById("openWhatsappWeb");
+    const contactoRestringido = {{ contacto_manual_restringido|yesno:"true,false" }};
     const emailButton = document.getElementById("sendEmail");
     const manualHelp = document.getElementById("manualWhatsappHelp");
     let timer = null;
@@ -160,16 +161,16 @@
         patientId.value = patient.id;
         patientName.textContent = patient.nombre;
         const contact = [patient.expediente ? "Exp. " + patient.expediente : "", patient.telefono || "Sin teléfono", patient.correo || "Sin correo"].filter(Boolean);
-        patientDetails.textContent = contact.join(" · ");
+        patientDetails.textContent = contactoRestringido ? "El sistema utilizará el contacto registrado para los envíos directos." : contact.join(" · ");
         patientCard.hidden = false;
         channelActions.hidden = false;
         manualHelp.hidden = false;
-        whatsappButton.disabled = !patient.telefono;
-        whatsappWebButton.disabled = !patient.telefono;
-        emailButton.disabled = !patient.correo;
+        whatsappButton.disabled = !contactoRestringido && !patient.telefono;
+        whatsappWebButton.disabled = !contactoRestringido && !patient.telefono;
+        emailButton.disabled = !contactoRestringido && !patient.correo;
         const missing = [];
-        if(!patient.telefono){ missing.push("No tiene teléfono o WhatsApp registrado"); }
-        if(!patient.correo){ missing.push("No tiene correo electrónico registrado"); }
+        if(!contactoRestringido && !patient.telefono){ missing.push("No tiene teléfono o WhatsApp registrado"); }
+        if(!contactoRestringido && !patient.correo){ missing.push("No tiene correo electrónico registrado"); }
         warning.textContent = missing.join(". ");
         warning.hidden = missing.length === 0;
         results.replaceChildren();

@@ -818,7 +818,7 @@
           <div class="mobile-patient-picker" id="mobilePatientPicker" data-search-url="{% if field.name == 'paciente' %}{% url 'agenda_buscar_pacientes' empresa.slug %}{% else %}{% url 'agenda_buscar_clientes' empresa.slug %}{% endif %}">
             <div class="mobile-patient-native">{{ field }}</div>
             <div class="mobile-patient-search">
-              <input id="mobilePatientSearch" type="search" autocomplete="off" placeholder="{% if datos_paciente_limitados %}Buscar por nombre{% elif field.name == 'paciente' %}Buscar por nombre, identidad, expediente, teléfono o correo{% else %}Buscar por nombre, RTN, teléfono, WhatsApp o correo{% endif %}">
+              <input id="mobilePatientSearch" type="search" autocomplete="off" placeholder="{% if datos_paciente_limitados %}Buscar por nombre{% if field.name == "paciente" and erp_access.buscar_pacientes_por_identidad %} o identidad completa{% endif %}{% elif field.name == 'paciente' %}Buscar por nombre, identidad, expediente, teléfono o correo{% else %}Buscar por nombre, RTN, teléfono, WhatsApp o correo{% endif %}">
               <button class="mobile-patient-clear" type="button" id="mobilePatientClear" aria-label="Limpiar paciente">×</button>
               <div class="mobile-patient-results" id="mobilePatientResults"></div>
             </div>

@@ -37,6 +37,7 @@ from facturacion.models import (
     Producto,
     TipoImpuesto,
 )
+from clinica.busqueda_pacientes import filtro_identidad_paciente
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 from clinica.restricciones_citas import mensaje_restriccion
 
@@ -2802,23 +2803,37 @@ def buscar_pacientes_cita(request, empresa_slug):
     query = " ".join((request.GET.get("q") or "").split())
     pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
     datos_limitados = datos_paciente_limitados(request.user, empresa_operativa)
-    for termino in query.split():
-        filtro = Q(nombre__icontains=termino)
-        if not datos_limitados:
-            filtro |= (
-                Q(primer_nombre__icontains=termino) | Q(segundo_nombre__icontains=termino)
-                | Q(primer_apellido__icontains=termino) | Q(segundo_apellido__icontains=termino)
-                | Q(identidad__icontains=termino) | Q(expediente_codigo__icontains=termino)
-                | Q(telefono__icontains=termino) | Q(whatsapp__icontains=termino) | Q(correo__icontains=termino)
-            )
-        pacientes = pacientes.filter(filtro)
+    identidad = None
+    if (
+        datos_limitados
+        and request.user.tiene_permiso_erp("puede_buscar_pacientes_por_identidad", empresa_operativa)
+        and request.user.puede_acceder_empresa(empresa)
+        and request.user.tiene_permiso_erp("puede_buscar_pacientes_por_identidad", empresa)
+    ):
+        identidad = filtro_identidad_paciente(query)
+    if identidad is not None:
+        pacientes = pacientes.filter(identidad)
+    else:
+        for termino in query.split():
+            filtro = Q(nombre__icontains=termino)
+            if not datos_limitados:
+                filtro |= (
+                    Q(primer_nombre__icontains=termino) | Q(segundo_nombre__icontains=termino)
+                    | Q(primer_apellido__icontains=termino) | Q(segundo_apellido__icontains=termino)
+                    | Q(identidad__icontains=termino) | Q(expediente_codigo__icontains=termino)
+                    | Q(telefono__icontains=termino) | Q(whatsapp__icontains=termino) | Q(correo__icontains=termino)
+                )
+            pacientes = pacientes.filter(filtro)
     orden = ("nombre", "pk") if datos_limitados else ("-fecha_creacion", "nombre")
-    return JsonResponse({
+    respuesta = JsonResponse({
         "results": [
             _contacto_paciente_cita(paciente, request.user, datos_limitados=datos_limitados)
             for paciente in pacientes.order_by(*orden)[:12]
         ]
     })
+    if datos_limitados:
+        respuesta["Cache-Control"] = "private, no-store"
+    return respuesta
 
 
 @login_required

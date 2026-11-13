@@ -13,7 +13,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from core.access import interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
+from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_acciones_v3, rol_clinico_v2
 from .forms import EliminarProductoForm, ProductoForm
 from .models import (
     BodegaInventario, ExistenciaLoteBodega, InventarioProducto, LoteInventario,
@@ -40,11 +40,16 @@ def gestion_productos_disponible_app(request, empresa):
         and (usuario.is_superuser or empresa.licencia_operativa)
         and empresa.tiene_modulo_activo("facturacion")
     )
+    eliminar = (
+        "puede_eliminar_productos"
+        if disponible and (rol_clinico_v2(usuario, empresa) or rol_acciones_v3(usuario, empresa))
+        else "puede_productos"
+    )
     return {
         clave: bool(disponible and usuario.tiene_permiso_erp(permiso, empresa))
         for clave, permiso in (
             ("ver", "puede_productos"), ("crear", "puede_crear_productos"),
-            ("editar", "puede_editar_productos"), ("eliminar", "puede_productos"),
+            ("editar", "puede_editar_productos"), ("eliminar", eliminar),
         )
     }
 

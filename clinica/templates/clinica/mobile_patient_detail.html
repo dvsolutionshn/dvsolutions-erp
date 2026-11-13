@@ -2,7 +2,7 @@
 {% load humanize %}
 {% block mobile_title %}{{ paciente.nombre }}{% endblock %}
 {% block mobile_back_url %}{% if can_view_patients %}{{ app_patients_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
-{% block mobile_page_title %}Expediente{% endblock %}
+{% block mobile_page_title %}{% if can_view_history %}Expediente{% else %}Ficha del paciente{% endif %}{% endblock %}
 {% block mobile_header_description %}<p>{{ paciente.expediente_codigo }}</p>{% endblock %}
 {% block mobile_header_actions %}{% if can_edit_patient or can_view_history or can_create_history or can_view_gastos %}<button type="button" class="mi-more" data-open-sheet="patientActionsSheet" aria-label="Más acciones del paciente"><b aria-hidden="true">⋮</b> Acciones</button>{% endif %}{% endblock %}
 {% block mobile_content %}

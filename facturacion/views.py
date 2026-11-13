@@ -3445,6 +3445,12 @@ def eliminar_cliente(request, empresa_slug, cliente_id):
     return redirect("clientes_facturacion", empresa_slug=empresa.slug)
 
 
+def _puede_gestionar_catalogo_productos(usuario, empresa):
+    from core.clinical_permissions import rol_clinico_granular
+
+    return not rol_clinico_granular(usuario, empresa) or usuario.tiene_permiso_erp("puede_editar_productos", empresa)
+
+
 @login_required
 def productos_facturacion(request, empresa_slug):
     from .mobile_products import (
@@ -3510,6 +3516,7 @@ def productos_facturacion(request, empresa_slug):
         "q": q,
         "categoria_id": categoria_id,
         "tipo_item": tipo_item,
+        "puede_gestionar_catalogo": _puede_gestionar_catalogo_productos(request.user, empresa),
         "categorias_farmaceuticas": CategoriaProductoFarmaceutico.objects.filter(empresa=empresa, activa=True).order_by('nombre'),
         "productos_sugeridos": Producto.objects.filter(empresa=empresa, eliminado=False).order_by('nombre').values_list('nombre', flat=True).distinct(),
         "ultimas_bajas": BitacoraProductoEliminado.objects.filter(empresa=empresa).select_related('usuario', 'producto')[:8],
@@ -3519,6 +3526,8 @@ def productos_facturacion(request, empresa_slug):
 @login_required
 def codigos_barras_productos(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not _puede_gestionar_catalogo_productos(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para asignar códigos de barras.")
 
     if request.method == "POST":
         producto = get_object_or_404(
@@ -6910,6 +6919,8 @@ def eliminar_producto(request, empresa_slug, producto_id):
 @login_required
 def categorias_farmaceuticas(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not _puede_gestionar_catalogo_productos(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para administrar categorías farmacéuticas.")
     if not _empresa_usa_perfil_farmaceutico(empresa):
         messages.error(request, "Las categorias farmaceuticas no estan activas para esta empresa.")
         return redirect("productos_facturacion", empresa_slug=empresa.slug)

@@ -10,6 +10,7 @@ import uuid
 PERMISOS_CLINICOS_GRANULARES = {
     "puede_ver_calendario", "puede_crear_citas", "puede_editar_citas", "puede_eliminar_citas",
     "puede_ver_pacientes", "puede_ver_datos_generales_paciente", "puede_crear_pacientes",
+    "puede_buscar_pacientes_por_identidad",
     "puede_generar_enlace_paciente_nuevo", "puede_enviar_enlace_historia_clinica",
     "puede_editar_pacientes", "puede_eliminar_pacientes", "puede_crear_recordatorios_paciente",
     "puede_restringir_citas_paciente", "puede_habilitar_citas_paciente",
@@ -219,6 +220,7 @@ class RolSistema(models.Model):
     puede_marcar_citas_pagadas = models.BooleanField(default=False)
     puede_marcar_citas_cortesia = models.BooleanField(default=False)
     puede_ver_pacientes = models.BooleanField(default=False)
+    puede_buscar_pacientes_por_identidad = models.BooleanField(default=False, db_default=False)
     puede_ver_datos_generales_paciente = models.BooleanField(default=False)
     puede_crear_pacientes = models.BooleanField(default=False)
     puede_generar_enlace_paciente_nuevo = models.BooleanField(default=False, db_default=False)

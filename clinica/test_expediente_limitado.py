@@ -141,6 +141,47 @@ class ExpedienteLimitadoTests(TestCase):
                             self.assertNotContains(self.client.get(listado, busqueda), paciente.nombre)
                             self.assertEqual(self.client.get(sugerencias, busqueda).json()["results"], [])
 
+    def test_busqueda_por_identidad_completa_sin_mostrarla(self):
+        permiso = "puede_buscar_pacientes_por_identidad"
+        RolSistema.objects.filter(pk__in=[rol.pk for rol in self.roles.values()]).update(**{permiso: True})
+        self.conceder_areas(self.PLANES)
+        for slug, empresa in self.empresas.items():
+            paciente = self.pacientes[slug]
+            identidad = paciente.identidad
+            formateada = f"{identidad[:4]}-{identidad[4:8]} {identidad[8:]}"
+            for app in (False, True):
+                with self.subTest(clinica=slug, app=app):
+                    listado = self.url("clinica_pacientes", empresa=empresa)
+                    sugerencias = self.url("clinica_pacientes_sugerencias", empresa=empresa)
+                    parametros = {"app": "1"} if app else {}
+                    respuesta = self.client.get(listado, {**parametros, "q": formateada})
+                    self.assertContains(respuesta, paciente.nombre)
+                    self.assertContains(respuesta, paciente.foto_perfil.url)
+                    self.assertNotContains(respuesta, formateada)
+                    self.assert_datos_privados_ausentes(respuesta, paciente)
+
+                    respuesta = self.client.get(sugerencias, {**parametros, "q": identidad})
+                    resultado, = respuesta.json()["results"]
+                    self.assertEqual(resultado["nombre"], paciente.nombre)
+                    self.assertEqual(set(resultado), {"id", "nombre", "url"})
+                    self.assert_datos_privados_ausentes(respuesta, paciente)
+
+                    ajeno = next(otro for otro in self.pacientes.values() if otro.empresa_id != empresa.pk)
+                    for consulta in (identidad[:-1], paciente.telefono, paciente.whatsapp, ajeno.identidad):
+                        with self.subTest(consulta=consulta):
+                            respuesta = self.client.get(sugerencias, {**parametros, "q": consulta})
+                            self.assertEqual(respuesta.json()["results"], [])
+
+    def test_busqueda_identidad_de_agenda_conserva_la_respuesta_limitada(self):
+        RolSistema.objects.filter(pk=self.roles[2].pk).update(puede_buscar_pacientes_por_identidad=True)
+        agenda = self.url("agenda_buscar_pacientes")
+        respuesta = self.client.get(agenda, {"q": self.paciente.identidad})
+        resultado, = respuesta.json()["results"]
+        self.assertEqual(resultado["nombre"], self.paciente.nombre)
+        self.assert_datos_privados_ausentes(respuesta, self.paciente)
+        self.assertEqual(respuesta["Cache-Control"], "private, no-store")
+        self.assertEqual(self.client.get(agenda, {"q": self.paciente.identidad[:-1]}).json()["results"], [])
+
     def test_expediente_muestra_solo_el_area_concedida_y_admite_head(self):
         enlaces = {
             self.PLANES: ("clinica_planes_tratamiento_paciente",),

@@ -3,16 +3,16 @@
         <div>
             <span class="patients-premium-eyebrow">Directorio clínico</span>
             <h2>Pacientes</h2>
-            <p>Buscá por nombre para abrir las secciones autorizadas del expediente.</p>
+            <p>Buscá por nombre{% if puede_buscar_identidad %} o número de identidad completo{% endif %} para abrir las secciones autorizadas del expediente.</p>
         </div>
     </header>
     <div class="patients-premium-body">
         <form method="get" class="patient-search-panel">
             <div class="patient-search-box">
-                <input class="patient-search-input" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre" aria-label="Buscar por nombre" autocomplete="off">
+                <input class="patient-search-input" type="search" name="q" value="{{ q }}" placeholder="Nombre{% if puede_buscar_identidad %} o número de identidad{% endif %}" aria-label="Buscar paciente" autocomplete="off">
             </div>
             <button class="erp-btn" type="submit">Buscar</button>
-            {% if q %}<a class="patient-search-chip" href="{% url 'clinica_pacientes' empresa.slug %}">Limpiar</a>{% endif %}
+            {% if busqueda_activa %}<a class="patient-search-chip" href="{% url 'clinica_pacientes' empresa.slug %}">Limpiar</a>{% endif %}
         </form>
 
         <div class="patients-premium-grid">
@@ -32,7 +32,7 @@
                 {% endif %}
             </article>
             {% empty %}
-            <p class="patients-premium-empty">No encontramos pacientes con ese nombre.</p>
+            <p class="patients-premium-empty">No encontramos pacientes para esa búsqueda.</p>
             {% endfor %}
         </div>
 
