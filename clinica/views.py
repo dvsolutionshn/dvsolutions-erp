@@ -2131,10 +2131,13 @@ def _contexto_receta_impresion(empresa, paciente, receta, *, para_pdf=False):
     }
 
 
-def _generar_receta_pdf_bytes(empresa, paciente, receta):
+def _generar_receta_pdf_bytes(empresa, paciente, receta, *, ocultar_datos_paciente=False):
     html_string = render_to_string(
         "clinica/receta_imprimir.html",
-        _contexto_receta_impresion(empresa, paciente, receta, para_pdf=True),
+        {
+            **_contexto_receta_impresion(empresa, paciente, receta, para_pdf=True),
+            "ocultar_datos_paciente": ocultar_datos_paciente,
+        },
     )
     return HTML(string=html_string, base_url=str(settings.BASE_DIR)).write_pdf()
 
@@ -2542,6 +2545,7 @@ def enviar_manual_receta_correo(request, empresa_slug, manual_id):
 
 
 @login_required
+@never_cache
 def recetas_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_recetas_app(request, empresa, "puede_ver_recetas")
@@ -2568,6 +2572,7 @@ def recetas_paciente(request, empresa_slug, paciente_id):
 
 
 @login_required
+@never_cache
 def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_recetas_app(request, empresa, "puede_enviar_recetas")
@@ -2586,12 +2591,17 @@ def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
 
 
 @login_required
+@never_cache
 def descargar_receta_pdf(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_recetas_app(request, empresa, "puede_enviar_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     receta = _receta_con_adjuntos(empresa, paciente, receta_id)
-    response = HttpResponse(_generar_receta_pdf_bytes(empresa, paciente, receta), content_type="application/pdf")
+    contenido = _generar_receta_pdf_bytes(
+        empresa, paciente, receta,
+        ocultar_datos_paciente=datos_paciente_limitados(request.user, empresa),
+    )
+    response = HttpResponse(contenido, content_type="application/pdf")
     disposition = "inline" if es_recetas_app(request, empresa) else "attachment"
     response["Content-Disposition"] = f'{disposition}; filename="{_nombre_receta_pdf(receta)}"'
     return respuesta_recetas_app(request, empresa, response)
@@ -2640,10 +2650,8 @@ def enviar_receta_correo(request, empresa_slug, paciente_id, receta_id):
         logger.exception("No se pudo enviar la receta %s por correo", receta.id)
         messages.error(request, "No se pudo enviar la receta por correo. Revise la configuración de correo e intente nuevamente.")
     else:
-        messages.success(
-            request,
-            f"Receta{f' y {total_manuales} manual(es)' if total_manuales else ''} enviada por correo a {paciente.correo}.",
-        )
+        destinatario = "al correo registrado" if datos_paciente_limitados(request.user, empresa) else f"por correo a {paciente.correo}"
+        messages.success(request, f"Receta{f' y {total_manuales} manual(es)' if total_manuales else ''} enviada {destinatario}.")
     return volver_receta_app(request, empresa, paciente, receta)
 
 
@@ -2683,8 +2691,11 @@ def enviar_receta_whatsapp(request, empresa_slug, paciente_id, receta_id):
                 enviar_documento_whatsapp(config, telefono, media_id, nombre, caption=caption)
     except Exception as exc:
         logger.exception("No se pudo enviar la receta %s por WhatsApp", receta.id)
-        detalle = str(exc) if isinstance(exc, WhatsAppAPIError) else "No fue posible preparar todos los documentos."
-        messages.error(request, f"No se pudo completar el envío por WhatsApp: {detalle}")
+        if datos_paciente_limitados(request.user, empresa):
+            messages.error(request, "No se pudo completar el envío por WhatsApp. Revisá la conexión e intentá nuevamente.")
+        else:
+            detalle = str(exc) if isinstance(exc, WhatsAppAPIError) else "No fue posible preparar todos los documentos."
+            messages.error(request, f"No se pudo completar el envío por WhatsApp: {detalle}")
     else:
         messages.success(request, f"Receta y {receta.manuales.count()} manual(es) enviados por WhatsApp.")
     return volver_receta_app(request, empresa, paciente, receta)
@@ -2790,11 +2801,14 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_anexos_app(request, empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    registros = list(
+    consulta = (
         PacienteFotoEvolucion.objects.filter(empresa=empresa, paciente=paciente)
         .select_related("creado_por")
         .order_by("fecha", "id")
     )
+    registros = [] if (
+        datos_paciente_limitados(request.user, empresa) and not puede_descargar_anexos(request, empresa)
+    ) else list(consulta)
     fotos = [registro for registro in registros if registro.imagen]
     videos = [registro for registro in registros if registro.video]
     preoperatorios = [registro for registro in registros if registro.tipo == "preoperatorio"]

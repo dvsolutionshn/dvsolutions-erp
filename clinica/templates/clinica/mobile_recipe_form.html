@@ -2,7 +2,7 @@
 {% block mobile_title %}Nueva receta{% endblock %}
 {% block mobile_back_url %}{% if can_view_recipes %}{{ app_recipes_url }}{% elif can_view_patient %}{{ app_patient_detail_url }}{% elif app_recipe_patient_picker_url %}{{ app_recipe_patient_picker_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
 {% block mobile_page_title %}Nueva receta{% endblock %}
-{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not ocultar_datos_paciente %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
 {% block mobile_content %}
 <form method="post" action="{{ app_recipe_form_url }}" enctype="multipart/form-data" id="mobileRecipeForm" class="mr-compose" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}
   {% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}{% if form.errors %}<div class="mi-error-box" role="alert"><strong>Revisa los datos marcados</strong><p>El contenido ingresado se conserva.</p></div>{% endif %}

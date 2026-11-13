@@ -17,7 +17,7 @@ from crm.models import (
 
 from .models import (
     DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, Paciente,
-    PlanTratamientoPaciente, PreconsultaClinica,
+    PacienteFotoEvolucion, PlanTratamientoPaciente, PreconsultaClinica,
 )
 
 
@@ -376,6 +376,21 @@ class ExpedienteLimitadoTests(TestCase):
                 }))
         self.assertEqual(PlanTratamientoPaciente.objects.filter(paciente=self.paciente).count(), 1)
         self.assertEqual(ExamenPaciente.objects.filter(paciente=self.paciente).count(), 1)
+
+    def test_evolucion_oculta_fotos_y_descripciones_sin_permiso_para_abrir_archivos(self):
+        self.conceder_areas(self.ANEXOS)
+        foto = PacienteFotoEvolucion.objects.create(
+            empresa=self.empresa, paciente=self.paciente, tipo="preoperatorio",
+            titulo="Foto clínica reservada", descripcion="Descripción de cirugía reservada",
+            imagen="crm/citas/cirugias/imagen-reservada.jpg",
+        )
+        for app in (False, True):
+            with self.subTest(app=app):
+                respuesta = self.client.get(self.url_paciente("clinica_evolucion_paciente", app=app))
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertNotContains(respuesta, foto.titulo)
+                self.assertNotContains(respuesta, foto.descripcion)
+                self.assertNotContains(respuesta, foto.imagen.url)
 
     def test_anexos_limitados_protegen_archivos_y_certificado(self):
         self.conceder_areas(self.ANEXOS)

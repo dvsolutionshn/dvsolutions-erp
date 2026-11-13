@@ -67,14 +67,16 @@
         </div>
         <div class="meta">
             <p><strong>Fecha:</strong> {{ receta.fecha|date:"d/m/Y" }}</p>
-            <p><strong>Expediente:</strong> {{ paciente.expediente_codigo }}</p>
+            {% if not ocultar_datos_paciente %}<p><strong>Expediente:</strong> {{ paciente.expediente_codigo }}</p>{% endif %}
         </div>
     </header>
     <h2 class="title">Receta medica</h2>
     <section class="patient">
         <div class="box"><span>Paciente</span><strong>{{ paciente.nombre }}</strong></div>
+        {% if not ocultar_datos_paciente %}
         <div class="box"><span>Identidad</span><strong>{{ paciente.identidad|default:"-" }}</strong></div>
         <div class="box"><span>Edad</span><strong>{% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</strong></div>
+        {% endif %}
     </section>
     {% if receta.diagnostico %}<section class="section"><h3>Diagnostico</h3><div class="box">{{ receta.diagnostico }}</div></section>{% endif %}
     {% if receta.detalles_medicamentos.all %}

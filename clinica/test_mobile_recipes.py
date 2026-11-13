@@ -374,6 +374,57 @@ class MobileRecipesIntegrationTests(TestCase):
         self.assertIn(self.paciente.nombre, engine.call_args.kwargs["string"])
         self.assertIn("Medicamento hospital_mia", engine.call_args.kwargs["string"])
 
+    def test_limited_recipe_reader_can_send_original_without_seeing_patient_data(self):
+        self.asignar_rol(
+            puede_ver_pacientes=True, puede_ver_recetas=True, puede_enviar_recetas=True,
+        )
+        self.paciente.telefono = "50499993123"
+        self.paciente.fecha_nacimiento = timezone.localdate().replace(year=1970, month=1, day=1)
+        self.paciente.save(update_fields=["telefono", "fecha_nacimiento"])
+        privados = (
+            self.paciente.identidad, self.paciente.expediente_codigo, self.paciente.telefono,
+            self.paciente.whatsapp, self.paciente.correo, f"{self.paciente.edad} anos",
+        )
+
+        with patch("clinica.views.HTML") as engine:
+            engine.return_value.write_pdf.return_value = b"%PDF-1.4 receta"
+            for mobile in (False, True):
+                with self.subTest(mobile=mobile):
+                    for vista, receta in (
+                        ("clinica_recetas_paciente", None), ("clinica_receta_imprimir", self.receta),
+                    ):
+                        respuesta = self.client.get(self.url(vista, receta, mobile=mobile))
+                        self.assertContains(respuesta, "Medicamento hospital_mia")
+                        for valor in privados:
+                            self.assertNotContains(respuesta, valor)
+                        self.assertIn("no-store", respuesta["Cache-Control"])
+                    pdf = self.client.get(self.url("clinica_receta_pdf", self.receta, mobile=mobile))
+                    self.assertEqual(pdf.status_code, 200)
+                    self.assertIn("no-store", pdf["Cache-Control"])
+                    html = engine.call_args.kwargs["string"]
+                    for valor in privados:
+                        self.assertNotIn(valor, html)
+                    self.assertIn("Medicamento hospital_mia", html)
+            with patch("clinica.views.EmailMultiAlternatives.send", autospec=True, return_value=1) as enviar:
+                respuesta = self.client.post(self.url("clinica_enviar_receta_correo", self.receta), {"app": "1"}, follow=True)
+            self.assertEqual(enviar.call_args.args[0].to, [self.paciente.correo])
+            original = engine.call_args.kwargs["string"]
+            for valor in (self.paciente.identidad, self.paciente.expediente_codigo, f"{self.paciente.edad} anos"):
+                self.assertIn(valor, original)
+            self.assertContains(respuesta, "enviada al correo registrado")
+            self.assertNotContains(respuesta, self.paciente.correo)
+
+        ConfiguracionCRM.objects.create(empresa=self.empresa, whatsapp_activo=True)
+        with patch("clinica.views.HTML") as engine, patch(
+            "clinica.views.subir_documento_whatsapp", return_value="media-receta"
+        ), patch("clinica.views.enviar_documento_whatsapp", side_effect=WhatsAppAPIError(self.paciente.whatsapp)) as enviar:
+            engine.return_value.write_pdf.return_value = b"%PDF-1.4 receta"
+            respuesta = self.client.post(self.url("clinica_enviar_receta_whatsapp", self.receta), {"app": "1"}, follow=True)
+        self.assertEqual(enviar.call_args.args[1], self.paciente.whatsapp)
+        self.assertIn(self.paciente.identidad, engine.call_args.kwargs["string"])
+        self.assertContains(respuesta, "No se pudo completar el envío por WhatsApp")
+        self.assertNotContains(respuesta, self.paciente.whatsapp)
+
     def test_email_keeps_original_pdf_manual_attachments_patient_recipient_and_mobile_return(self):
         manual = self.manual()
         self.receta.manuales.add(manual)

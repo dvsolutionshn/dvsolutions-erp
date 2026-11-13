@@ -1,12 +1,25 @@
+import re
+from urllib.parse import urlsplit
+
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+
+from clinica.media_privada import PREFIJOS_MEDIA_CLINICA, archivo_media_clinica
 
 urlpatterns = []
 
 if settings.ENABLE_DJANGO_ADMIN:
     urlpatterns.append(path(settings.DJANGO_ADMIN_PATH, admin.site.urls))
+
+prefijo_media = re.escape(urlsplit(settings.MEDIA_URL).path.lstrip("/"))
+rutas_media_clinica = "|".join(map(re.escape, PREFIJOS_MEDIA_CLINICA))
+urlpatterns.append(re_path(
+    rf"^{prefijo_media}(?P<nombre>(?:{rutas_media_clinica}).+)$",
+    archivo_media_clinica,
+    name="archivo_media_clinica",
+))
 
 urlpatterns += [
     path('mero/', include('mero.urls')),

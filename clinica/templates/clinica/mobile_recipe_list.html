@@ -1,8 +1,8 @@
 {% extends "clinica/mobile_recipe_base.html" %}
 {% block mobile_title %}Recetas del paciente{% endblock %}
-{% block mobile_back_url %}{% if can_view_patient %}{{ app_patient_detail_url }}{% elif app_recipe_patient_picker_url %}{{ app_recipe_patient_picker_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_back_url %}{% if receta_regreso_limitado_url %}{{ receta_regreso_limitado_url }}{% elif can_view_patient %}{{ app_patient_detail_url }}{% elif app_recipe_patient_picker_url %}{{ app_recipe_patient_picker_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
 {% block mobile_page_title %}Recetas{% endblock %}
-{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not ocultar_datos_paciente %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
 {% block mobile_header_actions %}{% if can_create_recipe %}<a class="mi-more mr-header-link" href="{{ app_recipe_create_url }}"><b aria-hidden="true">+</b> Nueva</a>{% endif %}{% endblock %}
 {% block mobile_content %}
 <div class="mr-list-head"><strong>{{ recetas|length }} receta{{ recetas|length|pluralize }}</strong><span>Más recientes primero</span></div>

@@ -3,6 +3,8 @@
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from core.clinical_permissions import datos_paciente_limitados, puede_abrir_expediente_limitado
+
 from .mobile_patients import (
     autorizar_pacientes_app,
     contexto_pacientes_app,
@@ -86,7 +88,17 @@ def contexto_recetas_app(request, empresa, paciente, receta=None, recetas=None):
 
 
 def render_recetas_app(request, empresa, web_template, mobile_template, contexto):
-    if es_recetas_app(request, empresa):
+    modo_app = es_recetas_app(request, empresa)
+    if datos_paciente_limitados(request.user, empresa):
+        contexto["ocultar_datos_paciente"] = True
+        paciente = contexto["paciente"]
+        if puede_abrir_expediente_limitado(request.user, empresa):
+            regreso = reverse("clinica_paciente_expediente", args=[empresa.slug, paciente.pk])
+            contexto["receta_regreso_limitado_url"] = f"{regreso}?app=1" if modo_app else regreso
+        elif request.user.tiene_permiso_erp("puede_ver_pacientes", empresa):
+            regreso = reverse("clinica_pacientes", args=[empresa.slug])
+            contexto["receta_regreso_limitado_url"] = f"{regreso}?app=1&destino=recetas" if modo_app else regreso
+    if modo_app:
         contexto.update(contexto_recetas_app(
             request, empresa, contexto["paciente"], contexto.get("receta"), contexto.get("recetas"),
         ))
