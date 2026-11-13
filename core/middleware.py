@@ -385,9 +385,11 @@ class EmpresaAccessMiddleware:
                     if pacientes_solo_tarjetas(request.user, empresa) and (
                         suffix not in {"pacientes", "pacientes/sugerencias"} or request.method not in {"GET", "HEAD"}
                     ):
-                        respuesta = render(request, "clinica/acceso_paciente_denegado.html", status=403)
-                        respuesta["Cache-Control"] = "private, no-store"
-                        return respuesta
+                        permiso_enlace = permiso_enlace_paciente_desde_ruta(suffix, request.method)
+                        if not permiso_enlace or not request.user.tiene_permiso_erp(permiso_enlace, empresa):
+                            respuesta = render(request, "clinica/acceso_paciente_denegado.html", status=403)
+                            respuesta["Cache-Control"] = "private, no-store"
+                            return respuesta
                 if parts[3:4] == ["gastos-adicionales"]:
                     if not gastos_adicionales_habilitados(empresa):
                         messages.error(request, "Gastos Adicionales no está habilitado para esta empresa.")

@@ -4402,6 +4402,8 @@ def _puede_enviar_enlace_delegado(usuario, empresa):
 
 
 def _puede_enviar_preconsulta_heredada(usuario, empresa):
+    if pacientes_solo_tarjetas(usuario, empresa):
+        return False
     if not rol_clinico_granular(usuario, empresa):
         return usuario.tiene_permiso_erp("puede_expediente_clinico", empresa)
     return not historial_paciente_limitado(usuario, empresa) and (
@@ -4416,13 +4418,13 @@ def _puede_enviar_preconsulta_heredada(usuario, empresa):
 def _volver_desde_enlace(request, empresa, paciente=None):
     vista = "clinica_pacientes"
     argumentos = [empresa.slug]
-    if paciente and datos_paciente_limitados(request.user, empresa):
-        if puede_abrir_expediente_limitado(request.user, empresa):
+    if paciente and not pacientes_solo_tarjetas(request.user, empresa):
+        if not datos_paciente_limitados(request.user, empresa):
+            vista = "clinica_paciente_detalle"
+            argumentos.append(paciente.pk)
+        elif puede_abrir_expediente_limitado(request.user, empresa):
             vista = "clinica_paciente_expediente"
             argumentos.append(paciente.pk)
-    elif paciente:
-        vista = "clinica_paciente_detalle"
-        argumentos.append(paciente.pk)
     ruta = reverse(vista, args=argumentos)
     return f"{ruta}?app=1" if es_pacientes_app(request, empresa) else ruta
 

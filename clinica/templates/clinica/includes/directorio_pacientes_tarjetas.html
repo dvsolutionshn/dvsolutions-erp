@@ -23,6 +23,9 @@
                     {% if paciente.sexo != "no_indicado" %}<span class="premium-patient-badge">{{ paciente.get_sexo_display }}</span>{% endif %}
                 </div>
                 {% include "clinica/includes/contacto_tarjeta_paciente.html" with clase_contacto="premium-patient-contact" %}
+                {% if erp_access.enviar_enlace_historia_clinica %}
+                    {% include "clinica/includes/enviar_enlace_historia_clinica.html" with clase_formulario="erp-inline-form" clase_boton="erp-btn-secondary" %}
+                {% endif %}
             </article>
             {% empty %}
             <div class="patients-premium-empty">No encontramos pacientes con ese criterio.</div>

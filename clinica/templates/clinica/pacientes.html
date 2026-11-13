@@ -6,15 +6,13 @@
 {% block header_description %}{% if vista_pacientes_solo_tarjetas %}Consultá los datos generales y de contacto de los pacientes.{% else %}Base maestra de pacientes con datos generales, contacto, riesgos y acceso directo al expediente.{% endif %}{% endblock %}
 
 {% block topbar_actions %}
-{% if not vista_pacientes_solo_tarjetas %}
-{% if erp_access.generar_enlace_paciente_nuevo or empresa.slug == "hospital_mia" and erp_access.crear_pacientes %}
+{% if erp_access.generar_enlace_paciente_nuevo or not vista_pacientes_solo_tarjetas and empresa.slug == "hospital_mia" and erp_access.crear_pacientes %}
 <form method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-btn-secondary" type="submit">Enlace para paciente nuevo</button>
 </form>
 {% endif %}
-{% if erp_access.crear_pacientes %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>{% endif %}
-{% endif %}
+{% if not vista_pacientes_solo_tarjetas and erp_access.crear_pacientes %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>{% endif %}
 {% endblock %}
 
 {% block extra_head %}

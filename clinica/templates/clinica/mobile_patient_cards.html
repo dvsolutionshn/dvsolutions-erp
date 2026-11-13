@@ -2,6 +2,15 @@
 
 {% block mobile_page_title %}Pacientes{% endblock %}
 {% block mobile_header_description %}<p>Consultá los datos generales y de contacto de los pacientes.</p>{% endblock %}
+{% block mobile_header_actions %}
+{% if erp_access.generar_enlace_paciente_nuevo %}
+<form method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}">
+    {% csrf_token %}
+    <input type="hidden" name="app" value="1">
+    <button class="mi-more" type="submit">Enlace para paciente nuevo</button>
+</form>
+{% endif %}
+{% endblock %}
 {% block mobile_content %}
 <form class="mi-card mp-search" action="{% url 'clinica_pacientes' empresa.slug %}" method="get">
     <input type="hidden" name="app" value="1">
@@ -32,6 +41,9 @@
             {% if paciente.sexo != "no_indicado" %}<span>{{ paciente.get_sexo_display }}</span>{% endif %}
         </div>
         {% include "clinica/includes/contacto_tarjeta_paciente.html" with clase_contacto="mp-patient-meta" %}
+        {% if erp_access.enviar_enlace_historia_clinica %}
+            {% include "clinica/includes/enviar_enlace_historia_clinica.html" with modo_app=True clase_boton="mi-button secondary" %}
+        {% endif %}
     </article>
     {% empty %}
     <div class="mi-card mp-empty"><h2>No se encontraron pacientes</h2><p>Probá otro nombre, número de identidad o teléfono.</p></div>
