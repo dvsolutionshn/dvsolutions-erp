@@ -1220,7 +1220,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
             {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
           </div>
           {% elif field.name != "hora_cita" and field.name != "periodo_cita" and field.name != "cirugia_periodo_fin" and field.name != "detalles_agenda" %}
-          <div class="erp-field{% if field.name == 'observacion' %} appointment-notes-field{% endif %}" data-field-name="{{ field.name }}">
+          <div class="erp-field{% if field.name == 'observacion' %} appointment-notes-field{% endif %}" data-field-name="{{ field.name }}"{% if field.name == 'observacion' and form.permitir_motivo_consulta_nueva %} data-appointment-create-reason{% endif %}>
             <label for="{% if field.name == 'paciente' and es_clinica %}patientSearchInput{% else %}{{ field.id_for_label }}{% endif %}">{{ field.label }}</label>
             {% if field.name == "paciente" and es_clinica %}
             <div class="appointment-patient-picker">
@@ -2280,7 +2280,7 @@ window.appointmentPatientPicker = {choosePatient};
         if(!show && input.type !== "file"){ input.value = ""; }
       });
     });
-    const notesField = document.querySelector('[data-field-name="observacion"]');
+    const notesField = document.querySelector('[data-field-name="observacion"]:not([data-appointment-create-reason])');
     if(notesField){
       notesField.style.display = show ? "none" : "";
       notesField.querySelectorAll("textarea, input, select").forEach(function(input){

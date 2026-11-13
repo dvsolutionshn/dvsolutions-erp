@@ -1618,7 +1618,8 @@ def _formulario_agenda(request, empresa, empresa_agenda=None):
     if solo_consulta and request.method not in {"GET", "HEAD", "OPTIONS"}:
         raise PermissionDenied("Tu rol solo puede consultar las citas.")
     permisos = _permisos_accion_agenda(request.user, empresa)
-    if empresa.pk != empresa_agenda.pk and pacientes_solo_tarjetas(request.user, empresa):
+    solo_tarjetas = pacientes_solo_tarjetas(request.user, empresa)
+    if empresa.pk != empresa_agenda.pk and solo_tarjetas:
         permisos = dict.fromkeys(permisos, False)
     if request.method == "POST":
         cita_id = request.POST.get("cita_id")
@@ -1635,6 +1636,7 @@ def _formulario_agenda(request, empresa, empresa_agenda=None):
     form = CitaClienteForm(
         request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto, usuario=request.user,
         ocultar_datos_clinicos=not _agenda_ver_detalles_clinicos(request.user, empresa, empresa_agenda),
+        permitir_motivo_consulta_nueva=solo_tarjetas and permisos["crear"],
     )
     _limitar_campos_especiales_cita(request, empresa, form)
     if not permisos["estado"] and not permisos["cancelar"]:

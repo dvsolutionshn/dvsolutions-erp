@@ -843,7 +843,7 @@
           <div class="errors">{{ field.errors }}</div>
         </div>
         {% elif field.name != "hora_cita" and field.name != "periodo_cita" and field.name != "cirugia_periodo_fin" and field.name != "detalles_agenda" %}
-        <div class="field {% if field.name == 'observacion' or field.name == 'cirugia_detalle' or field.name == 'fotos_cirugia' %}wide{% endif %}" data-field-name="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}<div class="errors">{{ field.errors }}</div></div>
+        <div class="field {% if field.name == 'observacion' or field.name == 'cirugia_detalle' or field.name == 'fotos_cirugia' %}wide{% endif %}" data-field-name="{{ field.name }}"{% if field.name == 'observacion' and form.permitir_motivo_consulta_nueva %} data-appointment-create-reason{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}<div class="errors">{{ field.errors }}</div></div>
         {% endif %}
       {% endfor %}
       {% if detalles_agenda_hospital_mia %}{{ form.detalles_agenda }}{% if empresa.tipo_solucion == 'clinica' %}{% include "crm/_detalles_agenda_hospital_mia.html" with detalles_agenda_app_segura=True %}{% else %}{% include "crm/_detalles_agenda_hospital_mia.html" %}{% endif %}{% endif %}
@@ -1985,7 +1985,7 @@
         if(!show && input.type !== "file"){ input.value = ""; }
       });
     });
-    const notesField = document.querySelector('[data-field-name="observacion"]');
+    const notesField = document.querySelector('[data-field-name="observacion"]:not([data-appointment-create-reason])');
     if(notesField){
       notesField.style.display = show ? "none" : "";
       notesField.querySelectorAll("textarea, input, select").forEach(function(input){
