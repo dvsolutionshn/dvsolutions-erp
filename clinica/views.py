@@ -2690,10 +2690,11 @@ def enviar_receta_whatsapp(request, empresa_slug, paciente_id, receta_id):
                 media_id = subir_documento_whatsapp(config, ruta, "application/pdf")
                 enviar_documento_whatsapp(config, telefono, media_id, nombre, caption=caption)
     except Exception as exc:
-        logger.exception("No se pudo enviar la receta %s por WhatsApp", receta.id)
         if datos_paciente_limitados(request.user, empresa):
+            logger.warning("No se pudo enviar la receta %s por WhatsApp (%s)", receta.id, type(exc).__name__)
             messages.error(request, "No se pudo completar el envío por WhatsApp. Revisá la conexión e intentá nuevamente.")
         else:
+            logger.exception("No se pudo enviar la receta %s por WhatsApp", receta.id)
             detalle = str(exc) if isinstance(exc, WhatsAppAPIError) else "No fue posible preparar todos los documentos."
             messages.error(request, f"No se pudo completar el envío por WhatsApp: {detalle}")
     else:
