@@ -514,6 +514,7 @@ def _contexto_calendario(
     empresa_agenda=None,
 ):
     empresa_agenda = empresa_agenda or _empresa_origen_agenda(empresa)
+    agenda_solo_consulta = _agenda_solo_consulta(request.user, empresa)
     es_clinica = bool(
         empresa_agenda.tipo_solucion == "clinica"
         or empresa_agenda.tiene_modulo_activo("clinica_medica")
@@ -565,9 +566,10 @@ def _contexto_calendario(
             empresa=empresa_agenda, fecha_hora__date__gte=inicio, fecha_hora__date__lte=fin
         )
         .select_related("cliente", "producto", "paciente", "servicio_clinico", "profesional_salud")
-        .prefetch_related("fotos_cirugia")
         .order_by("fecha_hora")
     )
+    if not agenda_solo_consulta:
+        citas_qs = citas_qs.prefetch_related("fotos_cirugia")
     if agenda_espejo and empresa.slug == "serviciosmedicos":
         citas_qs = citas_qs.filter(Q(profesional_salud__nombre__icontains="Luis") | Q(responsable__icontains="Luis"))
     if filtro_servicio:
@@ -713,15 +715,16 @@ def _contexto_calendario(
     puede_listar_pacientes = not datos_limitados or request.user.tiene_permiso_erp("puede_ver_pacientes", empresa)
     if es_clinica and "paciente" in form.fields:
         campo_paciente = form.fields["paciente"]
-        if datos_limitados:
+        if datos_limitados or agenda_solo_consulta:
             campo_paciente.label_from_instance = lambda paciente: paciente.nombre
         if not puede_listar_pacientes:
             campo_paciente.queryset = campo_paciente.queryset.filter(pk=form.instance.paciente_id)
         pacientes_busqueda = [
-            _contacto_paciente_cita(paciente, request.user, datos_limitados=datos_limitados)
+            {"id": paciente.id, "nombre": paciente.nombre} if agenda_solo_consulta
+            else _contacto_paciente_cita(paciente, request.user, datos_limitados=datos_limitados)
             for paciente in campo_paciente.queryset
         ]
-    if not es_clinica and "cliente" in form.fields:
+    if not agenda_solo_consulta and not es_clinica and "cliente" in form.fields:
         campo_cliente = form.fields["cliente"]
         if not puede_listar_pacientes:
             campo_cliente.queryset = campo_cliente.queryset.filter(pk=form.instance.cliente_id)
@@ -757,9 +760,10 @@ def _contexto_calendario(
         citas_historial_qs = (
             CitaCliente.objects.filter(empresa=empresa_agenda, paciente=paciente_historial)
             .select_related("paciente", "cliente", "servicio_clinico", "producto", "profesional_salud")
-            .prefetch_related("fotos_cirugia")
             .order_by("fecha_hora")
         )
+        if not agenda_solo_consulta:
+            citas_historial_qs = citas_historial_qs.prefetch_related("fotos_cirugia")
         citas_historial = [
             _preparar_acceso_atencion_cita(cita) for cita in citas_historial_qs
             if _cita_pertenece_agenda_espejo(cita, empresa)
@@ -802,6 +806,7 @@ def _contexto_calendario(
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
         "agenda_empresa": empresa_agenda,
         "agenda_espejo": agenda_espejo,
+        "agenda_solo_consulta": agenda_solo_consulta,
         "datos_paciente_limitados": datos_limitados,
         "vista": vista, "fecha_seleccionada": seleccionada, "titulo_periodo": titulo_periodo,
         "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
@@ -1544,13 +1549,45 @@ def enviar_campania_whatsapp_api(request, empresa_slug, campania_id):
     return redirect("crm_ver_campania", empresa_slug=empresa.slug, campania_id=campania.id)
 
 
+def _agenda_solo_consulta(usuario, empresa):
+    from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
+    from core.read_only_permissions import rol_solo_lectura
+
+    if rol_solo_lectura(usuario, empresa, "agenda"):
+        return True
+    if empresa.slug not in EMPRESAS_CLINICAS_CON_ROLES or not (
+        rol_clinico_granular(usuario, empresa) or rol_acciones_v3(usuario, empresa)
+    ):
+        return False
+    permisos_operativos = (
+        "puede_crear_citas", "puede_editar_citas", "puede_reagendar_citas",
+        "puede_cambiar_estado_citas", "puede_cancelar_citas", "puede_eliminar_citas",
+        "puede_marcar_citas_pagadas", "puede_marcar_citas_cortesia",
+        "puede_crear_bloqueos_agenda", "puede_editar_bloqueos_agenda", "puede_eliminar_bloqueos_agenda",
+    )
+    return usuario.tiene_permiso_erp("puede_ver_calendario", empresa) and not any(
+        usuario.tiene_permiso_erp(permiso, empresa) for permiso in permisos_operativos
+    )
+
+
+def _formulario_agenda(request, empresa, empresa_agenda=None):
+    empresa_agenda = empresa_agenda or empresa
+    solo_consulta = _agenda_solo_consulta(request.user, empresa)
+    if solo_consulta and request.method not in {"GET", "HEAD", "OPTIONS"}:
+        raise PermissionDenied("Tu rol solo puede consultar las citas.")
+    cita_id = None if solo_consulta else request.POST.get("cita_id") or request.GET.get("editar")
+    objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
+    form = CitaClienteForm(
+        request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto, usuario=request.user,
+    )
+    _limitar_campos_especiales_cita(request, empresa, form)
+    return form, objeto
+
+
 @login_required
 def citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto, usuario=request.user)
-    _limitar_campos_especiales_cita(request, empresa, form)
+    form, objeto = _formulario_agenda(request, empresa)
     if request.method == "POST" and form.is_valid():
         try:
             cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
@@ -1565,11 +1602,9 @@ def citas(request, empresa_slug):
 @login_required
 def agenda_citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    _asegurar_pacientes_empresas_clinicas(empresa)
-    cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto, usuario=request.user)
-    _limitar_campos_especiales_cita(request, empresa, form)
+    if not _agenda_solo_consulta(request.user, empresa):
+        _asegurar_pacientes_empresas_clinicas(empresa)
+    form, objeto = _formulario_agenda(request, empresa)
     if request.method == "POST" and form.is_valid():
         try:
             cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
@@ -2138,13 +2173,11 @@ def agenda_mobile(request, empresa_slug):
     if acceso_denegado:
         return acceso_denegado
     empresa_agenda = _empresa_origen_agenda_mobile(empresa)
-    _asegurar_pacientes_empresas_clinicas(empresa)
-    if empresa_agenda.id != empresa.id:
-        _asegurar_pacientes_empresas_clinicas(empresa_agenda)
-    cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto, usuario=request.user)
-    _limitar_campos_especiales_cita(request, empresa, form)
+    if not _agenda_solo_consulta(request.user, empresa):
+        _asegurar_pacientes_empresas_clinicas(empresa)
+        if empresa_agenda.id != empresa.id:
+            _asegurar_pacientes_empresas_clinicas(empresa_agenda)
+    form, objeto = _formulario_agenda(request, empresa, empresa_agenda)
     if request.method == "POST" and form.is_valid():
         try:
             cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)

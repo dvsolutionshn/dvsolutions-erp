@@ -202,7 +202,7 @@
           <div class="mobile-home-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M4 10h16"/><path d="M9 14h.01"/><path d="M12 14h.01"/><path d="M15 14h.01"/></svg></div>
           <div class="mobile-home-copy">
             <strong>Calendario de citas</strong>
-            <span>Ver la agenda, crear atenciones y revisar detalles por día, semana, mes o año.</span>
+            <span>{% if agenda_solo_consulta %}Consultar citas por día, semana, mes o año.{% else %}Ver la agenda, crear atenciones y revisar detalles por día, semana, mes o año.{% endif %}</span>
             <em>{{ citas_hoy_total }} hoy</em>
           </div>
           <div class="mobile-home-go">↓</div>
@@ -323,7 +323,7 @@
           <div class="patient-profile-actions">
             <a class="patient-profile-action" id="patientProfileCall" href="#"><svg viewBox="0 0 24 24"><path d="M6.6 3.5 9 8l-2 1.7a15 15 0 0 0 7.3 7.3l1.7-2 4.5 2.4-.8 3a2 2 0 0 1-2 1.5C9.1 21.1 2.9 14.9 2.1 6.3a2 2 0 0 1 1.5-2Z"/></svg><span>Llamar</span></a>
             <a class="patient-profile-action" id="patientProfileWhatsapp" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.8 3 2 4.2 5 5"/></svg><span>WhatsApp</span></a>
-            <button class="patient-profile-action primary" id="patientProfileAppointment" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16M12 13v4M10 15h4"/></svg><span>Crear cita</span></button>
+            {% if not agenda_solo_consulta %}<button class="patient-profile-action primary" id="patientProfileAppointment" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16M12 13v4M10 15h4"/></svg><span>Crear cita</span></button>{% endif %}
             <a class="patient-profile-action" id="patientProfileRecord" href="#"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5M10 12h6M10 16h6"/></svg><span>Expediente</span></a>
           </div>
           <div class="patient-profile-next" id="patientProfileNext"></div>
@@ -587,7 +587,7 @@
     <header class="premium-calendar-top">
       <div class="premium-calendar-top-row">
         <div><small>Agenda clínica</small><h2>{{ titulo_periodo }}</h2></div>
-        <button class="premium-calendar-create" type="button" data-open-editor>+ Nueva cita</button>
+        {% if not agenda_solo_consulta %}<button class="premium-calendar-create" type="button" data-open-editor>+ Nueva cita</button>{% endif %}
       </div>
     </header>
     {% endif %}
@@ -678,23 +678,23 @@
           {% for bloqueo in dia.bloqueos %}
           <article class="appointment is-unavailable">
             <div class="time">{% if bloqueo.dia_completo or dia.fecha > bloqueo.fecha and dia.fecha < bloqueo.fecha_fin %}TODO<small>EL DÍA</small>{% elif dia.fecha == bloqueo.fecha_fin and dia.fecha != bloqueo.fecha %}HASTA<small>{{ bloqueo.hora_fin|time:"h:i A" }}</small>{% else %}DESDE<small>{{ bloqueo.hora_inicio|time:"h:i A" }}</small>{% endif %}</div>
-            <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.periodo_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div>
+            <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.periodo_display }}{% if bloqueo.motivo and not agenda_solo_consulta %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div>
             <span></span>
           </article>
           {% endfor %}
           {% for cita in dia.citas %}
-          <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}" data-cita-actions="{{ cita.id }}">
+          <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada and not agenda_solo_consulta %}is-paid{% endif %} {% if cita.cortesia and not agenda_solo_consulta %}is-courtesy{% endif %}" data-cita-actions="{{ cita.id }}">
             <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
             <div class="appointment-avatar">{{ cita.display_cliente|slice:":1"|upper }}</div>
-            <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{{ cita.display_servicio }}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia %}<em class="status courtesy">Cortesía</em>{% endif %}</div>
-            <button class="more" type="button" data-cita-actions="{{ cita.id }}">•••</button>
+            <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{{ cita.display_servicio }}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada and not agenda_solo_consulta %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia and not agenda_solo_consulta %}<em class="status courtesy">Cortesía</em>{% endif %}</div>
+            <button class="more" type="button" data-cita-actions="{{ cita.id }}" aria-label="{% if agenda_solo_consulta %}Ver detalle de la cita{% else %}Ver acciones de la cita{% endif %}">•••</button>
           </article>
           {% endfor %}
         </div>
       </article>
       {% endif %}
       {% endfor %}
-      {% else %}<div class="premium-empty-state"><b>No hay citas en este período</b><span>Cambie la fecha o los filtros, o programe una nueva atención.</span></div>{% endif %}
+      {% else %}<div class="premium-empty-state"><b>No hay citas en este período</b><span>Cambie la fecha o los filtros{% if not agenda_solo_consulta %}, o programe una nueva atención{% endif %}.</span></div>{% endif %}
     </section>
     {% elif vista == "anio" %}
     <div class="section-head"><div><small>Resumen anual</small><h2>{{ fecha_seleccionada.year }}</h2></div></div>
@@ -730,34 +730,35 @@
       {% for dia in dias %}{% for bloqueo in dia.bloqueos %}
       <article class="appointment is-unavailable">
         <div class="time">{% if bloqueo.dia_completo or dia.fecha > bloqueo.fecha and dia.fecha < bloqueo.fecha_fin %}TODO<small>EL DÍA</small>{% elif dia.fecha == bloqueo.fecha_fin and dia.fecha != bloqueo.fecha %}HASTA<small>{{ bloqueo.hora_fin|time:"h:i A" }}</small>{% else %}DESDE<small>{{ bloqueo.hora_inicio|time:"h:i A" }}</small>{% endif %}</div>
-        <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.periodo_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div><span></span>
+        <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.periodo_display }}{% if bloqueo.motivo and not agenda_solo_consulta %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div><span></span>
       </article>
       {% endfor %}{% endfor %}
       {% for cita in citas %}
-      <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %} {% if cita.cortesia %}is-courtesy{% endif %}" data-cita-actions="{{ cita.id }}">
+      <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada and not agenda_solo_consulta %}is-paid{% endif %} {% if cita.cortesia and not agenda_solo_consulta %}is-courtesy{% endif %}" data-cita-actions="{{ cita.id }}">
         <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
         {% if hospital_mia_app_premium %}<div class="appointment-avatar">{{ cita.display_cliente|slice:":1"|upper }}</div>{% endif %}
-        <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{% if es_clinica %}{{ cita.display_servicio }}{% else %}{{ cita.titulo }}{% endif %}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia %}<em class="status courtesy">Cortesía</em>{% endif %}</div>
-        <button class="more" type="button" data-cita-actions="{{ cita.id }}">•••</button>
+        <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{% if es_clinica %}{{ cita.display_servicio }}{% else %}{{ cita.titulo }}{% endif %}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada and not agenda_solo_consulta %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia and not agenda_solo_consulta %}<em class="status courtesy">Cortesía</em>{% endif %}</div>
+        <button class="more" type="button" data-cita-actions="{{ cita.id }}" aria-label="{% if agenda_solo_consulta %}Ver detalle de la cita{% else %}Ver acciones de la cita{% endif %}">•••</button>
       </article>
       {% endfor %}
-      {% if not citas and not bloqueos %}<div class="empty">No hay citas ni bloqueos para este día.<br>Toca el botón <strong>+</strong> para programar una.</div>{% endif %}
+      {% if not citas and not bloqueos %}<div class="empty">No hay citas ni bloqueos para este día.{% if not agenda_solo_consulta %}<br>Toca el botón <strong>+</strong> para programar una.{% endif %}</div>{% endif %}
     </section>
     {% endif %}
-    {% if es_clinica and puede_gestionar_bloqueos %}<button class="availability-mobile-trigger" type="button" data-open-availability>Bloquear horario / No disponible</button>{% endif %}
+    {% if es_clinica and puede_gestionar_bloqueos and not agenda_solo_consulta %}<button class="availability-mobile-trigger" type="button" data-open-availability>Bloquear horario / No disponible</button>{% endif %}
     </section>
   </div>
 
-  <nav class="bottom">
+  <nav class="bottom"{% if agenda_solo_consulta %} style="display:flex;justify-content:space-around;align-items:center"{% endif %}>
     {% if hospital_mia_app_premium %}
     <button class="nav-item" type="button" data-app-close><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10M10 20v-6h4v6"/></svg></b><span>Inicio</span></button>
     {% if not datos_paciente_limitados or pacientes_app_limitados_url %}<a class="nav-item" {% if pacientes_app_limitados_url %}href="{{ pacientes_app_limitados_url }}"{% else %}href="#pacientes-app" data-app-open="pacientes-app"{% endif %}><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>{% endif %}
-    <button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>
+    {% if not agenda_solo_consulta %}<button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>{% endif %}
     <a class="nav-item" href="#agenda-app" data-app-open="agenda-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></b><span>Citas</span></a>
     <a class="nav-item" href="#factura-app" data-app-open="factura-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-3-1.5-2 1-2-1-2 1-3-1.5V5a2 2 0 0 1 2-2Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></b><span>Facturar</span></a>
     {% else %}
     {% if not datos_paciente_limitados or pacientes_app_limitados_url %}<a class="nav-item" {% if pacientes_app_limitados_url %}href="{{ pacientes_app_limitados_url }}"{% else %}href="#pacientes-app" data-app-open="pacientes-app"{% endif %}><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>{% endif %}
-    <button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>
+    {% if not agenda_solo_consulta %}<button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>{% endif %}
+    {% if agenda_solo_consulta %}<a class="nav-item" href="#agenda-app" data-app-open="agenda-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></b><span>Citas</span></a>{% endif %}
     <a class="nav-item" href="#factura-app" data-app-open="factura-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-3-1.5-2 1-2-1-2 1-3-1.5V5a2 2 0 0 1 2-2Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></b><span>Facturar</span></a>
     {% endif %}
   </nav>
@@ -765,7 +766,7 @@
 
 {% include "crm/mobile_agenda_navigation.html" %}
 
-{% if es_clinica and puede_gestionar_bloqueos %}
+{% if es_clinica and puede_gestionar_bloqueos and not agenda_solo_consulta %}
 <section class="sheet {% if bloqueo_editando %}open{% endif %}" id="disponibilidad-medica">
   <div class="sheet-card">
     <div class="sheet-grip"></div>
@@ -790,6 +791,7 @@
 </section>
 {% endif %}
 
+{% if not agenda_solo_consulta %}
 <section class="sheet {% if form.errors or cita_editando %}open{% endif %}" id="editor">
   <div class="sheet-card">
     <div class="sheet-grip"></div>
@@ -853,10 +855,11 @@
 </section>
 
 {{ servicios_clinicos_meta|json_script:"mobileServicesMeta" }}
+{% endif %}
 
 {% for cita in citas %}
 <section class="sheet" id="actions-{{ cita.id }}">
-  <div class="sheet-card"><div class="sheet-grip"></div><div class="sheet-head"><div><small>Gestionar cita</small><h2>{{ cita.display_cliente }}</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
+  <div class="sheet-card"><div class="sheet-grip"></div><div class="sheet-head"><div><small>{% if agenda_solo_consulta %}Detalle de la cita{% else %}Gestionar cita{% endif %}</small><h2>{{ cita.display_cliente }}</h2></div><button class="close" type="button" data-close-sheet aria-label="Cerrar">×</button></div>
     <div class="mobile-appointment-summary">
       <small>Detalle rápido</small>
       <div class="mobile-detail-grid">
@@ -865,6 +868,9 @@
         <div class="mobile-detail-item"><span>Fecha</span><strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong></div>
         <div class="mobile-detail-item"><span>Hora</span><strong>{{ cita.fecha_hora|date:"h:i A" }}</strong></div>
         {% if cita.cirugia_fin_estimada %}<div class="mobile-detail-item"><span>Fin estimado</span><strong>{{ cita.cirugia_fin_estimada|date:"h:i A" }}</strong></div>{% endif %}
+        {% if agenda_solo_consulta %}
+        <div class="mobile-detail-item"><span>Estado</span><strong>{{ cita.get_estado_display }}</strong></div>
+        {% else %}
         {% if cita.pagada %}<div class="mobile-detail-item"><span>Pago</span><strong>Pagada</strong></div>{% endif %}
         {% if cita.cortesia %}<div class="mobile-detail-item"><span>Condición</span><strong>Cortesía</strong></div>{% endif %}
         {% if cita.cirugia_detalle %}<div class="mobile-detail-item wide"><span>Detalle de cirugía</span><strong class="mobile-detail-note">{{ cita.cirugia_detalle }}</strong></div>{% endif %}
@@ -887,8 +893,10 @@
           </div>
         </div>
         {% endif %}
+        {% endif %}
       </div>
     </div>
+    {% if not agenda_solo_consulta %}
     <div class="actions-menu">
       {% if cita.atencion_url %}<a class="action-link attention" href="{{ cita.atencion_url }}">{{ cita.atencion_label }}</a>{% endif %}
       {% if agenda_espejo %}
@@ -901,6 +909,7 @@
       <div class="danger-block"><form method="post" action="{% url 'agenda_cita_eliminar' cita.empresa.slug cita.id %}" onsubmit="return confirm('¿Eliminar definitivamente esta cita?');">{% csrf_token %}<input type="hidden" name="return_to" value="mobile"><input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}"><input name="motivo_eliminacion" minlength="5" required placeholder="Motivo de eliminación"><button type="submit">Eliminar</button></form></div>
       {% endif %}
     </div>
+    {% endif %}
   </div>
 </section>
 {% endfor %}
@@ -926,12 +935,12 @@
   </div>
 </section>
 
-{% if paciente_rapido_form %}
+{% if paciente_rapido_form and not agenda_solo_consulta %}
 <dialog class="patient-dialog" id="patientDialog"><div class="patient-body"><div class="sheet-head"><div><small>Nuevo expediente</small><h2>Crear paciente</h2></div><button class="close" type="button" id="closePatientDialog">×</button></div><form id="patientForm">{% csrf_token %}<div class="form-grid">{% for field in paciente_rapido_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}<div class="errors" data-error="{{ field.name }}"></div></div>{% endfor %}</div><div class="patient-actions"><button class="secondary" type="button" id="cancelPatient">Cancelar</button><button class="save" style="width:auto;margin:0;padding:0 18px" type="submit">Guardar paciente</button></div></form></div></dialog>
 {% endif %}
 
 {{ proximas_app|json_script:"upcomingAppointments" }}
-{{ agenda_contactos_busqueda|json_script:"mobilePatientsData" }}
+{% if not agenda_solo_consulta %}{{ agenda_contactos_busqueda|json_script:"mobilePatientsData" }}{% endif %}
 {{ pacientes_app_payload|json_script:"mobileAppPatientsData" }}
 {{ productos_app_payload|json_script:"mobileAppProductsData" }}
 {{ inventario_productos_app_payload|json_script:"mobileInventoryProductsData" }}
@@ -1417,7 +1426,7 @@
     const restrictionActions=patientRestrictionActionsMarkup(patient);
     const restrictionReason=patient.no_agendar&&patient.motivo_no_agendar?`<p class="premium-patient-restriction-reason"><strong>Motivo:</strong> ${escapeHtml(patient.motivo_no_agendar)}</p>`:"";
     const bookingWarning=cannotSchedule?`<p class="premium-patient-booking-warning">${escapeHtml(patientBookingRestrictionMessage(patient))}</p>`:"";
-    const appointmentAction=cannotSchedule?`<button class="premium-patient-action" type="button" disabled aria-label="No se puede crear una cita: paciente NO AGENDAR" title="No se puede crear una nueva cita">${patientIcons.calendar}</button>`:`<button class="premium-patient-action" type="button" data-patient-appointment="${patient.id}" aria-label="Crear cita">${patientIcons.calendar}</button>`;
+    const appointmentAction=editor?(cannotSchedule?`<button class="premium-patient-action" type="button" disabled aria-label="No se puede crear una cita: paciente NO AGENDAR" title="No se puede crear una nueva cita">${patientIcons.calendar}</button>`:`<button class="premium-patient-action" type="button" data-patient-appointment="${patient.id}" aria-label="Crear cita">${patientIcons.calendar}</button>`):"";
     const status=patient.no_agendar?'<span class="premium-patient-badge restricted">NO AGENDAR</span>':'<span class="premium-patient-badge">Expediente activo</span>';
     return `<article class="premium-patient-card${patient.alergico?" has-alert":""}${patient.no_agendar?" is-restricted":""}" data-patient-open="${patient.id}" tabindex="0" role="button" aria-label="Abrir expediente de ${escapeHtml(patient.nombre)}"><div class="premium-patient-top">${patientPhotoMarkup(patient)}<div class="premium-patient-name"><strong>${escapeHtml(patient.nombre||"Paciente")}</strong><span>${escapeHtml(meta||"Expediente clínico")}</span></div><button class="patient-favorite${favorite?" active":""}" type="button" data-patient-favorite="${patient.id}" aria-label="${favorite?"Quitar de":"Agregar a"} favoritos">★</button></div><div class="premium-patient-status">${status}${patient.alergico?'<span class="premium-patient-badge alert">Alerta médica</span>':""}${patient.proxima_cita?'<span class="premium-patient-badge appointment">Próxima cita</span>':""}${Number(patient.frecuencia||0)>=2?`<span class="premium-patient-badge">${patient.frecuencia} citas</span>`:""}</div>${restrictionReason}${patientAppointmentMarkup(patient)}${bookingWarning}<div class="premium-patient-actions">${callAction}${whatsappAction}${appointmentAction}<button class="premium-patient-action primary" type="button" data-patient-open="${patient.id}" aria-label="Abrir expediente">${patientIcons.record}</button></div>${restrictionActions?`<div class="premium-patient-restriction-actions">${restrictionActions}</div>`:""}</article>`;
   };
@@ -1468,7 +1477,7 @@
     openAppPanel("patient-profile-app");
   };
   const startPatientAppointment=patient=>{
-    if(!patient)return;
+    if(!editor||!patient)return;
     if(patientCannotSchedule(patient)){
       const profileActive=document.getElementById("patient-profile-app")?.classList.contains("active");
       const status=document.getElementById(profileActive?"patientProfileRestriction":"patientDirectoryBookingStatus");
