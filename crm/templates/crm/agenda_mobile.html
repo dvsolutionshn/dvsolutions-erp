@@ -57,7 +57,7 @@
   .mobile-date-jump{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:end;margin:10px 0 12px;padding:11px;border:1px solid #d7e5ee;border-radius:18px;background:rgba(255,255,255,.78);box-shadow:0 12px 28px rgba(18,50,74,.06)}
   .mobile-date-jump label{display:grid;gap:5px;min-width:0}
   .mobile-date-jump span{color:var(--muted);font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.11em}
-  .mobile-date-jump input{width:100%;min-height:42px;border:1px solid #bfd0db;border-radius:13px;background:#fff;padding:0 11px;color:var(--ink);font-size:13px;font-weight:900}
+  .mobile-date-jump input{width:100%;min-width:0;min-height:42px;border:1px solid #bfd0db;border-radius:13px;background:#fff;padding:0 11px;color:var(--ink);font-size:13px;font-weight:900}
   .mobile-date-jump button{min-height:42px;border:0;border-radius:13px;background:linear-gradient(135deg,var(--teal),#197ad0);color:#fff;padding:0 14px;font-size:10px;font-weight:900;box-shadow:0 10px 22px rgba(25,122,208,.16)}
   @media(max-width:390px){.mobile-date-jump{grid-template-columns:1fr}.mobile-date-jump button{width:100%}}
   </style>
@@ -96,6 +96,7 @@
   .premium-calendar-shell{display:grid;gap:12px}.premium-calendar-top{position:relative;overflow:hidden;padding:17px;border-radius:24px;background:linear-gradient(140deg,#12324a,#1b6872);color:#fff;box-shadow:0 18px 40px rgba(18,50,74,.18)}.premium-calendar-top:after{content:"";position:absolute;right:-45px;bottom:-70px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(230,117,160,.34),transparent 70%)}.premium-calendar-top-row{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px}.premium-calendar-top small{display:block;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.7}.premium-calendar-top h2{margin:5px 0 0;font-size:22px;text-transform:capitalize}.premium-calendar-create{min-height:40px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:#fff;color:#15566a;padding:0 13px;font-size:9px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.12)}
   .hospital-mia-premium-app .premium-calendar-shell .mobile-view-switch{grid-template-columns:repeat(6,minmax(62px,1fr));overflow-x:auto;margin:0;padding:5px;scrollbar-width:none}.hospital-mia-premium-app .premium-calendar-shell .mobile-view-switch::-webkit-scrollbar{display:none}.hospital-mia-premium-app .premium-calendar-shell .mobile-view-switch a{padding:0 9px;white-space:nowrap}
   .hospital-mia-premium-app .premium-calendar-shell .mobile-date-jump,.hospital-mia-premium-app .premium-calendar-shell .mobile-agenda-filters{margin:0;background:rgba(255,255,255,.94)}
+  .premium-calendar-shell .mobile-agenda-query{display:grid;gap:12px;min-width:0}
   .premium-calendar-shell .days{padding:2px 1px 4px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}.premium-calendar-shell .days::-webkit-scrollbar{display:none}.premium-calendar-shell .day{min-width:62px;scroll-snap-align:center}
   .premium-calendar-shell .section-head{margin:7px 2px 0}.premium-calendar-shell .appointments{gap:9px}.premium-calendar-shell .appointment{grid-template-columns:50px 42px minmax(0,1fr) auto;padding:12px 11px;border-radius:18px;box-shadow:0 11px 27px rgba(18,50,74,.07);transition:transform .18s ease,box-shadow .18s ease}.premium-calendar-shell .appointment:active{transform:scale(.985)}.appointment-avatar{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(145deg,#e8f8f5,#e9f0fb);color:#176575;font-size:13px;font-weight:900}.premium-calendar-shell .appointment-main strong{font-size:13px}.premium-calendar-shell .time{font-size:11px}.premium-calendar-date{display:block;margin-bottom:4px;color:#267691;font-size:8px!important;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
   .premium-period-list{display:grid;gap:9px}.premium-period-day{padding:13px;border:1px solid #d9e7ee;border-radius:19px;background:#fff;box-shadow:0 10px 25px rgba(18,50,74,.06)}.premium-period-day-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.premium-period-day-head strong{font-size:12px;text-transform:capitalize}.premium-period-day-head span{padding:5px 8px;border-radius:999px;background:#e8f7f3;color:#167368;font-size:8px;font-weight:900}
@@ -581,7 +582,7 @@
         </form>
       </div>
     </section>
-    <section class="agenda-screen mobile-app-screen {% if hospital_mia_app_premium %}premium-calendar-shell{% endif %}" id="agenda-app">
+    <section class="agenda-screen mobile-app-screen {% if hospital_mia_app_premium %}premium-calendar-shell{% endif %}" id="agenda-app" data-agenda-date="{{ fecha_seleccionada|date:'Y-m-d' }}" data-agenda-view="{{ vista }}">
     <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Calendario de citas</span></div>
     {% if hospital_mia_app_premium %}
     <header class="premium-calendar-top">
@@ -607,18 +608,22 @@
       {% endif %}
     </div>
     <div class="section-head"><div><small>Explorar agenda</small><h2>{{ titulo_periodo|capfirst }}</h2></div><a href="?vista={{ vista }}&fecha={% now 'Y-m-d' %}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">Ir a hoy</a></div>
-    <form class="mobile-date-jump" method="get" action="{% url 'agenda_mobile' empresa.slug %}{% if hospital_mia_app_premium %}#agenda-app{% endif %}" aria-label="Buscar agenda por fecha">
+    <form class="mobile-agenda-query" method="get" action="{% url 'agenda_mobile' empresa.slug %}{% if hospital_mia_app_premium %}#agenda-app{% endif %}" aria-label="Buscar y filtrar agenda">
       <input type="hidden" name="vista" value="{{ vista }}">
       {% if hospital_mia_app_premium %}<input type="hidden" name="app" value="agenda">{% endif %}
+      {% if not es_clinica and not hospital_mia_app_premium %}
       {% if filtro_servicio %}<input type="hidden" name="servicio" value="{{ filtro_servicio }}">{% endif %}
       {% if filtro_profesional %}<input type="hidden" name="profesional" value="{{ filtro_profesional }}">{% endif %}
-      {% if filtro_estado %}<input type="hidden" name="estado" value="{{ filtro_estado }}">{% endif %}
-      <label for="mobileDateJump">
-        <span>Ir directo a una fecha</span>
-        <input id="mobileDateJump" type="date" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
-      </label>
-      <button type="submit">Ver fecha</button>
-    </form>
+      {% endif %}
+      {% if not hospital_mia_app_premium and filtro_estado %}<input type="hidden" name="estado" value="{{ filtro_estado }}">{% endif %}
+      {% if paciente_historial_id %}<input type="hidden" name="paciente_historial" value="{{ paciente_historial_id }}">{% endif %}
+      <div class="mobile-date-jump">
+        <label for="mobileDateJump">
+          <span>Ir directo a una fecha</span>
+          <input id="mobileDateJump" type="date" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}" required>
+        </label>
+        <button type="submit">Ver fecha</button>
+      </div>
     {% if not hospital_mia_app_premium or vista == 'dia' %}
     <nav class="days" data-day-strip-swipe data-prev-url="?vista=dia&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}" data-next-url="?vista=dia&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
       {% for dia in dias_moviles %}
@@ -627,10 +632,7 @@
     </nav>
     {% endif %}
     {% if es_clinica or hospital_mia_app_premium %}
-    <form class="mobile-agenda-filters" method="get" action="{% url 'agenda_mobile' empresa.slug %}{% if hospital_mia_app_premium %}#agenda-app{% endif %}">
-      <input type="hidden" name="vista" value="{{ vista }}">
-      <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
-      {% if hospital_mia_app_premium %}<input type="hidden" name="app" value="agenda">{% endif %}
+    <div class="mobile-agenda-filters">
       <label>
         <span>Tipo de consulta</span>
         <select name="servicio">
@@ -663,8 +665,9 @@
         {% if filtros_activos %}<a href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">Limpiar</a>{% endif %}
       </div>
       <div class="mobile-swipe-tip">Desliza hacia la izquierda o derecha para cambiar de {% if vista == 'anio' %}año{% elif vista == 'mes' %}mes{% elif vista == 'semana' %}semana{% else %}día{% endif %}.</div>
-    </form>
+    </div>
     {% endif %}
+    </form>
 
     {% if vista == "agenda" or vista == "proximas" %}
     <div class="section-head"><div><small>{% if vista == "proximas" %}Próximas atenciones{% else %}Agenda cronológica{% endif %}</small><h2>{{ citas|length }} cita{{ citas|length|pluralize:"s" }}</h2></div></div>

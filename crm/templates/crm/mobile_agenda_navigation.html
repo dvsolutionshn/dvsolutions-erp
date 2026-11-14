@@ -68,8 +68,11 @@
       const current = screens.find(screen => screen.classList.contains("active"));
       if (!current || current === home) return;
       const target = new URL(companyLink.href, window.location.origin);
-      if (current.id === "agenda-app") target.searchParams.set("app", "agenda");
-      else target.hash = current.id === "patient-profile-app" ? "pacientes-app"
+      if (current.id === "agenda-app") {
+        target.searchParams.set("app", "agenda");
+        target.searchParams.set("vista", current.dataset.agendaView);
+        target.searchParams.set("fecha", current.dataset.agendaDate);
+      } else target.hash = current.id === "patient-profile-app" ? "pacientes-app"
         : current.id === "producto-detalle-app" ? "productos-app" : current.id;
       event.preventDefault();
       window.location.href = target.href;

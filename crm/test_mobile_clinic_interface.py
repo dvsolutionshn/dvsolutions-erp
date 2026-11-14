@@ -16,6 +16,7 @@ from django.db import connection, reset_queries
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 
 from clinica.models import Paciente
 from core.models import Empresa, RolSistema, Usuario, UsuarioEmpresaPermiso
@@ -23,6 +24,7 @@ from facturacion.forms import ProductoForm
 from facturacion.models import Producto
 from . import test_mobile_inventory_product_edit as _inventory_tests
 from .mobile_inventory import productos_inventario_app
+from .models import CitaCliente
 
 
 class _ClinicInterfaceMarkup(HTMLParser):
@@ -157,6 +159,49 @@ class MobileClinicInterfaceTests(TestCase):
             if index+1 < len(sequence):
                 next_url = next(item["url"] for item in switch if item["slug"] == sequence[index+1])
                 self.assertEqual(next_url, reverse("agenda_mobile", args=[sequence[index+1]]))
+
+    def test_mobile_agenda_date_and_filters_share_one_native_get_form_in_four_companies(self):
+        self.set_role(puede_ver_datos_generales_paciente=True)
+        profesional = self.profesionales[self.empresa.slug]
+        profesional.nombre = "Luis Gonzalez QA"
+        profesional.save(update_fields=["nombre"])
+        cita_pasada = CitaCliente.objects.create(
+            empresa=self.empresa,
+            profesional_salud=profesional,
+            titulo="Consulta QA fecha anterior",
+            fecha_hora=self.NOW.replace(day=29),
+            estado="confirmada",
+        )
+        cita_futura = CitaCliente.objects.create(
+            empresa=self.empresa,
+            profesional_salud=profesional,
+            titulo="Consulta QA fecha posterior",
+            fecha_hora=self.NOW.replace(day=31),
+            estado="pendiente",
+        )
+        for company in self.empresas.values():
+            for cita in (cita_pasada, cita_futura):
+                fecha = timezone.localdate(cita.fecha_hora).isoformat()
+                with self.subTest(company=company.slug, fecha=fecha):
+                    page = self.home(company, vista="dia", app="agenda", fecha=fecha, estado=cita.estado)
+                    self.assertEqual(page.context["fecha_seleccionada"].isoformat(), fecha)
+                    self.assertEqual([c.pk for c in page.context["citas"]], [cita.pk])
+                    self.assertContains(page, f'data-agenda-date="{fecha}" data-agenda-view="dia"')
+                    html = page.content.decode()
+                    comienzo = html.index('<form class="mobile-agenda-query"')
+                    form_html = html[comienzo:html.index("</form>", comienzo)]
+                    form, *fields = _ClinicInterfaceMarkup(form_html).nodes
+                    self.assertEqual(form[1]["method"], "get")
+                    self.assertEqual(form[1]["action"], reverse("agenda_mobile", args=[company.slug]) + "#agenda-app")
+                    self.assertEqual(
+                        [(tag, attrs.get("type"), attrs.get("value")) for tag, attrs in fields if attrs.get("name") == "fecha"],
+                        [("input", "date", fecha)],
+                    )
+                    self.assertEqual(
+                        {attrs["name"] for tag, attrs in fields if tag == "select"},
+                        {"servicio", "profesional", "estado"},
+                    )
+                    self.assertEqual(sum(tag == "button" and attrs.get("type") == "submit" for tag, attrs in fields), 2)
 
     def test_central_agenda_origin_and_own_company_payloads_remain_distinct(self):
         self.set_role(puede_inventario=True, puede_editar_productos=True)
@@ -409,6 +454,8 @@ class InstalledClinicEntrySourceTests(SimpleTestCase):
         end = source.index("window.mobileAgendaNavigation", start)
         function = source[start:end]
         self.assertLess(function.index("if (!screens.includes(panel)) return false;"), function.index("showPanel(panel)"))
-        self.assertIn('if (current.id === "agenda-app") target.searchParams.set("app", "agenda");', source)
+        self.assertIn('target.searchParams.set("app", "agenda");', source)
+        self.assertIn('target.searchParams.set("vista", current.dataset.agendaView);', source)
+        self.assertIn('target.searchParams.set("fecha", current.dataset.agendaDate);', source)
         self.assertIn('current.id === "patient-profile-app" ? "pacientes-app"', source)
         self.assertIn('current.id === "producto-detalle-app" ? "productos-app"', source)
