@@ -651,6 +651,7 @@ class CitaClienteForm(forms.ModelForm):
         self.usuario = kwargs.pop("usuario", None)
         self.empresa = empresa
         self.ocultar_datos_clinicos = kwargs.pop("ocultar_datos_clinicos", False)
+        permitir_motivo_consulta = kwargs.pop("permitir_motivo_consulta", False)
         permitir_motivo_consulta_nueva = kwargs.pop("permitir_motivo_consulta_nueva", False)
         super().__init__(*args, **kwargs)
         if empresa:
@@ -658,9 +659,14 @@ class CitaClienteForm(forms.ModelForm):
         self.instance._restriccion_usuario = self.usuario
         self._paciente_original_id = self.instance.paciente_id
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
-        self.permitir_motivo_consulta_nueva = (
-            permitir_motivo_consulta_nueva and self.es_clinica and not self.instance.pk
+        self.permitir_motivo_consulta = self.es_clinica and (
+            permitir_motivo_consulta or permitir_motivo_consulta_nueva and not self.instance.pk
         )
+        if self.permitir_motivo_consulta and self.instance.pk and self.is_bound:
+            campo_motivo = self.add_prefix("observacion")
+            if campo_motivo not in self.data:
+                self.data = self.data.copy()
+                self.data[campo_motivo] = self.instance.observacion
         self.notificaciones_cita_activas = bool(empresa and empresa.slug in self.EMPRESAS_WHATSAPP_CITAS)
         self.cirugia_extendida_activa = bool(empresa and empresa.slug in self.EMPRESAS_CIRUGIA_EXTENDIDA)
         self.detalles_agenda_activos = bool(empresa and empresa.slug == "hospital_mia")
@@ -825,7 +831,7 @@ class CitaClienteForm(forms.ModelForm):
                 self.fields.pop(nombre, None)
         if self.ocultar_datos_clinicos:
             campos_ocultos = ["cirugia_detalle", "fotos_cirugia"]
-            if not self.permitir_motivo_consulta_nueva:
+            if not self.permitir_motivo_consulta:
                 campos_ocultos.append("observacion")
             for nombre in campos_ocultos:
                 self.fields.pop(nombre, None)
@@ -851,7 +857,7 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["profesional_salud"].error_messages["required"] = "Selecciona el doctor o profesional que atendera la cita."
             if "observacion" in self.fields:
                 self.fields["observacion"].label = (
-                    "Motivo de consulta" if self.permitir_motivo_consulta_nueva else "Motivo o notas de la cita"
+                    "Motivo de consulta" if self.permitir_motivo_consulta else "Motivo o notas de la cita"
                 )
             self.fields["pagada"].label = "Cita pagada"
             self.fields["cortesia"].label = "Cita de cortesía"

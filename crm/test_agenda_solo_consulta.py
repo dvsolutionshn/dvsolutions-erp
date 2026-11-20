@@ -87,7 +87,7 @@ class AgendaSoloConsultaTests(TestCase):
                 self.assertContains(respuesta, 'name="cita_id"')
                 self.assertFalse(respuesta.context["agenda_solo_consulta"])
 
-    def test_recepcion_puede_gestionar_sin_ver_ni_sobrescribir_notas_clinicas(self):
+    def test_recepcion_edita_motivo_sin_ver_detalles_ni_fotos_de_cirugia(self):
         RolSistema.objects.filter(pk=self.rol.pk).update(
             solo_tarjetas_pacientes=True, puede_crear_citas=True, puede_editar_citas=True,
             puede_reagendar_citas=True, puede_cancelar_citas=True,
@@ -100,9 +100,9 @@ class AgendaSoloConsultaTests(TestCase):
                 self.assertContains(respuesta, 'name="cita_id"')
                 self.assertContains(respuesta, self.url("agenda_cita_reagendar_whatsapp", self.cita.pk))
                 self.assertContains(respuesta, self.url("agenda_cita_cancelar_whatsapp", self.cita.pk))
-                self.assertNotIn("observacion", respuesta.context["form"].fields)
-                self.assertNotIn('<textarea name="observacion"', respuesta.content.decode())
-                for privado in (self.cita.observacion, self.cita.cirugia_detalle, self.foto.imagen.url):
+                self.assertEqual(respuesta.context["form"]["observacion"].value(), self.cita.observacion)
+                self.assertContains(respuesta, '<textarea name="observacion"')
+                for privado in (self.cita.cirugia_detalle, self.foto.imagen.url):
                     self.assertNotContains(respuesta, privado)
                 self.assertNotContains(respuesta, self.url("agenda_cita_eliminar", self.cita.pk))
         respuesta = self.client.post(self.url("agenda_cita_eliminar", self.cita.pk), {"motivo_eliminacion": "Prueba"})
@@ -124,7 +124,7 @@ class AgendaSoloConsultaTests(TestCase):
                     formulario = self.client.get(url, {"fecha": fecha})
                     self.assertContains(formulario, "Motivo de consulta")
                     self.assertContains(formulario, '<textarea name="observacion"')
-                    self.assertContains(formulario, 'data-field-name="observacion" data-appointment-create-reason')
+                    self.assertContains(formulario, 'data-field-name="observacion" data-appointment-reason')
                     self.assertNotContains(formulario, 'name="cirugia_detalle"')
                     self.assertNotContains(formulario, 'name="fotos_cirugia"')
                     motivo = f"Paciente solicita cita ({vista}, {servicio.nombre})"
@@ -163,14 +163,14 @@ class AgendaSoloConsultaTests(TestCase):
         self.assertNotIn(inyectada, self.cita.observacion)
         self.assertIn(notas_anteriores, self.cita.cita_clinica.observaciones)
 
-    def test_editar_requiere_su_permiso_y_conserva_notas_en_web_y_app(self):
+    def test_editar_requiere_su_permiso_y_permite_motivo_sin_permiso_de_crear(self):
         RolSistema.objects.filter(pk=self.rol.pk).update(solo_tarjetas_pacientes=True, puede_crear_citas=True)
         servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta operativa QA")
         profesional = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Profesional QA")
         datos = {
             "cita_id": self.cita.pk, "paciente": self.cita.paciente_id, "servicio_clinico": servicio.pk,
             "profesional_salud": profesional.pk, "fecha_hora": "2030-01-15T10:00",
-            "observacion": "Dato no autorizado", "cirugia_detalle": "Dato no autorizado",
+            "observacion": "Motivo actualizado por Recepción", "cirugia_detalle": "Dato no autorizado",
         }
         self.client.force_login(self.usuario)
         url = self.url("agenda_mobile")
@@ -188,6 +188,6 @@ class AgendaSoloConsultaTests(TestCase):
                 self.cita.refresh_from_db()
                 self.assertEqual(self.cita.servicio_clinico_id, servicio.pk)
                 self.assertEqual(timezone.localtime(self.cita.fecha_hora).strftime("%Y-%m-%dT%H:%M"), nueva_fecha)
-                self.assertEqual(self.cita.observacion, "Nota de cita reservada QA")
+                self.assertEqual(self.cita.observacion, "Motivo actualizado por Recepción")
                 self.assertEqual(self.cita.cirugia_detalle, "Detalle de cirugía reservado QA")
                 self.assertTrue(CitaClinica.objects.filter(pk=self.cita.cita_clinica_id).exists())

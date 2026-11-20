@@ -1636,7 +1636,7 @@ def _formulario_agenda(request, empresa, empresa_agenda=None):
     form = CitaClienteForm(
         request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto, usuario=request.user,
         ocultar_datos_clinicos=not _agenda_ver_detalles_clinicos(request.user, empresa, empresa_agenda),
-        permitir_motivo_consulta_nueva=solo_tarjetas and permisos["crear"],
+        permitir_motivo_consulta=solo_tarjetas and permisos["editar" if objeto else "crear"],
     )
     _limitar_campos_especiales_cita(request, empresa, form)
     if not permisos["estado"] and not permisos["cancelar"]:
