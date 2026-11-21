@@ -969,6 +969,10 @@ class PreconsultaClinica(models.Model):
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="preconsultas_clinicas")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="preconsultas")
+    cita = models.ForeignKey(
+        CitaClinica, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="preconsultas",
+    )
     tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default="general")
     sin_datos_previos = models.BooleanField(default=False, db_default=False)
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
@@ -1007,6 +1011,23 @@ class PreconsultaClinica(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
+    fecha_primera_apertura = models.DateTimeField(blank=True, null=True)
+    fecha_ultima_actividad = models.DateTimeField(blank=True, null=True)
+    paso_maximo = models.PositiveSmallIntegerField(default=0, db_default=0)
+    cantidad_aperturas = models.PositiveIntegerField(default=0, db_default=0)
+    intentos_envio = models.PositiveIntegerField(default=0, db_default=0)
+    fecha_ultimo_intento = models.DateTimeField(blank=True, null=True)
+    ultimo_resultado = models.CharField(
+        max_length=20,
+        choices=[
+            ("sin_intento", "Sin intento de envío"),
+            ("validacion", "Detenido por validación"),
+            ("error_tecnico", "Error técnico"),
+            ("completado", "Completado"),
+        ],
+        default="sin_intento", db_default="sin_intento",
+    )
+
     class Meta:
         ordering = ["-fecha_creacion", "-id"]
         indexes = [
@@ -1016,6 +1037,15 @@ class PreconsultaClinica(models.Model):
         ]
         verbose_name = "Preconsulta clinica"
         verbose_name_plural = "Preconsultas clinicas"
+
+    def clean(self):
+        super().clean()
+        if self.paciente_id and self.empresa_id and self.paciente.empresa_id != self.empresa_id:
+            raise ValidationError("El paciente no pertenece a la empresa del formulario.")
+        if self.cita_id and (
+            self.cita.empresa_id != self.empresa_id or self.cita.paciente_id != self.paciente_id
+        ):
+            raise ValidationError("La cita no corresponde al paciente y empresa del formulario.")
 
     @property
     def vigente(self):

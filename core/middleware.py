@@ -419,6 +419,11 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     rol_granular = rol_clinico_granular(request.user, empresa)
+                    if suffix == "enlaces-historia" and request.method in {"GET", "HEAD"}:
+                        from clinica.preconsulta_control import puede_controlar_preconsultas
+
+                        if puede_controlar_preconsultas(request.user, empresa):
+                            return self.get_response(request)
                     permiso_enlace = permiso_enlace_paciente_desde_ruta(suffix, request.method) if rol_granular else None
                     if permiso_enlace and request.user.tiene_permiso_erp(permiso_enlace, empresa):
                         return self.get_response(request)

@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from copy import copy
-from datetime import datetime
+from datetime import date, datetime
 
 from django import forms
 from django.utils import timezone
@@ -2115,14 +2115,21 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         modo_basico_paciente_nuevo=False,
         omitir_pasos_iniciales=False,
         sin_datos_previos=False,
+        formulario_paciente_existente=False,
         **kwargs,
     ):
         self.paciente = paciente
         self.empresa = empresa or getattr(paciente, "empresa", None)
         self.modo_basico_paciente_nuevo = modo_basico_paciente_nuevo
-        self.omitir_pasos_iniciales = omitir_pasos_iniciales
+        self.formulario_paciente_existente = formulario_paciente_existente
+        self.omitir_pasos_iniciales = omitir_pasos_iniciales or formulario_paciente_existente
         self.sin_datos_previos = sin_datos_previos
         super().__init__(*args, **kwargs)
+        if self.formulario_paciente_existente and paciente:
+            self.fields["motivo_consulta"].label = "Motivo de consulta"
+            self.fields["motivo_consulta"].widget.attrs["placeholder"] = (
+                "Explique con sus propias palabras por qué agendó su cita."
+            )
         self._valores_modelo_historicos = {}
         if self.sin_datos_previos:
             self.initial.clear()
@@ -2295,11 +2302,19 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             self.fields["foto_perfil"].required = False
             self.fields["consentimiento_datos"].required = False
             self.fields["motivo_categoria"].required = True
+        if self.formulario_paciente_existente and paciente:
+            self.initial["sexo"] = (
+                paciente.sexo if paciente.sexo in dict(self.fields["sexo"].choices) else ""
+            )
         if self.omitir_pasos_iniciales:
             for campo in self.CAMPOS_PASOS_INICIALES:
                 if campo in self.fields:
                     self.fields[campo].required = False
-                    self.fields[campo].disabled = True
+                    respuesta_anterior_enviada = (
+                        self.formulario_paciente_existente and self.is_bound and campo != "sexo"
+                        and self.add_prefix(campo) in self.data
+                    )
+                    self.fields[campo].disabled = not respuesta_anterior_enviada
 
     def clean_identidad(self):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
@@ -2377,7 +2392,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         respuestas_funciones = [cleaned_data.get(campo) for campo, _etiqueta in self.FUNCIONES_ORGANICAS_CAMPOS if cleaned_data.get(campo)]
         cleaned_data["funciones_organicas"] = "alterada" if "alterada" in respuestas_funciones else "normal"
         alteradas = [etiqueta for campo, etiqueta in self.FUNCIONES_ORGANICAS_CAMPOS if cleaned_data.get(campo) == "alterada"]
-        cleaned_data["funciones_detalle"] = ", ".join(alteradas)
+        detalle_funciones = (cleaned_data.get("funciones_detalle") or "").strip()
+        cleaned_data["funciones_detalle"] = detalle_funciones or ", ".join(alteradas)
 
         for respuesta, detalle, mensaje in [
             ("diagnostico_medico", "diagnostico_medico_detalle", "Detalle las condiciones diagnosticadas por un médico."),
@@ -2427,15 +2443,17 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 if categoria in categorias_con_procedimiento
             ]
 
-        if cleaned_data.get("sexo") != "femenino":
+        if not self.formulario_paciente_existente and cleaned_data.get("sexo") != "femenino":
             for campo in [
                 "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos",
                 "gine_ultima_menstruacion", "gine_embarazada", "gine_lactancia",
                 "gine_mamografia", "gine_mamografia_fecha",
             ]:
                 cleaned_data[campo] = [] if isinstance(self.fields.get(campo), forms.MultipleChoiceField) else ""
-        elif cleaned_data.get("sexo") == "femenino" and "si" in (cleaned_data.get("gine_mamografia") or []) and not cleaned_data.get("gine_mamografia_fecha"):
+        elif "si" in (cleaned_data.get("gine_mamografia") or []) and not cleaned_data.get("gine_mamografia_fecha"):
             self.add_error("gine_mamografia_fecha", "Indique la fecha aproximada de la ultima mamografia o ultrasonido.")
+        if self.formulario_paciente_existente and "no" in (cleaned_data.get("gine_mamografia") or []):
+            cleaned_data["gine_mamografia_fecha"] = None
         consumo_riesgo = cleaned_data.get("consumo_riesgo") or []
         if len(consumo_riesgo) > 1:
             self.add_error("consumo_riesgo", "Seleccione solo una opción.")
@@ -2465,7 +2483,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         categorias_cirugia = {
             "cirugia_facial", "cirugia_mamaria", "contorno_corporal", "cirugia_intima_femenina"
         }
-        if categorias.isdisjoint(categorias_cirugia):
+        if not self.formulario_paciente_existente and categorias.isdisjoint(categorias_cirugia):
             cleaned_data["decision_cirugia"] = []
             cleaned_data["decision_cirugia_otros"] = ""
         return cleaned_data
@@ -2507,8 +2525,21 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         datos = {}
         if not self.sin_datos_previos and self.instance and isinstance(self.instance.datos_generales, dict):
             datos = dict(self.instance.datos_generales)
-        datos.update({campo: self.cleaned_data.get(campo) for campo in campos})
-        if datos.get("fecha_nacimiento"):
+        if self.formulario_paciente_existente:
+            campos_recibidos = {
+                campo for campo in campos
+                if campo != "sexo" and self.is_bound and self.add_prefix(campo) in self.data
+            }
+            if "nombres" in campos_recibidos:
+                campos_recibidos.update({"primer_nombre", "segundo_nombre"})
+            if "apellidos" in campos_recibidos:
+                campos_recibidos.update({"primer_apellido", "segundo_apellido"})
+            if "contacto_emergencia_completo" in campos_recibidos:
+                campos_recibidos.update({"contacto_emergencia", "telefono_emergencia"})
+            datos.update({campo: self.cleaned_data.get(campo) for campo in campos_recibidos})
+        else:
+            datos.update({campo: self.cleaned_data.get(campo) for campo in campos})
+        if isinstance(datos.get("fecha_nacimiento"), date):
             datos["fecha_nacimiento"] = datos["fecha_nacimiento"].isoformat()
         if self.modo_basico_paciente_nuevo:
             for campo in ["motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros"]:

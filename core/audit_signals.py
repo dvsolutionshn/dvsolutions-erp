@@ -106,6 +106,11 @@ def _request_data(action):
         if request_user is not None and getattr(request_user, "is_authenticated", False):
             user = request_user
         path = (getattr(request, "path", "") or "")[:500]
+        resolver = getattr(request, "resolver_match", None)
+        if getattr(resolver, "url_name", None) in {"clinica_preconsulta_publica", "clinica_preconsulta_actividad"}:
+            token = resolver.kwargs.get("token")
+            if token:
+                path = path.replace(token, "[enlace]")
         method = (getattr(request, "method", "") or "")[:10]
         forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
         ip = forwarded or request.META.get("REMOTE_ADDR") or None

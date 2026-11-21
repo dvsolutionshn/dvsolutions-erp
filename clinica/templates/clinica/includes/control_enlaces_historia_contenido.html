@@ -1,0 +1,48 @@
+<div class="mrc-control">
+  <section class="mrc-kpis" aria-label="Resumen de enlaces clínicos">
+    <article class="erp-card mi-card mrc-kpi"><span>Enlaces</span><strong>{{ conteos.total }}</strong><small>Según búsqueda y fechas</small></article>
+    <article class="erp-card mi-card mrc-kpi completed"><span>Completados</span><strong>{{ conteos.completado }}</strong><small>Envíos finales guardados</small></article>
+    <article class="erp-card mi-card mrc-kpi progress"><span>En proceso</span><strong>{{ conteos.en_progreso }}</strong><small>Con actividad registrada</small></article>
+    <article class="erp-card mi-card mrc-kpi review"><span>Requieren revisión</span><strong>{{ requieren_revision }}</strong><small>Validación o error de guardado</small></article>
+  </section>
+  <section class="erp-card mi-card mrc-filters">
+    <form method="get" action="{{ control_url }}">
+      {% if modo_app %}<input type="hidden" name="app" value="1">{% endif %}
+      {% if paciente_filtro %}<input type="hidden" name="paciente" value="{{ paciente_filtro }}">{% endif %}
+      <div class="erp-field mi-field mrc-wide"><label for="historyLinkSearch">Buscar paciente o código</label><input id="historyLinkSearch" type="search" name="q" value="{{ consulta }}"></div>
+      <div class="erp-field mi-field mrc-wide"><label for="historyLinkState">Estado</label><select id="historyLinkState" name="estado"><option value="">Todos</option>{% for codigo, nombre in estados_control %}<option value="{{ codigo }}"{% if estado_filtro == codigo %} selected{% endif %}>{{ nombre }}</option>{% endfor %}</select></div>
+      <div class="erp-field mi-field"><label for="historyLinkFrom">Generado desde</label><input id="historyLinkFrom" type="date" name="desde" value="{{ fecha_desde }}"></div>
+      <div class="erp-field mi-field"><label for="historyLinkUntil">Generado hasta</label><input id="historyLinkUntil" type="date" name="hasta" value="{{ fecha_hasta }}"></div>
+      <button class="erp-btn mi-button mrc-wide" type="submit">Aplicar filtros</button>
+    </form>
+  </section>
+  <p class="mrc-summary-note">Abrir un enlace registra una apertura. El estado Completado corresponde al envío final guardado. Las fechas e interacciones históricas que faltan se muestran como “Sin registro”.</p>
+  {% if not puede_ver_respuestas %}<p class="mrc-summary-note">Se muestran los enlaces que generaste. El acceso a las respuestas requiere permiso de lectura del historial clínico.</p>{% endif %}
+  <div class="mrc-list-meta"><strong>{{ pagina.paginator.count }} enlace{{ pagina.paginator.count|pluralize:"s" }}</strong>{% if pagina.paginator.count %}<span>{{ pagina.start_index }}–{{ pagina.end_index }}</span>{% endif %}</div>
+  <section class="mrc-list" aria-label="Enlaces de historia clínica">
+    {% for enlace in pagina.object_list %}
+    <article class="erp-card mi-card mrc-record" data-history-link-state="{{ enlace.estado_codigo }}">
+      <div class="mrc-record-head">
+        <div class="mrc-person"><h2>{{ enlace.paciente_nombre }}</h2><span class="mrc-code">Enlace {{ enlace.id }} · {{ enlace.tipo_nombre }}</span><p>Cita vinculada {% if enlace.cita_fecha %}{{ enlace.cita_id }} · {{ enlace.cita_fecha|date:"d/m/Y H:i" }}{% else %}Sin registro{% endif %}</p></div>
+        <span class="mrc-state state-{{ enlace.estado_codigo }}">{{ enlace.estado_etiqueta }}</span>
+      </div>
+      <p class="mrc-explanation">{{ enlace.estado_explicacion }}</p>
+      <dl class="mrc-activity-counts"><div><dt>Aperturas registradas</dt><dd>{{ enlace.actividad.cantidad_aperturas }}</dd></div><div><dt>Intentos de envío registrados</dt><dd>{{ enlace.actividad.intentos_envio }}</dd></div></dl>
+      <p class="mrc-generated">Generado {{ enlace.fecha_creacion|date:"d/m/Y H:i" }} · {{ enlace.creador_nombre }}</p>
+      <details class="mrc-activity">
+        <summary>Actividad y fechas</summary>
+        <dl>
+          <div><dt>Primera apertura</dt><dd>{{ enlace.actividad.fecha_primera_apertura|date:"d/m/Y H:i"|default:"Sin registro" }}</dd></div>
+          <div><dt>Última actividad</dt><dd>{{ enlace.actividad.fecha_ultima_actividad|date:"d/m/Y H:i"|default:"Sin registro" }}</dd></div>
+          <div><dt>Último paso registrado</dt><dd>{% if enlace.actividad.paso_maximo %}{{ enlace.actividad.paso_maximo }}{% else %}Sin registro{% endif %}</dd></div>
+          <div><dt>Último intento de envío</dt><dd>{{ enlace.actividad.fecha_ultimo_intento|date:"d/m/Y H:i"|default:"Sin registro" }}</dd></div>
+          <div><dt>Envío final guardado</dt><dd>{{ enlace.fecha_completada|date:"d/m/Y H:i"|default:"Sin registro" }}</dd></div>
+          <div><dt>Vencimiento</dt><dd>{{ enlace.fecha_expiracion|date:"d/m/Y H:i" }}</dd></div>
+        </dl>
+      </details>
+      {% if enlace.respuestas_url %}<a class="erp-link mi-button secondary" href="{{ enlace.respuestas_url }}">Ver respuestas recibidas</a>{% endif %}
+    </article>
+    {% empty %}<article class="erp-card mi-card mrc-empty"><h2>Sin enlaces con estos filtros</h2><p>Ajustá la búsqueda, las fechas o el estado.</p></article>{% endfor %}
+  </section>
+  {% if pagina.paginator.num_pages > 1 %}<nav class="mrc-pagination" aria-label="Páginas de enlaces clínicos"><p>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</p><div>{% if anterior_url %}<a href="{{ anterior_url }}">Anterior</a>{% endif %}{% if siguiente_url %}<a href="{{ siguiente_url }}">Siguiente</a>{% endif %}</div></nav>{% endif %}
+</div>

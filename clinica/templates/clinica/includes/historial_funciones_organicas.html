@@ -7,6 +7,10 @@
         </div>
     </div>
     <div class="panel-body">
+        {% if bloques_funciones_preconsulta %}
+        <h4>Respuestas del paciente</h4>
+        {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_funciones_preconsulta %}
+        {% endif %}
         {% if puede_editar_evaluacion %}<form method="post" action="?seccion=funciones_organicas#funciones-organicas" class="integral-form">
             {% csrf_token %}
             <input type="hidden" name="accion" value="guardar_funciones_organicas">

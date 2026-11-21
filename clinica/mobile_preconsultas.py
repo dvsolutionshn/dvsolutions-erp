@@ -7,8 +7,9 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
 from core.access import interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
+from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, datos_paciente_limitados, rol_clinico_granular
 from .models import PreconsultaClinica
+from .preconsulta_respuestas import CAMPOS_GENERALES_LECTURA, CAMPOS_MODELO_LECTURA
 
 
 def es_preconsultas_app(request, empresa):
@@ -126,32 +127,46 @@ def _selecciones_originales(valor):
     return valor
 
 
-def _secciones_seguras(preconsulta, secciones_callback):
+def _secciones_seguras(preconsulta, secciones_callback, *, incluir_datos_generales=True):
     datos = preconsulta.datos_generales
     general = datos.get("formulario_general", {}) or {} if isinstance(datos, dict) else {}
     if not isinstance(general, dict):
         raise PermissionDenied("La preconsulta contiene un formulario con estructura no compatible.")
+    datos_lectura = {"formulario_general": _LecturaGeneral(general)}
+    if incluir_datos_generales and isinstance(datos, dict):
+        snapshot = _LecturaGeneral(datos)
+        for nombre in CAMPOS_GENERALES_LECTURA:
+            if nombre in snapshot:
+                datos_lectura[nombre] = snapshot.get(nombre)
+    campos_modelo = {nombre: getattr(preconsulta, nombre, "") for nombre in CAMPOS_MODELO_LECTURA}
+    if any(not _valor_plano(valor) for valor in campos_modelo.values()):
+        raise PermissionDenied("La preconsulta contiene una respuesta con estructura no compatible.")
     # El callback original es la única autoridad de campos, etiquetas, choices,
     # grupos y orden. El lector valida exclusivamente las claves que consulta.
     lectura = SimpleNamespace(
-        datos_generales={"formulario_general": _LecturaGeneral(general)},
+        datos_generales=datos_lectura,
         antecedentes_personales=_selecciones_originales(preconsulta.antecedentes_personales),
         medicamentos_habituales=_selecciones_originales(preconsulta.medicamentos_habituales),
         antecedentes_familiares=_selecciones_originales(preconsulta.antecedentes_familiares),
         antecedentes_infecciosos=preconsulta.antecedentes_infecciosos,
+        **campos_modelo,
     )
     return secciones_callback(lectura)
 
 
 def render_preconsulta_app(request, empresa, paciente, preconsulta_id, secciones_callback):
-    metadatos = ("id", "empresa_id", "paciente_id", "tipo", "estado", "fecha_completada")
-    base = PreconsultaClinica.objects.filter(pk=preconsulta_id, empresa=empresa, paciente=paciente)
+    metadatos = (
+        "id", "empresa_id", "paciente_id", "tipo", "estado", "fecha_completada", "cita_id",
+        "cita__id", "cita__empresa_id", "cita__paciente_id", "cita__fecha_hora",
+    )
+    base = PreconsultaClinica.objects.filter(pk=preconsulta_id, empresa=empresa, paciente=paciente).select_related("cita")
     preconsulta = get_object_or_404(base.only(*metadatos))
     secciones = []
     if preconsulta.estado == "completada":
         respuestas = base.filter(estado="completada").only(
             *metadatos, "datos_generales", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "antecedentes_infecciosos",
+            *CAMPOS_MODELO_LECTURA,
         ).first()
         if respuestas is None:
             # Una revocación/borrado entre lecturas no abre respuestas ni crea
@@ -159,7 +174,15 @@ def render_preconsulta_app(request, empresa, paciente, preconsulta_id, secciones
             preconsulta = get_object_or_404(base.only(*metadatos))
         else:
             preconsulta = respuestas
-            secciones = _secciones_seguras(preconsulta, secciones_callback)
+            secciones = _secciones_seguras(
+                preconsulta, secciones_callback,
+                incluir_datos_generales=not datos_paciente_limitados(request.user, empresa),
+            )
+    cita = preconsulta.cita if preconsulta.cita_id else None
+    if preconsulta.cita_id and (
+        cita is None or cita.empresa_id != empresa.pk or cita.paciente_id != paciente.pk
+    ):
+        raise PermissionDenied("La cita del formulario no corresponde a este expediente.")
     modulos = reverse("agenda_mobile_modules_screen", args=[empresa.slug])
     puede_historia = preconsultas_disponibles_app(request, empresa)
     historias = f"{reverse('clinica_historias_especialidad', args=[empresa.slug, paciente.pk])}?app=1" if puede_historia else ""
@@ -170,7 +193,9 @@ def render_preconsulta_app(request, empresa, paciente, preconsulta_id, secciones
         "preconsulta": SimpleNamespace(id=preconsulta.pk, tipo=preconsulta.tipo,
                                        tipo_label=preconsulta.get_tipo_display(), estado=preconsulta.estado,
                                        estado_label=preconsulta.get_estado_display(),
-                                       fecha_completada=preconsulta.fecha_completada),
+                                       fecha_completada=preconsulta.fecha_completada,
+                                       cita_id=preconsulta.cita_id,
+                                       cita_fecha=cita.fecha_hora if cita else None),
         "secciones_preconsulta": secciones,
         "can_view_history": puede_historia, "can_view_app_modules": True,
         "app_home_disponible": False, "app_base_url": "",

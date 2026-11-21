@@ -1,0 +1,9 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+{% block title %}Bitácora de historia clínica · {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Seguimiento de formularios{% endblock %}
+{% block header_title %}Bitácora de historia clínica{% endblock %}
+{% block header_description %}Actividad y envíos de los enlaces clínicos de {{ empresa.nombre }}.{% endblock %}
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{{ volver_url }}">Volver a pacientes</a>{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_registration_control.css' %}">{% endblock %}
+{% block content %}{% include "clinica/includes/control_enlaces_historia_contenido.html" %}{% endblock %}

@@ -24,6 +24,7 @@ urlpatterns = [
     path("pacientes/crear/", views.crear_paciente, name="clinica_crear_paciente"),
     path("pacientes/enlace-registro/generar/", views.generar_enlace_registro_paciente, name="clinica_generar_enlace_registro_paciente"),
     path("pacientes/enlaces-registro/", views.control_enlaces_registro_paciente, name="clinica_control_enlaces_registro_paciente"),
+    path("enlaces-historia/", views.control_enlaces_historia_clinica, name="clinica_control_enlaces_historia"),
     path("pacientes/<int:paciente_id>/", views.paciente_detalle, name="clinica_paciente_detalle"),
     path("pacientes/<int:paciente_id>/expediente/", expediente_limitado.expediente, name="clinica_paciente_expediente"),
     path("pacientes/<int:paciente_id>/restriccion/", views_restricciones_citas.restringir, name="clinica_restringir_citas_paciente"),

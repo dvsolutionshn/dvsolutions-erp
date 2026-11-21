@@ -33,6 +33,7 @@
             <h3>{{ paciente.nombre }}</h3>
             <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · {{ preconsulta.get_tipo_display }}{% if preconsulta.fecha_completada %} · Completado {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% endif %}</p>
             {% if preconsulta.estado == "completada" %}<p><strong>Consulta completada</strong></p>{% endif %}
+            <p>{% if preconsulta.cita_id %}Cita {{ preconsulta.cita_id }} · {{ preconsulta.cita.fecha_hora|date:"d/m/Y H:i" }}{% else %}Cita vinculada · Sin registro{% endif %}</p>
         </div>
         <span class="read-badge">{{ preconsulta.get_estado_display }}</span>
     </div>

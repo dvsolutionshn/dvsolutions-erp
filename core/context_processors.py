@@ -28,6 +28,8 @@ def _empresa_actual(request, user):
 
 
 def erp_access(request):
+    from clinica.preconsulta_control import puede_controlar_preconsultas
+
     user = getattr(request, "user", None)
     empresa = _empresa_actual(request, user)
     onix_disponible = bool(empresa and onix_disponible_para_empresa(empresa))
@@ -239,6 +241,7 @@ def erp_access(request):
             interfaz_clinica and clinica_activa and rol_piloto
             and permiso("puede_ver_pacientes") and permiso("puede_enviar_enlace_historia_clinica")
         ),
+        "control_enlaces_historia": puede_controlar_preconsultas(user, empresa),
         "editar_pacientes": permiso("puede_editar_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "eliminar_pacientes": permiso("puede_eliminar_pacientes") if permisos_clinicos_granulares else permiso("puede_pacientes"),
         "crear_recordatorios_paciente": permiso("puede_crear_recordatorios_paciente") if permisos_clinicos_granulares else permiso("puede_pacientes"),

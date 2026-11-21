@@ -1,0 +1,23 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Cita del formulario - {{ empresa.nombre }}{% endblock %}
+{% block header_title %}Vincular el formulario a una cita{% endblock %}
+{% block header_description %}{{ paciente.nombre }} tiene varias citas. Seleccioná la atención a la que corresponde este enlace.{% endblock %}
+{% block content %}
+<section class="erp-card" style="max-width:760px;margin:0 auto;">
+    <form method="post" action="{% url 'clinica_generar_enlace_preconsulta_tipo' empresa.slug paciente.pk tipo %}">
+        {% csrf_token %}
+        {% if modo_app %}<input type="hidden" name="app" value="1">{% endif %}
+        <div class="erp-field">
+            <label for="preconsultaCita">Cita de {{ paciente.nombre }}</label>
+            <select id="preconsultaCita" name="cita_id" required>
+                <option value="">Seleccioná una cita</option>
+                {% for cita in citas %}
+                <option value="{{ cita.pk }}">{{ cita.fecha_hora|date:"d/m/Y h:i A" }}{% if cita.servicio %} · {{ cita.servicio.nombre }}{% endif %}{% if cita.profesional %} · {{ cita.profesional.nombre }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="erp-btn" type="submit">Generar enlace para esta cita</button>
+        <a class="erp-btn-secondary" href="{{ volver_url }}">Volver</a>
+    </form>
+</section>
+{% endblock %}

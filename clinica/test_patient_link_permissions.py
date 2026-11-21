@@ -86,7 +86,8 @@ class PermisosEnlacesPacientesTests(TestCase):
                     self.assertNotContains(historia, paciente.whatsapp)
 
                     publica = Client().get(urlsplit(historia.context["enlace_publico"]).path)
-                    self.assertContains(publica, 'name="nombres"')
+                    self.assertContains(publica, '<h2>Motivo de Consulta</h2>')
+                    self.assertNotContains(publica, 'name="nombres"')
                     for dato in (
                         paciente.identidad, paciente.correo, paciente.expediente_codigo, paciente.whatsapp,
                         paciente.alergias, paciente.medicamentos_actuales, "Procedimiento privado",

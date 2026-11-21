@@ -12,6 +12,7 @@
 {% endif %}
 {% endblock %}
 {% block mobile_content %}
+{% if erp_access.control_enlaces_historia %}<a class="mi-link" href="{% url 'clinica_control_enlaces_historia' empresa.slug %}?app=1">Bitácora de historias clínicas</a>{% endif %}
 <form class="mi-card mp-search" action="{% url 'clinica_pacientes' empresa.slug %}" method="get">
     <input type="hidden" name="app" value="1">
     <div class="mi-field">

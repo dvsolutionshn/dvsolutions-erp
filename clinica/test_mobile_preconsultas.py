@@ -24,7 +24,7 @@ from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario, UsuarioEmpresaPermiso
 from . import views
-from .models import Paciente, PreconsultaClinica
+from .models import CitaClinica, Paciente, PreconsultaClinica
 
 
 class _PreconsultaMarkup(HTMLParser):
@@ -369,10 +369,24 @@ class MobilePreconsultasIntegrationTests(TestCase):
         response = self.read(); self.sections(response)
         record, patient = response.context["preconsulta"], response.context["paciente"]
         self.assertFalse(hasattr(record, "_meta")); self.assertFalse(hasattr(patient, "_meta"))
-        self.assertEqual(set(vars(record)), {"id", "tipo", "tipo_label", "estado", "estado_label", "fecha_completada"})
+        self.assertEqual(set(vars(record)), {"id", "tipo", "tipo_label", "estado", "estado_label", "fecha_completada", "cita_id", "cita_fecha"})
         for key in ("form", "resumen", "datos_generales", "token", "token_hash", "preconsulta_model", "usuario_creador"):
             self.assertNotIn(key, response.context)
         for sentinel in self.PRIVATE: self.assertNotContains(response, sentinel)
+
+    def test_cita_vinculada_muestra_solo_metadatos_de_la_atencion_propia(self):
+        cita = CitaClinica.objects.create(empresa=self.empresa, paciente=self.paciente, fecha_hora=self.NOW)
+        self.filled(cita=cita)
+        respuesta = self.read()
+        self.assertEqual(respuesta.context["preconsulta"].cita_id, cita.pk)
+        self.assertEqual(respuesta.context["preconsulta"].cita_fecha, self.NOW)
+        self.assertContains(respuesta, f"Cita {cita.pk}")
+
+    def test_cita_ajena_no_permite_leer_respuestas_ni_sus_metadatos(self):
+        empresa = self.empresas["medical_spa"]
+        cita = CitaClinica.objects.create(empresa=empresa, paciente=self.pacientes[empresa.slug], fecha_hora=self.NOW)
+        self.filled(cita=cita)
+        self.denied(early=False, exception=PermissionDenied)
 
     def test_private_sql_does_not_fetch_token_ip_expiry_contact_photo_or_creator(self):
         reset_queries()
@@ -458,6 +472,7 @@ class MobilePreconsultasIntegrationTests(TestCase):
         self.assertEqual(self.snapshot(), before)
 
     def test_outside_four_app_flag_keeps_original_desktop_not_new_private_adapter(self):
+        UsuarioEmpresaPermiso.objects.create(usuario=self.usuario, empresa=self.externa, rol_sistema=self.legado)
         before = self.snapshot()
         with patch.object(views, "_resumen_preconsulta", wraps=self.original_summary): response = self.client.get(self.url(self.externa))
         self.assertEqual(response.status_code, 200); self.assertTemplateUsed(response, "clinica/preconsulta_detalle.html")

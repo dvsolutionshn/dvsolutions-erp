@@ -6,6 +6,7 @@
 {% block header_description %}{% if vista_pacientes_solo_tarjetas %}Consultá los datos generales y de contacto de los pacientes.{% else %}Base maestra de pacientes con datos generales, contacto, riesgos y acceso directo al expediente.{% endif %}{% endblock %}
 
 {% block topbar_actions %}
+{% if erp_access.control_enlaces_historia %}<a class="erp-btn-secondary" href="{% url 'clinica_control_enlaces_historia' empresa.slug %}">Bitácora de historias clínicas</a>{% endif %}
 {% if erp_access.generar_enlace_paciente_nuevo or not vista_pacientes_solo_tarjetas and empresa.slug == "hospital_mia" and erp_access.crear_pacientes %}
 <form method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}" style="display:inline;">
     {% csrf_token %}

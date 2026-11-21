@@ -3061,7 +3061,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertNotIn("alergias_detalle", form_medicamento_incompleto.errors)
         self.assertIn("medicamentos_detalle", form_medicamento_incompleto.errors)
 
-    def test_preconsulta_publica_se_genera_completa_y_actualiza_expediente(self):
+    def test_preconsulta_publica_guarda_respuestas_por_consulta_sin_sobrescribir_paciente(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
             expediente_codigo="HM-0400",
@@ -3075,8 +3075,12 @@ class ClinicaPacienteTests(TestCase):
             correo="laura@example.com",
             telefono="99990001",
             whatsapp="99990001",
+            es_alergico=True,
+            alergias="Alergia de consulta anterior",
+            medicamentos_actuales="Medicamento de consulta anterior",
+            antecedentes_medicos="Antecedente de consulta anterior",
         )
-        PreconsultaClinica.objects.create(
+        historia_anterior = PreconsultaClinica.objects.create(
             empresa=self.empresa,
             paciente=paciente,
             tipo="general",
@@ -3106,10 +3110,7 @@ class ClinicaPacienteTests(TestCase):
         preconsulta = PreconsultaClinica.objects.get(paciente=paciente, estado="pendiente")
         self.assertEqual(preconsulta.token_hash, hash_token_preconsulta(token_raw))
         self.assertNotEqual(preconsulta.token_hash, token_raw)
-        self.assertEqual(
-            preconsulta.datos_generales["formulario_general"]["motivo_categoria"],
-            ["cirugia_facial"],
-        )
+        self.assertEqual(preconsulta.datos_generales.get("formulario_general", {}), {})
         self.assertContains(response, "Enviar directo por WhatsApp")
         self.assertContains(response, "Abrir WhatsApp manual")
 
@@ -3117,7 +3118,7 @@ class ClinicaPacienteTests(TestCase):
         publica_url = reverse("clinica_preconsulta_publica", args=[token_raw])
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Continúe desde el paso 4")
+        self.assertContains(response, "<h2>Motivo de Consulta</h2>")
         self.assertContains(response, "Lea esto antes de empezar")
         self.assertContains(response, "contacte al admin DV Solutions")
         self.assertNotContains(response, "Datos generales")
@@ -3125,11 +3126,11 @@ class ClinicaPacienteTests(TestCase):
         self.assertNotContains(response, "Motivo y procedimiento de interés")
         self.assertNotContains(response, 'name="nombres"')
         self.assertNotContains(response, 'name="telefono"')
-        self.assertNotContains(response, 'data-step="0"')
+        self.assertContains(response, 'data-history-reason-step')
         self.assertNotContains(response, 'data-step="1"')
         self.assertNotContains(response, 'data-step="2"')
-        self.assertContains(response, "Paso 4 de 9")
-        self.assertContains(response, "Paso 9 de 9")
+        self.assertContains(response, "Paso 1 de 7")
+        self.assertContains(response, "Paso 7 de 7")
         self.assertNotContains(response, "Braquioplastia (brazos: retirar flacidez o exceso de piel)")
         self.assertNotContains(response, "Facebook")
         self.assertNotContains(response, "Cocaina")
@@ -3145,8 +3146,11 @@ class ClinicaPacienteTests(TestCase):
             publica_url,
             {
                 "nombres": "Nombre alterado",
-                "identidad": "0000000000000",
+                "identidad": paciente.identidad,
                 "motivo_consulta": "Valoracion de cirugia facial",
+                "motivo_categoria": ["cirugia_facial"],
+                "procedimientos_interes": ["rinoplastia"],
+                "procedimientos_interes_otros": "Revision de cicatriz previa",
                 "historia_mejorar": "Perfil facial y densidad capilar",
                 "historia_tiempo_preocupacion": "2 anos",
                 "historia_tratamientos_previos": "Mesoterapia capilar",
@@ -3231,18 +3235,37 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(paciente.identidad, "0801199600001")
         self.assertEqual(paciente.correo, "laura@example.com")
         self.assertTrue(paciente.es_alergico)
-        self.assertEqual(paciente.alergias, "Alergia a penicilina")
-        self.assertEqual(paciente.medicamentos_actuales, "Anticonceptivos de uso diario")
+        self.assertEqual(paciente.alergias, "Alergia de consulta anterior")
+        self.assertEqual(paciente.medicamentos_actuales, "Medicamento de consulta anterior")
+        self.assertEqual(paciente.antecedentes_medicos, "Antecedente de consulta anterior")
         self.assertEqual(preconsulta.alergias, "Alergia a penicilina")
         self.assertEqual(preconsulta.medicamentos_habituales_detalle, "Anticonceptivos de uso diario")
-        self.assertIn("Asma controlada", paciente.antecedentes_medicos)
+        self.assertEqual(preconsulta.datos_generales["nombres"], "Nombre alterado")
+        self.assertEqual(preconsulta.paciente_id, paciente.pk)
+        historia_anterior.refresh_from_db()
+        self.assertEqual(historia_anterior.estado, "completada")
+        self.assertEqual(historia_anterior.datos_generales["formulario_general"], {
+            "motivo_categoria": ["cirugia_facial"],
+            "procedimientos_interes": ["rinoplastia"],
+            "procedimientos_interes_otros": "Revision de cicatriz previa",
+        })
 
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Información recibida")
 
-    @patch("clinica.views._actualizar_paciente_desde_preconsulta")
-    def test_preconsulta_publica_muestra_soporte_si_ocurre_error_tecnico(self, actualizar_mock):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse(
+            "clinica_preconsulta_detalle", args=[self.empresa.slug, paciente.pk, preconsulta.pk],
+        ))
+        for respuesta_recibida in (
+            "Valoracion de cirugia facial", "Micción", "Asma controlada e hipertensión",
+            "Alergia a penicilina", "Anticonceptivos de uso diario", "64", "98",
+        ):
+            with self.subTest(respuesta=respuesta_recibida):
+                self.assertContains(response, respuesta_recibida)
+
+    def test_preconsulta_publica_muestra_soporte_si_ocurre_error_tecnico(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
             expediente_codigo="HM-ERR",
@@ -3262,24 +3285,32 @@ class ClinicaPacienteTests(TestCase):
             fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
             creada_por=self.user,
         )
-        actualizar_mock.side_effect = RuntimeError("fallo controlado")
-
         self.client.logout()
-        response = self.client.post(
-            reverse("clinica_preconsulta_publica", args=[token_raw]),
-            self._datos_formulario_general(
-                nombres="Paciente",
-                apellidos="Error",
-                identidad="0801199600100",
-                telefono="99990010",
-            ),
-        )
+        guardar_original = PreconsultaClinica.save
+
+        def fallar_guardado_final(instancia, *args, **kwargs):
+            if instancia.estado == "completada":
+                raise RuntimeError("fallo controlado")
+            return guardar_original(instancia, *args, **kwargs)
+
+        with patch.object(PreconsultaClinica, "save", autospec=True, side_effect=fallar_guardado_final):
+            response = self.client.post(
+                reverse("clinica_preconsulta_publica", args=[token_raw]),
+                self._datos_formulario_general(
+                    nombres="Paciente",
+                    apellidos="Error",
+                    identidad="0801199600100",
+                    telefono="99990010",
+                ),
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No pudimos enviar todavía")
         self.assertContains(response, "contacte al admin DV Solutions")
         preconsulta.refresh_from_db()
         self.assertEqual(preconsulta.estado, "pendiente")
+        self.assertIsNone(preconsulta.fecha_completada)
+        self.assertEqual(preconsulta.ultimo_resultado, "error_tecnico")
 
     def test_solo_admin_empresa_puede_eliminar_paciente(self):
         cliente = Cliente.objects.create(

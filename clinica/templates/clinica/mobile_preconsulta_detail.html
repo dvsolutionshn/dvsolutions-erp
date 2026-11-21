@@ -19,6 +19,7 @@
   <p class="mpre-expediente">Expediente {{ paciente.expediente_codigo }}</p>
   <div class="mpre-badges"><span class="mpre-type">{{ preconsulta.tipo_label }}</span><span class="mpre-state" data-state="{{ preconsulta.estado }}">{{ preconsulta.estado_label }}</span></div>
   {% if preconsulta.estado == 'completada' and preconsulta.fecha_completada %}<p class="mpre-completed-date">Completado <time>{{ preconsulta.fecha_completada|date:'d/m/Y H:i' }}</time></p>{% endif %}
+  <p class="mpre-completed-date">{% if preconsulta.cita_id %}Cita {{ preconsulta.cita_id }} · <time>{{ preconsulta.cita_fecha|date:'d/m/Y H:i' }}</time>{% else %}Cita vinculada · Sin registro{% endif %}</p>
 </section>
 <section class="mi-card mpre-confidential" aria-labelledby="preconsultaPrivacyTitle"><h2 id="preconsultaPrivacyTitle">Información privada y confidencial</h2><p>Revise y confirme las respuestas registradas durante la atención con el profesional autorizado.</p><p class="mpre-caption">Esta pantalla permite leer el formulario registrado. No modifica las respuestas ni crea una nota clínica.</p></section>
 {% if preconsulta.estado == 'completada' %}

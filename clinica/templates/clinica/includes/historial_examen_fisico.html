@@ -7,6 +7,10 @@
         </div>
     </div>
     <div class="panel-body">
+        {% if bloques_examen_preconsulta %}
+        <h4>Mediciones declaradas por el paciente</h4>
+        {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_examen_preconsulta %}
+        {% endif %}
         {% if puede_editar_examen %}<form method="post" action="?seccion=examen_fisico#examen-fisico" class="integral-form">
             {% csrf_token %}
             <input type="hidden" name="accion" value="guardar_examen_fisico">

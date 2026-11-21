@@ -1,0 +1,10 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Bitácora de historia clínica{% endblock %}
+{% block mobile_page_title %}Bitácora de historia clínica{% endblock %}
+{% block mobile_kicker %}Seguimiento de formularios{% endblock %}
+{% block mobile_back_url %}{{ volver_url }}{% endblock %}
+{% block mobile_header_description %}<p>Actividad y envíos de los enlaces clínicos de {{ empresa.nombre }}.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'clinica/mobile_registration_control.css' %}">{% endblock %}
+{% block mobile_content %}{% include "clinica/includes/control_enlaces_historia_contenido.html" %}{% endblock %}
+{% block mobile_navigation %}{% endblock %}

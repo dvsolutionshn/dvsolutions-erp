@@ -6,6 +6,7 @@
 {% block header_description %}Comparte este acceso únicamente con el paciente. Vence en siete días y deja de aceptar cambios al completarse.{% endblock %}
 
 {% block topbar_actions %}
+{% if erp_access.control_enlaces_historia %}<a class="erp-btn-secondary" href="{% url 'clinica_control_enlaces_historia' empresa.slug %}{% if modo_app %}?app=1{% endif %}">Bitácora de historias clínicas</a>{% endif %}
 {% if volver_url %}
 <a class="erp-btn-secondary" href="{{ volver_url }}">Volver</a>
 {% elif enlace_sin_datos_previos %}
@@ -19,6 +20,7 @@
 <section class="erp-card" style="max-width:920px;margin:0 auto;">
     <div class="erp-kpi-label">Paciente</div>
     <h3 style="margin:6px 0;color:#102338;">{{ paciente.nombre }}</h3>
+    <p class="erp-card-muted">Cita vinculada · {% if preconsulta.cita %}{{ preconsulta.cita.fecha_hora|date:"d/m/Y h:i A" }}{% else %}Sin registro{% endif %}</p>
     <p class="erp-card-muted">Este es el único momento en que el enlace completo se muestra dentro del ERP.</p>
     <label for="preconsultaLink" style="display:block;margin:22px 0 7px;font-size:11px;font-weight:900;text-transform:uppercase;color:#4e6480;">Enlace de historia clinica</label>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">

@@ -577,7 +577,8 @@ def _campo_lectura_preconsulta(general, etiqueta, campo, choices=None, tipo="tex
     return {"label": etiqueta, "value": valor, "type": tipo}
 
 
-def _secciones_preconsulta(preconsulta):
+def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
+    from .preconsulta_respuestas import completar_secciones_preconsulta
     general = {}
     if isinstance(preconsulta.datos_generales, dict):
         general = preconsulta.datos_generales.get("formulario_general", {}) or {}
@@ -692,12 +693,36 @@ def _secciones_preconsulta(preconsulta):
             ],
         },
     ]
+    secciones = completar_secciones_preconsulta(preconsulta, secciones)
+    if not incluir_datos_generales:
+        secciones = [seccion for seccion in secciones if seccion.get("clave") != "datos_generales"]
     for seccion in secciones:
         seccion["campos"] = [
             campo for campo in seccion["campos"]
             if campo and campo.get("value") not in (None, "", [])
         ]
     return [seccion for seccion in secciones if seccion["campos"]]
+
+
+def _secciones_preconsulta_usuario(preconsulta, usuario, empresa):
+    cita = getattr(preconsulta, "cita", None)
+    if cita and (cita.empresa_id != empresa.pk or cita.paciente_id != preconsulta.paciente_id):
+        raise PermissionDenied("La cita del formulario pertenece a otro paciente o empresa.")
+    secciones = _secciones_preconsulta(
+        preconsulta, incluir_datos_generales=not datos_paciente_limitados(usuario, empresa),
+    )
+    if not rol_clinico_v2(usuario, empresa):
+        return secciones
+    permitidas = {"motivo_consulta"}
+    if usuario.tiene_permiso_erp("puede_ver_antecedentes_clinicos", empresa):
+        permitidas.update({"antecedentes", "habitos", "familiares", "consentimiento"})
+    if _puede_historia_tipo(usuario, empresa, "evaluacion_integral"):
+        permitidas.add("funciones_organicas")
+    if usuario.tiene_permiso_erp("puede_ver_examen_fisico", empresa):
+        permitidas.add("examen_fisico")
+    if not datos_paciente_limitados(usuario, empresa):
+        permitidas.add("datos_generales")
+    return [seccion for seccion in secciones if seccion.get("clave") in permitidas]
 
 
 def _actualizar_paciente_desde_preconsulta(paciente, form):
@@ -3408,7 +3433,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         form_inline = None
     preconsultas = list(
         paciente.preconsultas.filter(estado="completada")
-        .select_related("creada_por")
+        .select_related("creada_por", "cita")
         .order_by("-fecha_completada", "-fecha_creacion")
     )
     historias = list(
@@ -3511,22 +3536,11 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     bloques_preconsulta = [
         {
             "preconsulta": preconsulta,
-            "secciones": _secciones_preconsulta(preconsulta),
+            "secciones": _secciones_preconsulta_usuario(preconsulta, request.user, empresa),
         }
         for preconsulta in preconsultas
     ]
-    if permisos_v2 and not puede_ver_antecedentes:
-        bloques_preconsulta = [
-            {
-                "preconsulta": bloque["preconsulta"],
-                "secciones": [
-                    seccion for seccion in bloque["secciones"]
-                    if "Motivo" in seccion.get("titulo", "")
-                ],
-            }
-            for bloque in bloques_preconsulta
-        ]
-        bloques_preconsulta = [bloque for bloque in bloques_preconsulta if bloque["secciones"]]
+    bloques_preconsulta = [bloque for bloque in bloques_preconsulta if bloque["secciones"]]
     bloques_motivo = [
         {
             "preconsulta": bloque["preconsulta"],
@@ -3542,13 +3556,23 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "preconsulta": bloque["preconsulta"],
             "secciones": [
                 seccion for seccion in bloque["secciones"]
-                if "Motivo" not in seccion.get("titulo", "")
+                if seccion.get("clave") in {"antecedentes", "habitos", "familiares", "consentimiento", "datos_generales"}
             ],
         }
         for bloque in bloques_preconsulta
     ]
     bloques_motivo = [bloque for bloque in bloques_motivo if bloque["secciones"]]
     bloques_antecedentes = [bloque for bloque in bloques_antecedentes if bloque["secciones"]]
+    bloques_funciones_preconsulta = []
+    bloques_examen_preconsulta = []
+    for bloque in bloques_preconsulta:
+        for clave, destino in (
+            ("funciones_organicas", bloques_funciones_preconsulta),
+            ("examen_fisico", bloques_examen_preconsulta),
+        ):
+            secciones = [seccion for seccion in bloque["secciones"] if seccion.get("clave") == clave]
+            if secciones:
+                destino.append({"preconsulta": bloque["preconsulta"], "secciones": secciones})
     if permisos_v2 and not puede_ver_antecedentes:
         bloques_antecedentes = []
     if seccion_activa == "motivo_consulta":
@@ -3676,6 +3700,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "bloques_preconsulta": bloques_preconsulta,
             "bloques_motivo": bloques_motivo,
             "bloques_antecedentes": bloques_antecedentes,
+            "bloques_funciones_preconsulta": bloques_funciones_preconsulta,
+            "bloques_examen_preconsulta": bloques_examen_preconsulta,
             "bloques_preconsulta_enfoque": bloques_preconsulta_enfoque,
             "informacion_titulo": informacion_titulo,
             "informacion_descripcion": informacion_descripcion,
@@ -4429,6 +4455,25 @@ def _volver_desde_enlace(request, empresa, paciente=None):
     return f"{ruta}?app=1" if es_pacientes_app(request, empresa) else ruta
 
 
+def _cita_enlace_preconsulta(request, empresa, paciente, tipo):
+    citas = CitaClinica.objects.filter(empresa=empresa, paciente=paciente).exclude(estado="cancelada")
+    cita_id = (request.POST.get("cita_id") or "").strip()
+    if cita_id:
+        if not cita_id.isascii() or not cita_id.isdecimal() or len(cita_id) > 20:
+            raise Http404("La cita no es válida.")
+        return get_object_or_404(citas, pk=cita_id), None
+    proximas = list(citas.filter(fecha_hora__date__gte=timezone.localdate()).order_by("fecha_hora", "pk")[:2])
+    candidatas = proximas or list(citas.order_by("-fecha_hora", "-pk")[:2])
+    if len(candidatas) <= 1:
+        return candidatas[0] if candidatas else None, None
+    return None, render(request, "clinica/preconsulta_elegir_cita.html", {
+        "empresa": empresa, "paciente": paciente, "tipo": tipo,
+        "citas": citas.select_related("profesional", "servicio").order_by("-fecha_hora", "-pk"),
+        "volver_url": _volver_desde_enlace(request, empresa),
+        "modo_app": es_pacientes_app(request, empresa),
+    })
+
+
 @login_required
 @never_cache
 @require_POST
@@ -4444,6 +4489,9 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
     tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Tipo de formulario de historia clinica no valido.")
+    cita, seleccion = _cita_enlace_preconsulta(request, empresa, paciente, tipo)
+    if seleccion is not None:
+        return seleccion
     ultima_historia_general = (
         paciente.preconsultas.filter(tipo="general", estado="completada")
         .order_by("-fecha_completada", "-fecha_creacion", "-id")
@@ -4460,23 +4508,17 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
             for campo in campos_generales
             if campo in datos_previos
         }
-        formulario_previo = datos_previos.get("formulario_general", {})
-        if isinstance(formulario_previo, dict):
-            datos_pasos_iniciales["formulario_general"] = {
-                campo: deepcopy(formulario_previo[campo])
-                for campo in ["motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros"]
-                if campo in formulario_previo
-            }
     token_raw, token_hash, token_preview = generar_token_preconsulta()
     with transaction.atomic():
         Paciente.objects.select_for_update().only("pk").get(pk=paciente.pk)
-        pendientes = paciente.preconsultas.filter(empresa=empresa, estado="pendiente", tipo=tipo)
+        pendientes = paciente.preconsultas.filter(empresa=empresa, cita=cita, estado="pendiente", tipo=tipo)
         if delegado:
             pendientes = pendientes.filter(sin_datos_previos=True)
         pendientes.update(estado="revocada")
         preconsulta = PreconsultaClinica.objects.create(
             empresa=empresa,
             paciente=paciente,
+            cita=cita,
             tipo=tipo,
             token_hash=token_hash,
             token_preview=token_preview,
@@ -4778,7 +4820,10 @@ def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
             Paciente.objects.only("id", "empresa_id", "nombre", "expediente_codigo"),
             id=paciente_id, empresa=empresa,
         )
-        return render_preconsulta_app(request, empresa, paciente, preconsulta_id, _secciones_preconsulta)
+        return render_preconsulta_app(
+            request, empresa, paciente, preconsulta_id,
+            lambda preconsulta: _secciones_preconsulta_usuario(preconsulta, request.user, empresa),
+        )
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     preconsulta = get_object_or_404(
         PreconsultaClinica,
@@ -4794,16 +4839,23 @@ def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
             "paciente": paciente,
             "preconsulta": preconsulta,
             "resumen": _resumen_preconsulta(preconsulta),
-            "secciones_preconsulta": _secciones_preconsulta(preconsulta),
+            "secciones_preconsulta": _secciones_preconsulta_usuario(preconsulta, request.user, empresa),
         },
     )
 
 
 @never_cache
 @sensitive_post_parameters()
+@require_http_methods(["GET", "HEAD", "POST"])
 def preconsulta_publica(request, token):
+    from .preconsulta_control import registrar_actividad_preconsulta
+
     preconsulta = get_object_or_404(
-        PreconsultaClinica.objects.select_related("empresa", "paciente"),
+        PreconsultaClinica.objects.select_related("empresa", "paciente", "cita").filter(
+            paciente__empresa_id=F("empresa_id"),
+        ).filter(
+            Q(cita__isnull=True) | Q(cita__empresa_id=F("empresa_id"), cita__paciente_id=F("paciente_id")),
+        ),
         token_hash=hash_token_preconsulta(token),
         empresa__tipo_solucion="clinica",
     )
@@ -4812,49 +4864,67 @@ def preconsulta_publica(request, token):
     if not preconsulta.vigente:
         return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": False}, status=410)
 
-    omitir_pasos_iniciales = not preconsulta.sin_datos_previos
     form = PreconsultaClinicaPublicaForm(
         request.POST if request.method == "POST" else None,
         request.FILES if request.method == "POST" else None,
         instance=preconsulta,
         paciente=preconsulta.paciente,
         empresa=preconsulta.empresa,
-        omitir_pasos_iniciales=omitir_pasos_iniciales,
+        omitir_pasos_iniciales=True,
         sin_datos_previos=preconsulta.sin_datos_previos,
+        formulario_paciente_existente=True,
     )
-    if request.method == "POST" and form.is_valid():
+    if request.method == "GET":
+        preconsulta = registrar_actividad_preconsulta(preconsulta, "apertura")
+    guardado = False
+    if request.method == "POST":
         try:
             with transaction.atomic():
-                Paciente.objects.select_for_update().only("pk").get(pk=preconsulta.paciente_id)
-                vigente = PreconsultaClinica.objects.select_for_update().only("estado", "fecha_expiracion").get(pk=preconsulta.pk)
-                if not vigente.vigente:
-                    completada = vigente.estado == "completada"
+                paciente = Paciente.objects.select_for_update().get(pk=preconsulta.paciente_id, empresa=preconsulta.empresa)
+                preconsulta = PreconsultaClinica.objects.select_for_update().get(
+                    pk=preconsulta.pk, empresa=preconsulta.empresa, paciente=paciente,
+                )
+                if not preconsulta.vigente:
+                    completada = preconsulta.estado == "completada"
                     return render(
                         request, "clinica/preconsulta_publica_finalizada.html",
                         {"completada": completada}, status=200 if completada else 410,
                     )
-                preconsulta = form.save(commit=False)
-                preconsulta.datos_generales = form.datos_generales_limpios()
-                preconsulta.estado = "completada"
-                preconsulta.fecha_completada = timezone.now()
-                preconsulta.ip_completada = _ip_cliente(request)
-                preconsulta.save()
-                if not preconsulta.sin_datos_previos:
-                    _actualizar_paciente_desde_preconsulta(preconsulta.paciente, form)
+                form = PreconsultaClinicaPublicaForm(
+                    request.POST, request.FILES, instance=preconsulta, paciente=paciente,
+                    empresa=preconsulta.empresa, omitir_pasos_iniciales=True,
+                    sin_datos_previos=preconsulta.sin_datos_previos, formulario_paciente_existente=True,
+                )
+                if form.is_valid():
+                    preconsulta = form.save(commit=False)
+                    registrar_actividad_preconsulta(preconsulta, "intento")
+                    preconsulta.datos_generales = form.datos_generales_limpios()
+                    preconsulta.estado = "completada"
+                    preconsulta.fecha_completada = timezone.now()
+                    preconsulta.fecha_ultima_actividad = preconsulta.fecha_completada
+                    preconsulta.ultimo_resultado = "completado"
+                    preconsulta.ip_completada = _ip_cliente(request)
+                    preconsulta.save()
+                else:
+                    registrar_actividad_preconsulta(preconsulta, "intento", resultado="validacion")
         except ValidationError as exc:
-            logger.warning("Validacion al completar preconsulta publica %s: %s", preconsulta.id, exc)
+            _registrar_fallo_preconsulta(preconsulta, "validacion")
+            logger.warning("Validación al completar preconsulta pública %s", preconsulta.pk)
             if hasattr(exc, "message_dict"):
                 for campo, errores in exc.message_dict.items():
                     form.add_error(campo if campo in form.fields else None, errores)
             else:
                 form.add_error(None, exc)
-        except Exception:
-            logger.exception("Error tecnico al completar preconsulta publica %s", preconsulta.id)
+        except Exception as exc:
+            _registrar_fallo_preconsulta(preconsulta, "error_tecnico")
+            logger.error("Error técnico de tipo %s al completar preconsulta pública %s", type(exc).__name__, preconsulta.pk)
             form.add_error(
                 None,
                 "Ocurrio un problema tecnico al enviar el formulario. Sus respuestas siguen en pantalla; revise lo marcado e intente nuevamente. Si continua, contacte al admin DV Solutions.",
             )
         else:
+            guardado = preconsulta.estado == "completada"
+        if guardado:
             return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
 
     return render(
@@ -4863,10 +4933,54 @@ def preconsulta_publica(request, token):
         {
             "form": form,
             "preconsulta": preconsulta,
-            "omitir_pasos_iniciales": omitir_pasos_iniciales,
-            "paso_numero_inicial": 4 if omitir_pasos_iniciales else 1,
+            "omitir_pasos_iniciales": True,
+            "formulario_paciente_existente": True,
+            "paso_numero_inicial": 1,
+            "registro_actividad_url": reverse("clinica_preconsulta_actividad", args=[token]),
         },
     )
+
+
+def _registrar_fallo_preconsulta(preconsulta, resultado):
+    from .preconsulta_control import registrar_actividad_preconsulta
+
+    try:
+        registrar_actividad_preconsulta(preconsulta, "intento", resultado=resultado)
+    except Exception:
+        logger.error("No se pudo registrar el intento de la preconsulta %s", preconsulta.pk)
+
+
+@never_cache
+@require_POST
+def preconsulta_actividad_publica(request, token):
+    from .preconsulta_control import registrar_actividad_preconsulta
+
+    preconsulta = get_object_or_404(
+        PreconsultaClinica.objects.filter(paciente__empresa_id=F("empresa_id")).filter(
+            Q(cita__isnull=True) | Q(cita__empresa_id=F("empresa_id"), cita__paciente_id=F("paciente_id")),
+        ), token_hash=hash_token_preconsulta(token), empresa__tipo_solucion="clinica",
+    )
+    if not preconsulta.vigente:
+        return JsonResponse({"ok": False}, status=410)
+    evento = request.POST.get("evento") or "progreso"
+    if evento not in {"apertura", "progreso"}:
+        return JsonResponse({"ok": False}, status=400)
+    if evento == "progreso":
+        try:
+            paso = min(max(int(request.POST.get("paso") or 1), 1), 7)
+        except (TypeError, ValueError):
+            return JsonResponse({"ok": False}, status=400)
+        registrar_actividad_preconsulta(preconsulta, "progreso", paso=paso)
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@never_cache
+@require_safe
+def control_enlaces_historia_clinica(request, empresa_slug):
+    from .preconsulta_control import control_preconsultas
+
+    return control_preconsultas(request, _empresa_desde_slug(empresa_slug))
 
 
 @never_cache

@@ -337,41 +337,7 @@
                 {% endif %}
             </article>
             {% endif %}
-            {% for bloque in bloques_preconsulta_enfoque %}
-            <article class="single-note">
-                <div class="note-title">
-                    <div>
-                        <h4>{{ bloque.preconsulta.get_tipo_display }} · {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i" }}</h4>
-                        <small>Formulario completado por el paciente</small>
-                    </div>
-                    <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id bloque.preconsulta.id %}">Ver original</a>
-                </div>
-                {% for seccion in bloque.secciones %}
-                <div class="sheet-grid">
-                    {% for campo in seccion.campos %}
-                    <div class="sheet-field">
-                        <span class="field-label">{{ campo.label }}</span>
-                        <div class="field-value">
-                            {% if campo.type == "chips" %}
-                            <div class="chip-wrap">
-                                {% for item in campo.value %}
-                                <span class="sheet-chip">{{ item }}</span>
-                                {% empty %}
-                                <span class="erp-card-muted">No indicado</span>
-                                {% endfor %}
-                            </div>
-                            {% else %}
-                            {{ campo.value|default:"No indicado"|linebreaksbr }}
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endfor %}
-            </article>
-            {% empty %}
-            <div class="empty-sheet">Todavía no hay formularios completados por el paciente.</div>
-            {% endfor %}
+            {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_preconsulta_enfoque %}
         </div>
     </section>
     {% endif %}
