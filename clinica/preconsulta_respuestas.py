@@ -8,6 +8,7 @@ CAMPOS_GENERALES_LECTURA = (
     "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono_codigo_area", "telefono",
     "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo", "informante", "informante_detalle",
     "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia", "referido_por", "referido_por_detalle",
+    "redes_sociales",
 )
 CAMPOS_MODELO_LECTURA = (
     "motivo_consulta", "funciones_organicas", "funciones_detalle", "revision_sistemas", "revision_sistemas_detalle",
@@ -53,6 +54,7 @@ def completar_secciones_preconsulta(preconsulta, secciones):
     consentimiento["clave"] = "consentimiento"
     motivo["campos"].insert(0, _campo_respuesta("motivo_consulta", getattr(preconsulta, "motivo_consulta", ""), "Motivo de Consulta"))
     _agregar_campos(funciones, [
+        _campo_respuesta("funciones_organicas", general.get("funciones_organicas_historico"), "Estado histórico de funciones orgánicas"),
         _campo_respuesta("funciones_organicas", getattr(preconsulta, "funciones_organicas", ""), "Funciones orgánicas generales"),
         _campo_respuesta("funciones_detalle", getattr(preconsulta, "funciones_detalle", ""), "Detalle de funciones orgánicas"),
         _campo_respuesta("revision_sistemas", getattr(preconsulta, "revision_sistemas", "")),
@@ -105,3 +107,79 @@ def completar_secciones_preconsulta(preconsulta, secciones):
         )],
     })
     return secciones
+
+
+def registro_inicial_sin_historia(preconsulta):
+    """Distinguir respuestas del registro básico de una historia completa."""
+    datos = preconsulta.datos_generales if isinstance(preconsulta.datos_generales, dict) else {}
+    if not datos.get("formulario_general_pendiente_doctor"):
+        return False
+    general = datos.get("formulario_general") or {}
+    iniciales = {"pendiente_doctor_desde_paso", "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros"}
+    if any(valor not in (None, "", []) for clave, valor in general.items() if clave not in iniciales):
+        return False
+    return not any(
+        getattr(preconsulta, campo, None) not in (None, "", [], False)
+        for campo in (*CAMPOS_MODELO_LECTURA, "antecedentes_personales", "medicamentos_habituales", "antecedentes_familiares", "antecedentes_infecciosos")
+        if campo != "consentimiento_datos"
+    )
+
+
+def bloques_respuestas_paciente(usuario, empresa, paciente, claves=None, *, modo_app=False, tipos=None):
+    """Lectura de las respuestas recibidas junto al formulario profesional.
+
+    Usa el mismo lector y alcance del expediente, sin copiar respuestas a una
+    nota nueva ni cambiar los datos generales del paciente.
+    """
+    from types import SimpleNamespace
+
+    from django.core.exceptions import PermissionDenied
+
+    from core.clinical_permissions import datos_paciente_limitados
+    from .models import PreconsultaClinica
+    from .preconsulta_control import puede_ver_respuestas_preconsulta
+    from .views import _secciones_preconsulta_usuario
+
+    if paciente.empresa_id != empresa.pk:
+        raise PermissionDenied("El paciente no pertenece a esta empresa.")
+    if not puede_ver_respuestas_preconsulta(usuario, empresa):
+        return []
+    registros = PreconsultaClinica.objects.filter(
+        empresa=empresa, paciente=paciente, estado="completada",
+    ).select_related("cita").only(
+        "id", "empresa_id", "paciente_id", "tipo", "estado", "fecha_completada", "fecha_creacion",
+        "cita_id", "cita__id", "cita__empresa_id", "cita__paciente_id", "cita__fecha_hora",
+        "datos_generales", "antecedentes_personales", "medicamentos_habituales",
+        "antecedentes_familiares", "antecedentes_infecciosos", *CAMPOS_MODELO_LECTURA,
+    ).order_by("-fecha_completada", "-fecha_creacion", "-id")
+    if tipos is not None:
+        registros = registros.filter(tipo__in=tipos)
+    bloques = []
+    for registro in registros:
+        cita = registro.cita if registro.cita_id else None
+        if cita and (cita.empresa_id != empresa.pk or cita.paciente_id != paciente.pk):
+            raise PermissionDenied("La cita del formulario no corresponde a este expediente.")
+        if modo_app:
+            from .mobile_preconsultas import _secciones_seguras
+
+            secciones = _secciones_seguras(
+                registro, lambda lectura: _secciones_preconsulta_usuario(lectura, usuario, empresa),
+                incluir_datos_generales=not datos_paciente_limitados(usuario, empresa),
+            )
+            etiqueta = registro.get_tipo_display()
+            preconsulta = SimpleNamespace(
+                id=registro.pk, get_tipo_display=lambda valor=etiqueta: valor,
+                fecha_completada=registro.fecha_completada, cita_id=registro.cita_id,
+                cita=SimpleNamespace(fecha_hora=cita.fecha_hora) if cita else None,
+            )
+        else:
+            secciones = _secciones_preconsulta_usuario(registro, usuario, empresa)
+            preconsulta = registro
+        if claves is not None:
+            secciones = [seccion for seccion in secciones if seccion.get("clave") in claves]
+        if secciones:
+            bloques.append({
+                "preconsulta": preconsulta, "secciones": secciones,
+                "registro_inicial_pendiente": registro_inicial_sin_historia(registro),
+            })
+    return bloques

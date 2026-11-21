@@ -273,7 +273,7 @@
         <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
     </nav>
 
-    {% if seccion_activa == "completa" or seccion_activa == "motivo_consulta" or seccion_activa == "antecedentes" %}
+    {% if seccion_activa == "completa" or seccion_activa == "motivo_consulta" or seccion_activa == "antecedentes" or seccion_activa == "especialidad" %}
     <section class="sheet-panel" id="informacion-paciente">
         <div class="panel-head">
             <div>

@@ -129,6 +129,25 @@ class HistoriaCompletaFlujoTests(TestCase):
         self.assertEqual(preconsulta.ultimo_resultado, "validacion")
         self.assertContains(Client().post(enlace, datos), "Información recibida")
 
+    def test_respuestas_visibles_desde_la_pantalla_de_trabajo_por_especialidad(self):
+        for empresa, paciente, cita in self.casos:
+            with self.subTest(empresa=empresa.slug):
+                _preconsulta, enlace = self.generar(empresa, paciente, cita)
+                datos = self.respuestas()
+                self.assertContains(Client().post(enlace, datos), "Información recibida")
+                historial = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.pk])
+                pantalla = self.client.get(historial, {"seccion": "especialidad", "tipo": "medicina_estetica"})
+                self.assertContains(pantalla, "Respuestas recibidas del paciente")
+                for campo in ("motivo_consulta", "funciones_detalle", "diagnostico_medico_detalle", "alergias_detalle", "medicamentos_detalle", "quirurgicos_detalle", "antecedentes_familiares_detalle", "evaluacion_psicologica_detalle"):
+                    self.assertContains(pantalla, datos[campo])
+                formulario = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.pk, "medicina_estetica"])
+                for modo in ({}, {"app": "1"}):
+                    consulta = self.client.get(formulario, modo)
+                    self.assertContains(consulta, "Respuestas recibidas del paciente")
+                    for campo in ("motivo_consulta", "funciones_detalle", "medicamentos_detalle", "antecedentes_familiares_detalle", "evaluacion_psicologica_detalle"):
+                        self.assertContains(consulta, datos[campo])
+                self.assertFalse(HistoriaClinicaEspecialidad.objects.exists())
+
     def test_error_de_guardado_no_informa_exito_y_permite_reintentar(self):
         empresa, paciente, cita = self.casos[0]
         guardar_original = PreconsultaClinica.save
@@ -167,6 +186,9 @@ class HistoriaCompletaFlujoTests(TestCase):
         )
         historial = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.pk])
         self.assertNotContains(self.client.get(historial, {"seccion": "motivo_consulta"}), "Respuesta de otra empresa QA")
+        crear = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.pk, "medicina_estetica"])
+        for modo in ({}, {"app": "1"}):
+            self.assertNotContains(self.client.get(crear, modo), "Respuesta de otra empresa QA")
 
     def test_varias_citas_piden_elegir_y_conservan_respuestas_anteriores(self):
         empresa, paciente, cita = self.casos[0]

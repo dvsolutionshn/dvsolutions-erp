@@ -104,6 +104,8 @@ def _historial_antecedentes_app(empresa, paciente, antecedente):
 
 
 def render_antecedentes_app(request, empresa, paciente, form, antecedente):
+    from .preconsulta_respuestas import bloques_respuestas_paciente
+
     historial = _historial_antecedentes_app(empresa, paciente, antecedente)
     contexto = contexto_pacientes_app(request, empresa, paciente)
     if not rol_clinico_granular(request.user, empresa) and not request.user.tiene_permiso_erp("puede_citas", empresa):
@@ -115,6 +117,13 @@ def render_antecedentes_app(request, empresa, paciente, form, antecedente):
         "mobile_antecedent_history": historial,
         "app_antecedents_form_url": url_antecedentes_app(empresa, paciente),
         "app_antecedents_back_url": contexto["app_patient_history_url"],
+        "mobile_received_answers": bloques_respuestas_paciente(
+            request.user, empresa, paciente,
+            {"antecedentes", "habitos", "familiares", "consentimiento", "datos_generales"},
+            modo_app=True,
+        ) if contexto["can_view_history"] else [],
+        "app_patient_answers_url": contexto["app_patient_history_url"] + "&seccion=completa"
+        if contexto["can_view_history"] else "",
     })
     return respuesta_pacientes_app(request, empresa, render(request, "clinica/mobile_antecedents_form.html", contexto))
 

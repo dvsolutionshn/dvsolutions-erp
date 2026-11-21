@@ -70,7 +70,10 @@
         </div>
     </div>
     {% endif %}
-    {% if ultima_preconsulta and resumen_preconsulta %}
+    {% if respuestas_paciente_recibidas %}
+    <section class="preconsult-panel"><h3>Respuestas recibidas del paciente</h3><p>Historia clínica general y formularios de esta área, conservados por consulta.</p>{% include "clinica/includes/respuestas_preconsulta.html" with bloques=respuestas_paciente_recibidas %}</section>
+    {% endif %}
+    {% if not respuestas_paciente_recibidas and ultima_preconsulta and resumen_preconsulta %}
     <div class="general-summary">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
             <div><div class="erp-kpi-label">Formulario general de entrada</div><h3>InformaciÃ³n base del paciente</h3></div>

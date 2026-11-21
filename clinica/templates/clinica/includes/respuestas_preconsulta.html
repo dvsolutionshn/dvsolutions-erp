@@ -8,6 +8,7 @@
         </div>
         <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id bloque.preconsulta.id %}">Ver original</a>
     </div>
+    {% if bloque.registro_inicial_pendiente %}<p class="erp-card-muted"><strong>Registro inicial del paciente.</strong> Este envío contiene datos generales y procedimientos de interés. Las preguntas de historia clínica completa todavía no fueron respondidas en este formulario.</p>{% endif %}
     {% for seccion in bloque.secciones %}
     <h5>{{ seccion.titulo }}</h5>
     <div class="sheet-grid">

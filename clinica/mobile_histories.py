@@ -121,6 +121,12 @@ def contexto_historia_app(request, empresa, paciente, tipo, form, historia=None)
 
 
 def render_historia_app(request, empresa, paciente, tipo, contexto):
+    if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES:
+        from .preconsulta_respuestas import bloques_respuestas_paciente
+
+        contexto["respuestas_paciente_recibidas"] = bloques_respuestas_paciente(
+            request.user, empresa, paciente, modo_app=es_historias_app(request, empresa), tipos={"general", tipo},
+        )
     if es_historias_app(request, empresa):
         contexto.update(contexto_historia_app(request, empresa, paciente, tipo, contexto["form"], contexto.get("historia")))
         contexto["mobile_history_previous_notes"] = notas_historia_app(contexto.get("historias_previas", [])) if contexto["can_view_history"] else []

@@ -105,9 +105,11 @@ class MobileAntecedentsIntegrationTests(TestCase):
             kwargs["historia_id"] = self.especiales[(empresa.slug, tipo)].pk
         return (views.editar_historia_especialidad if edit else views.historial_clinico_consolidado)(request, **kwargs)
 
-    def assert_no_prior_queries(self, queries, allow_current_history=False):
+    def assert_no_prior_queries(self, queries, allow_current_history=False, allow_received_answers=False):
         selects = [query["sql"] for query in queries if query["sql"].lstrip().upper().startswith("SELECT")]
-        forbidden = [PreconsultaClinica, ClasificacionAlopecia]
+        forbidden = [ClasificacionAlopecia]
+        if not allow_received_answers:
+            forbidden.append(PreconsultaClinica)
         if not allow_current_history:
             forbidden.append(HistoriaClinicaEspecialidad)
         for model in forbidden:
@@ -196,12 +198,12 @@ class MobileAntecedentsIntegrationTests(TestCase):
             self.assertTemplateUsed(response, "clinica/historia_especialidad_form.html")
             self.assertFalse(response.context.get("mobile_history_generic_only", False))
 
-    def test_get_composer_reads_only_scoped_current_versions_not_preconsultations_or_histories(self):
+    def test_get_composer_reads_scoped_versions_and_received_answers_without_other_notes(self):
         before = self.conteos()
         with CaptureQueriesContext(connection) as captured:
             response = self.client.get(self.url())
         self.assertEqual(response.status_code, 200)
-        self.assert_no_prior_queries(captured)
+        self.assert_no_prior_queries(captured, allow_received_answers=True)
         self.assertNotContains(response, self.antecedentes["medical_spa"].contenido)
         rows = response.context["mobile_antecedent_history"]
         self.assertEqual([row["registro"].pk for row in rows], [self.versiones[self.empresa.slug].pk])
@@ -218,7 +220,7 @@ class MobileAntecedentsIntegrationTests(TestCase):
         self.assertTrue(response.context["form"].is_bound)
         self.assertIn("contenido", response.context["form"].errors)
         self.assertEqual(response.context["form"]["contenido"].value(), content)
-        self.assert_no_prior_queries(captured)
+        self.assert_no_prior_queries(captured, allow_received_answers=True)
         self.assertEqual(self.conteos(), before)
 
     def test_strict_action_prefix_and_foreign_metadata_do_not_reach_other_save_branches(self):

@@ -1,8 +1,9 @@
 {% for bloque in bloques %}
-<details class="mp-clinical-note">
+<details class="mp-clinical-note"{% if abrir_reciente and forloop.first %} open{% endif %}>
     <summary><span><strong>{{ bloque.preconsulta.get_tipo_display }}</strong><small>{{ bloque.preconsulta.fecha_completada|date:'d/m/Y H:i' }}</small></span></summary>
     <div class="mp-note-body">
         <p class="mi-muted">{% if bloque.preconsulta.cita_id %}Cita {{ bloque.preconsulta.cita_id }} · {{ bloque.preconsulta.cita.fecha_hora|date:'d/m/Y H:i' }}{% else %}Cita vinculada · Sin registro{% endif %}</p>
+        {% if bloque.registro_inicial_pendiente %}<p class="mi-muted"><strong>Registro inicial del paciente.</strong> Este envío contiene datos generales y procedimientos de interés. Las preguntas de historia clínica completa todavía no fueron respondidas en este formulario.</p>{% endif %}
         {% for seccion in bloque.secciones %}
         <h3 class="mp-read-section-title">{{ seccion.titulo }}</h3>
         {% for campo in seccion.campos %}

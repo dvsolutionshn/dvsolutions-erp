@@ -8,6 +8,7 @@ from django.utils import timezone
 from .mobile_preconsultas import _secciones_seguras
 from .models import CitaClinica, PreconsultaClinica
 from .views import _secciones_preconsulta
+from .preconsulta_respuestas import registro_inicial_sin_historia
 
 
 class PreconsultaRespuestasTests(SimpleTestCase):
@@ -97,3 +98,27 @@ class PreconsultaRespuestasTests(SimpleTestCase):
         self.assertNotIn("No exportar", str(secciones))
         with self.assertRaises(PermissionDenied):
             _secciones_seguras(preconsulta, _secciones_preconsulta)
+
+    def test_lectores_conservan_estado_historico_y_contacto_declarado(self):
+        preconsulta = self.preconsulta()
+        preconsulta.datos_generales["redes_sociales"] = "Contacto social declarado QA"
+        preconsulta.datos_generales["formulario_general"]["funciones_organicas_historico"] = "normal"
+        web = _secciones_preconsulta(preconsulta)
+        self.assertEqual(web, _secciones_seguras(preconsulta, _secciones_preconsulta))
+        historico = next(campo for seccion in web for campo in seccion["campos"] if campo["label"] == "Estado histórico de funciones orgánicas")
+        self.assertEqual(historico["value"], ["Normal"])
+        self.assertIn("Contacto social declarado QA", str(web))
+        limitado = _secciones_preconsulta(preconsulta, incluir_datos_generales=False)
+        self.assertNotIn("Contacto social declarado QA", str(limitado))
+
+    def test_registro_inicial_no_se_confunde_con_historia_clinica_respondida(self):
+        preconsulta = PreconsultaClinica(datos_generales={
+            "formulario_general_pendiente_doctor": True,
+            "formulario_general": {"pendiente_doctor_desde_paso": 4, "motivo_categoria": ["cirugia_facial"]},
+        })
+        self.assertTrue(registro_inicial_sin_historia(preconsulta))
+        preconsulta.datos_generales["formulario_general"]["gine_gestas"] = 0
+        self.assertFalse(registro_inicial_sin_historia(preconsulta))
+        preconsulta.datos_generales["formulario_general"].pop("gine_gestas")
+        preconsulta.funciones_detalle = "Respuesta clínica recibida QA"
+        self.assertFalse(registro_inicial_sin_historia(preconsulta))

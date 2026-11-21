@@ -43,6 +43,7 @@
     </div>
 
     {% if preconsulta.estado == "completada" %}
+        {% if registro_inicial_pendiente %}<div class="read-confidential"><strong>Registro inicial del paciente.</strong> Este envío contiene datos generales y procedimientos de interés. Las preguntas de historia clínica completa todavía no fueron respondidas en este formulario.</div>{% endif %}
         {% for seccion in secciones_preconsulta %}
         <article class="read-section">
             <div class="read-section-head">

@@ -9,7 +9,7 @@ from django.urls import reverse
 from core.access import interfaz_clinica_activa
 from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, datos_paciente_limitados, rol_clinico_granular
 from .models import PreconsultaClinica
-from .preconsulta_respuestas import CAMPOS_GENERALES_LECTURA, CAMPOS_MODELO_LECTURA
+from .preconsulta_respuestas import CAMPOS_GENERALES_LECTURA, CAMPOS_MODELO_LECTURA, registro_inicial_sin_historia
 
 
 def es_preconsultas_app(request, empresa):
@@ -197,6 +197,7 @@ def render_preconsulta_app(request, empresa, paciente, preconsulta_id, secciones
                                        cita_id=preconsulta.cita_id,
                                        cita_fecha=cita.fecha_hora if cita else None),
         "secciones_preconsulta": secciones,
+        "registro_inicial_pendiente": preconsulta.estado == "completada" and registro_inicial_sin_historia(preconsulta),
         "can_view_history": puede_historia, "can_view_app_modules": True,
         "app_home_disponible": False, "app_base_url": "",
         "app_hide_agenda_navigation": True, "app_hide_patient_navigation": True,

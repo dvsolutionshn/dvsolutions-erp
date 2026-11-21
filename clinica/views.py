@@ -3091,6 +3091,7 @@ def plan_tratamiento_crear_app(request, empresa_slug, paciente_id):
 @login_required
 def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     from .mobile_clinical_read_scope import validar_historias_lectura_app
+    from .preconsulta_respuestas import registro_inicial_sin_historia
 
     empresa = _empresa_desde_slug(empresa_slug)
     if historial_paciente_limitado(request.user, empresa):
@@ -3537,13 +3538,14 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         {
             "preconsulta": preconsulta,
             "secciones": _secciones_preconsulta_usuario(preconsulta, request.user, empresa),
+            "registro_inicial_pendiente": registro_inicial_sin_historia(preconsulta),
         }
         for preconsulta in preconsultas
     ]
     bloques_preconsulta = [bloque for bloque in bloques_preconsulta if bloque["secciones"]]
     bloques_motivo = [
         {
-            "preconsulta": bloque["preconsulta"],
+            **bloque,
             "secciones": [
                 seccion for seccion in bloque["secciones"]
                 if "Motivo" in seccion.get("titulo", "")
@@ -3553,7 +3555,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     ]
     bloques_antecedentes = [
         {
-            "preconsulta": bloque["preconsulta"],
+            **bloque,
             "secciones": [
                 seccion for seccion in bloque["secciones"]
                 if seccion.get("clave") in {"antecedentes", "habitos", "familiares", "consentimiento", "datos_generales"}
@@ -3572,7 +3574,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         ):
             secciones = [seccion for seccion in bloque["secciones"] if seccion.get("clave") == clave]
             if secciones:
-                destino.append({"preconsulta": bloque["preconsulta"], "secciones": secciones})
+                destino.append({**bloque, "secciones": secciones})
     if permisos_v2 and not puede_ver_antecedentes:
         bloques_antecedentes = []
     if seccion_activa == "motivo_consulta":
@@ -3583,6 +3585,10 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         bloques_preconsulta_enfoque = bloques_antecedentes
         informacion_titulo = "Antecedentes"
         informacion_descripcion = "Antecedentes, alergias, medicamentos, hábitos y riesgos clínicos."
+    elif seccion_activa == "especialidad":
+        bloques_preconsulta_enfoque = bloques_preconsulta
+        informacion_titulo = "Respuestas recibidas del paciente"
+        informacion_descripcion = "Formulario respondido por el paciente para consultar durante la atención de esta especialidad."
     else:
         bloques_preconsulta_enfoque = bloques_preconsulta
         informacion_titulo = "Formulario clínico recibido"
@@ -4184,9 +4190,9 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             tablero=True,
         )
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
-    preconsultas_tipo = paciente.preconsultas.filter(tipo=tipo).select_related("creada_por")[:10] if puede_ver_historia else []
+    preconsultas_tipo = paciente.preconsultas.filter(empresa=empresa, tipo=tipo).select_related("creada_por")[:10] if puede_ver_historia else []
     ultima_preconsulta = (
-        paciente.preconsultas.filter(estado="completada", tipo__in=[tipo, "general"])
+        paciente.preconsultas.filter(empresa=empresa, estado="completada", tipo__in=[tipo, "general"])
         .order_by("-fecha_completada", "-fecha_creacion")
         .first() if puede_ver_historia else None
     )
@@ -4346,9 +4352,9 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
     if bloqueada:
         for field in form.fields.values():
             field.disabled = True
-    preconsultas_tipo = paciente.preconsultas.filter(tipo=historia.tipo).select_related("creada_por")[:10] if puede_ver_historia else []
+    preconsultas_tipo = paciente.preconsultas.filter(empresa=empresa, tipo=historia.tipo).select_related("creada_por")[:10] if puede_ver_historia else []
     ultima_preconsulta = (
-        paciente.preconsultas.filter(estado="completada", tipo__in=[historia.tipo, "general"])
+        paciente.preconsultas.filter(empresa=empresa, estado="completada", tipo__in=[historia.tipo, "general"])
         .order_by("-fecha_completada", "-fecha_creacion")
         .first() if puede_ver_historia else None
     )
@@ -4809,6 +4815,7 @@ def control_enlaces_registro_paciente(request, empresa_slug):
 @login_required
 def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
     from .mobile_preconsultas import autorizar_preconsulta_app, es_preconsultas_app, render_preconsulta_app
+    from .preconsulta_respuestas import registro_inicial_sin_historia
 
     empresa = _empresa_desde_slug(empresa_slug)
     modo_app = es_preconsultas_app(request, empresa)
@@ -4840,6 +4847,7 @@ def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
             "preconsulta": preconsulta,
             "resumen": _resumen_preconsulta(preconsulta),
             "secciones_preconsulta": _secciones_preconsulta_usuario(preconsulta, request.user, empresa),
+            "registro_inicial_pendiente": preconsulta.estado == "completada" and registro_inicial_sin_historia(preconsulta),
         },
     )
 

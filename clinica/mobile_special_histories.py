@@ -103,8 +103,15 @@ def _secciones_formulario(form):
 
 
 def render_historia_especial_app(request, empresa, paciente, codigo, form):
+    from .preconsulta_respuestas import bloques_respuestas_paciente
+
     nombre, accion, _prefijo, _seccion = FORMULARIOS_HISTORIA_ESPECIALES_APP[codigo]
     contexto = contexto_pacientes_app(request, empresa, paciente)
+    claves_respuestas = {
+        "evaluacion_integral": {"funciones_organicas", "examen_fisico"},
+        "funciones_organicas": {"funciones_organicas"},
+        "examen_fisico": {"examen_fisico"},
+    }.get(codigo)
     contexto.update({
         "empresa": empresa, "paciente": paciente, "form": form,
         "can_manage_special_history": True,
@@ -113,6 +120,11 @@ def render_historia_especial_app(request, empresa, paciente, codigo, form):
         "app_special_history_form_url": url_historia_especial_app(empresa, paciente, codigo),
         "app_special_history_back_url": contexto["app_patient_history_url"],
         "app_special_history_cancel_url": contexto["app_patient_history_url"],
+        "mobile_received_answers": bloques_respuestas_paciente(
+            request.user, empresa, paciente, claves_respuestas, modo_app=True,
+        ) if claves_respuestas and contexto["can_view_history"] else [],
+        "app_patient_answers_url": contexto["app_patient_history_url"] + "&seccion=completa"
+        if contexto["can_view_history"] else "",
     })
     return respuesta_pacientes_app(request, empresa, render(request, "clinica/mobile_special_history_form.html", contexto))
 

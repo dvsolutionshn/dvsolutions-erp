@@ -83,9 +83,12 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
         request.user = user or Usuario.objects.get(pk=self.usuario.pk)
         return views.historial_clinico_consolidado(request, empresa_slug=empresa.slug, paciente_id=paciente.pk)
 
-    def assert_no_prior_selects(self, captured):
+    def assert_no_prior_selects(self, captured, allow_received_answers=False):
         selects = [q["sql"] for q in captured if q["sql"].lstrip().upper().startswith("SELECT")]
-        for model in (PreconsultaClinica, HistoriaClinicaEspecialidad, ClasificacionAlopecia, AntecedenteAdicionalPaciente, AntecedenteAdicionalHistorial):
+        forbidden = [HistoriaClinicaEspecialidad, ClasificacionAlopecia, AntecedenteAdicionalPaciente, AntecedenteAdicionalHistorial]
+        if not allow_received_answers:
+            forbidden.append(PreconsultaClinica)
+        for model in forbidden:
             self.assertFalse(any(f'"{model._meta.db_table}"' in sql for sql in selects), model._meta.label)
 
     def test_four_clinics_render_single_mobile_composers_web_and_old_mobile_unchanged(self):
@@ -156,7 +159,7 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
         self.assertTemplateUsed(response, "clinica/historial_clinico_consolidado.html")
         self.assertFalse(response.context.get("modo_app", False))
 
-    def test_passive_composer_get_does_not_query_prior_data_or_create_defaults(self):
+    def test_passive_composer_get_reads_received_answers_without_other_prior_data_or_defaults(self):
         self.preconsulta()
         AntecedenteAdicionalPaciente.objects.create(empresa=self.empresa, paciente=self.paciente, contenido="Antecedente previo confidencial")
         before = self.conteos()
@@ -164,7 +167,7 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
             with CaptureQueriesContext(connection) as captured:
                 response = self.client.get(self.url(formulario))
             self.assertEqual(response.status_code, 200)
-            self.assert_no_prior_selects(captured)
+            self.assert_no_prior_selects(captured, allow_received_answers=formulario != "tricopigmentacion")
             self.assertNotContains(response, "Antecedente previo confidencial")
         self.assertEqual(self.conteos(), before)
 
@@ -233,7 +236,7 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
             self.assertIn("funcion_cabeza", response.context["form"].errors)
             self.assertEqual(response.context["form"]["funcion_ojos_detalle"].value(), "Detalle sintético conservado")
             self.assertEqual(response.context["form"]["examen_peso"].value(), "68 kg")
-            self.assert_no_prior_selects(captured)
+            self.assert_no_prior_selects(captured, allow_received_answers=True)
             self.assertEqual(self.conteos(), before)
 
     def test_original_optional_detail_does_not_gain_new_clinical_validation(self):
