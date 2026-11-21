@@ -285,12 +285,15 @@ def render_pacientes_app(request, empresa, web_template, mobile_template, contex
                 contexto[clave] = [item for item in contexto[clave] if item["codigo"] == area["codigo"]]
             contexto["can_manage_antecedents"] = False
             contexto["can_complete_general_history"] = False
-        from .mobile_histories import TIPOS_HISTORIA_EDITABLES_APP
+        from .mobile_histories import TIPOS_HISTORIA_EDITABLES_APP, permiso_historia_app
+        from .views import _puede_historia_tipo
 
         paciente = contexto.get("paciente")
-        if paciente and contexto["can_edit_history"]:
+        if paciente:
             for nota in contexto.get("mobile_history_notes", []):
-                if nota["tipo"] in TIPOS_HISTORIA_EDITABLES_APP and not nota["bloqueada"]:
+                if (nota["tipo"] in TIPOS_HISTORIA_EDITABLES_APP and not nota["bloqueada"]
+                        and permiso_historia_app(request, empresa, nota["tipo"], editar=True)
+                        and _puede_historia_tipo(request.user, empresa, nota["tipo"], editar=True)):
                     nota["edit_url"] = f"{reverse('clinica_editar_historia_especialidad', args=[empresa.slug, paciente.pk, nota['id']])}?app=1"
                     if nota["tipo"] in {"evaluacion_integral", "tricopigmentacion"}:
                         nota["edit_label"] = "Editar textos y fecha"

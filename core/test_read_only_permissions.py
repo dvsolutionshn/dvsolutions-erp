@@ -131,6 +131,7 @@ class ReadOnlyModulePermissionTests(TestCase):
             "solo_lectura_contabilidad", "solo_lectura_clinica", "puede_editar_historia_clinica",
         ])
         self.assertTrue(self.usuario.tiene_permiso_erp("puede_ver_historia_clinica", self.empresa))
+        self.assertTrue(self.usuario.tiene_permiso_erp("puede_buscar_pacientes_por_identidad", self.empresa))
         self.assertFalse(self.usuario.tiene_permiso_erp("puede_editar_historia_clinica", self.empresa))
         self.assertEqual(
             self._response(self.empresa, "clinica", "pacientes/8/historias/consolidado/").status_code,

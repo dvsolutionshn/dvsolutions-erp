@@ -2,12 +2,12 @@
 {% load static %}
 
 {% block title %}Historia clínica completa - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
 {% block header_title %}Historia clínica completa{% endblock %}
 {% block header_description %}Lectura y trabajo clínico en una sola hoja: datos generales, formularios completados y cuadros médicos por área sin salir del expediente.{% endblock %}
 {% block topbar_actions %}
-<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
-<a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
+{% if not erp_access.datos_paciente_limitados %}<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>{% endif %}
+{% if erp_access.crear_citas %}<a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -193,13 +193,13 @@
                     {% endif %}
                 </div>
                 <div>
-                    <span class="summary-clinical-eyebrow">Resumen clínico · {{ paciente.expediente_codigo }}</span>
+                    <span class="summary-clinical-eyebrow">Resumen clínico{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %}</span>
                     <h2>{{ paciente.nombre }}</h2>
-                    <p>{{ paciente.identidad|default:"Documento no indicado" }} · {% if paciente.edad is not None %}{{ paciente.edad }} años{% else %}Edad no indicada{% endif %} · RH {{ paciente.rh|default:"No indicado" }}</p>
+                    {% if not erp_access.datos_paciente_limitados %}<p>{{ paciente.identidad|default:"Documento no indicado" }} · {% if paciente.edad is not None %}{{ paciente.edad }} años{% else %}Edad no indicada{% endif %}{% if puede_ver_antecedentes %} · RH {{ paciente.rh|default:"No indicado" }}{% endif %}</p>{% endif %}
                 </div>
             </div>
             <div class="summary-clinical-actions">
-                {% if paciente.telefono_accion %}
+                {% if not erp_access.datos_paciente_limitados and paciente.telefono_accion %}
                 <a class="summary-clinical-action" href="tel:+{{ paciente.telefono_accion }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 8l-2 1.7a15 15 0 0 0 7.3 7.3l1.7-2 4.5 2.4-.8 3a2 2 0 0 1-2 1.5C9.1 21.1 2.9 14.9 2.1 6.3a2 2 0 0 1 1.5-2Z"></path></svg>
                     Llamar
@@ -209,25 +209,27 @@
                     WhatsApp
                 </a>
                 {% endif %}
-                <a class="summary-clinical-action is-primary is-wide" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">
+                {% if erp_access.crear_citas %}<a class="summary-clinical-action is-primary is-wide" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 2v4M16 2v4M8 10h8M12 14v4M10 16h4"></path></svg>
                     Agendar cita
-                </a>
+                </a>{% endif %}
             </div>
         </div>
         <div class="summary-clinical-alerts">
-            {% if paciente.es_alergico %}
+            {% if puede_ver_antecedentes %}{% if paciente.es_alergico %}
             <span class="summary-clinical-badge is-alert">Alerta de alergia: {{ paciente.alergias|default:"Sin detalle" }}</span>
             {% else %}
             <span class="summary-clinical-badge">Sin alerta de alergia registrada</span>
-            {% endif %}
+            {% endif %}{% endif %}
+            {% if not erp_access.datos_paciente_limitados %}
             <span class="summary-clinical-badge">Teléfono: {{ paciente.whatsapp|default:paciente.telefono|default:"No indicado" }}</span>
             <span class="summary-clinical-badge">Correo: {{ paciente.correo|default:"No indicado" }}</span>
+            {% endif %}
         </div>
     </header>
 
     <section class="summary-dashboard" aria-label="Resumen operativo del paciente">
-        <article class="summary-dashboard-card is-next">
+        {% if erp_access.ver_calendario %}<article class="summary-dashboard-card is-next">
             <div class="summary-dashboard-label"><span class="summary-dashboard-icon">01</span>Próxima cita</div>
             {% if resumen_operativo.proxima_cita %}
             <strong>{{ resumen_operativo.proxima_cita.fecha_hora|date:"d/m/Y · h:i A" }}</strong>
@@ -236,31 +238,31 @@
             <strong>Sin cita programada</strong>
             <p>Puede agendar la próxima atención desde esta pantalla.</p>
             {% endif %}
-            <a class="summary-dashboard-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}" aria-label="Agendar cita para {{ paciente.nombre }}"></a>
-        </article>
+            {% if erp_access.crear_citas %}<a class="summary-dashboard-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}" aria-label="Agendar cita para {{ paciente.nombre }}"></a>{% endif %}
+        </article>{% endif %}
         <article class="summary-dashboard-card">
             <div class="summary-dashboard-label"><span class="summary-dashboard-icon">02</span>Historia</div>
             <strong>{{ historias|length }} nota{{ historias|length|pluralize:"s" }}</strong>
             <p>{{ preconsultas|length }} formulario{{ preconsultas|length|pluralize:"s" }} recibido{{ preconsultas|length|pluralize:"s" }}</p>
             <a class="summary-dashboard-link" href="#trabajo-clinico" aria-label="Ir al trabajo clínico"></a>
         </article>
-        <article class="summary-dashboard-card">
+        {% if erp_access.ver_planes_tratamiento %}<article class="summary-dashboard-card">
             <div class="summary-dashboard-label"><span class="summary-dashboard-icon">03</span>Tratamientos</div>
             <strong>{{ resumen_operativo.tratamientos_activos }} activo{{ resumen_operativo.tratamientos_activos|pluralize:"s" }}</strong>
-            <p>{{ resumen_operativo.citas_proximas }} próxima{{ resumen_operativo.citas_proximas|pluralize:"s" }} cita{{ resumen_operativo.citas_proximas|pluralize:"s" }}</p>
-            <a class="summary-dashboard-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}" aria-label="Ver tratamientos"></a>
-        </article>
-        <article class="summary-dashboard-card">
+            {% if erp_access.ver_calendario %}<p>{{ resumen_operativo.citas_proximas }} próxima{{ resumen_operativo.citas_proximas|pluralize:"s" }} cita{{ resumen_operativo.citas_proximas|pluralize:"s" }}</p>{% endif %}
+            <a class="summary-dashboard-link" href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}" aria-label="Ver tratamientos"></a>
+        </article>{% endif %}
+        {% if erp_access.ver_anexos_clinicos %}<article class="summary-dashboard-card">
             <div class="summary-dashboard-label"><span class="summary-dashboard-icon">04</span>Archivos clínicos</div>
             <strong>{{ resumen_operativo.examenes|add:resumen_operativo.consentimientos }}</strong>
             <p>{{ resumen_operativo.examenes }} examen{{ resumen_operativo.examenes|pluralize:"es" }} · {{ resumen_operativo.consentimientos }} consentimiento{{ resumen_operativo.consentimientos|pluralize:"s" }}</p>
             <a class="summary-dashboard-link" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}" aria-label="Ver archivos clínicos"></a>
-        </article>
+        </article>{% endif %}
     </section>
 
     <nav class="summary-section-nav" aria-label="Secciones de la historia clínica">
-        <a href="?seccion=motivo_consulta#informacion-paciente">Motivo de consulta</a>
-        <a href="?seccion=funciones_organicas#funciones-organicas">Funciones orgánicas</a>
+        {% if erp_access.ver_historia_clinica %}<a href="?seccion=motivo_consulta#informacion-paciente">Motivo de consulta</a>{% endif %}
+        {% if puede_ver_evaluacion or puede_editar_evaluacion %}<a href="?seccion=funciones_organicas#funciones-organicas">Funciones orgánicas</a>{% endif %}
         {% if puede_ver_examen or puede_editar_examen %}<a href="?seccion=examen_fisico#examen-fisico">Examen físico</a>{% endif %}
         {% if puede_ver_antecedentes or puede_editar_antecedentes %}<a href="?seccion=antecedentes#informacion-paciente">Antecedentes</a>{% endif %}
         {% if puede_ver_diagnosticos or puede_editar_diagnosticos %}<a href="?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>{% endif %}
@@ -284,6 +286,7 @@
         </div>
         <div class="panel-body">
             {% if seccion_activa == "completa" or seccion_activa == "antecedentes" %}
+            {% if puede_ver_antecedentes or puede_editar_antecedentes %}
             <article class="additional-history" id="antecedentes-adicionales">
                 <div class="additional-history-head">
                     <div>
@@ -337,6 +340,7 @@
                 {% endif %}
             </article>
             {% endif %}
+            {% endif %}
             {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_preconsulta_enfoque %}
         </div>
     </section>
@@ -385,7 +389,7 @@
                     <span class="area-toggle">Abrir / trabajar aquí</span>
                 </summary>
                 <div class="area-body">
-                    {% if tipo.puede_editar %}
+                    {% if tipo.puede_crear %}
                     <form class="inline-form" method="post" action="#trabajo-{{ tipo.codigo }}">
                         {% csrf_token %}
                         <input type="hidden" name="tipo_historia" value="{{ tipo.codigo }}">

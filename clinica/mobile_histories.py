@@ -8,11 +8,12 @@ from django.urls import reverse
 from core.access import interfaz_clinica_activa
 from core.clinical_permissions import (
     EMPRESAS_CLINICAS_CON_ROLES, datos_paciente_limitados, historial_paciente_limitado,
-    puede_abrir_expediente_limitado, rol_clinico_granular,
+    PERMISOS_EDICION_HISTORIAS, permiso_historia_por_tipo, puede_abrir_expediente_limitado,
+    rol_clinico_granular, rol_clinico_v2,
 )
 from .mobile_controls import url_lectura_expediente_limitado
 from .mobile_patients import (
-    autorizar_pacientes_app, contexto_pacientes_app, es_pacientes_app,
+    contexto_pacientes_app, es_pacientes_app,
     notas_historia_app, permiso_pacientes_app, respuesta_pacientes_app,
 )
 from .models import HistoriaClinicaEspecialidad
@@ -27,13 +28,39 @@ def _permiso_crear_tipo(tipo):
     return {"enfermeria": "puede_escribir_enfermeria", "terapias": "puede_escribir_terapias"}.get(tipo, "puede_crear_historia_clinica")
 
 
+def permiso_historia_app(request, empresa, tipo=None, *, editar=False):
+    """Resolver la acción del área sin exigir acceso a otras historias."""
+    usuario = request.user
+    if not (
+        empresa and empresa.activa and interfaz_clinica_activa(empresa)
+        and empresa.tiene_modulo_activo("clinica_medica")
+        and getattr(usuario, "is_authenticated", False) and usuario.puede_acceder_empresa(empresa)
+    ):
+        return False
+    rol_v2 = rol_clinico_v2(usuario, empresa)
+    if rol_v2:
+        if tipo is None and editar:
+            # La URL sólo contiene el id. La vista valida luego el tipo real.
+            return any(usuario.tiene_permiso_erp(nombre, empresa) for nombre in PERMISOS_EDICION_HISTORIAS)
+        acciones_separadas = bool(rol_v2.usa_permisos_acciones_v3)
+        permiso = permiso_historia_por_tipo(tipo, crear=not editar and acciones_separadas, editar=editar or not acciones_separadas)
+        return bool(permiso and usuario.tiene_permiso_erp(permiso, empresa))
+    return permiso_pacientes_app(
+        request, empresa, "puede_editar_historia_clinica" if editar else _permiso_crear_tipo(tipo),
+        "puede_expediente_clinico",
+    )
+
+
 def autorizar_historias_app(request, empresa, tipo=None, editar=False):
     if not es_historias_app(request, empresa):
         return
     permitidos = TIPOS_HISTORIA_EDITABLES_APP if editar else TIPOS_HISTORIA_APP
     if tipo is not None and tipo not in permitidos:
         raise Http404("Este formulario especializado aún no está adaptado a la app.")
-    autorizar_pacientes_app(request, empresa, "puede_editar_historia_clinica" if editar else _permiso_crear_tipo(tipo), "puede_expediente_clinico")
+    if not empresa.tiene_modulo_activo("clinica_medica"):
+        raise Http404("El módulo clínico no está habilitado para esta empresa.")
+    if not permiso_historia_app(request, empresa, tipo, editar=editar):
+        raise PermissionDenied("No tiene permiso para esta acción del expediente.")
 
 
 def validar_edicion_generica_app(request, empresa, historia, form):
@@ -65,7 +92,7 @@ def tipos_historia_creables_app(request, empresa, paciente=None):
     return [{
         "codigo": tipo, "nombre": nombre,
         "url": url_historia_form_app(empresa, paciente, tipo) if paciente else "",
-    } for tipo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES if tipo in TIPOS_HISTORIA_APP and permiso_pacientes_app(request, empresa, _permiso_crear_tipo(tipo), "puede_expediente_clinico")]
+    } for tipo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES if tipo in TIPOS_HISTORIA_APP and permiso_historia_app(request, empresa, tipo)]
 
 
 def _secciones_historia_app(form):
@@ -93,7 +120,7 @@ def contexto_historia_app(request, empresa, paciente, tipo, form, historia=None)
     if generic_only and not rol_clinico_granular(request.user, empresa) and not request.user.tiene_permiso_erp("puede_citas", empresa):
         contexto["app_home_disponible"] = False
         contexto["app_modules_url"] = reverse("agenda_mobile_modules_screen", args=[empresa.slug])
-    can_edit = permiso_pacientes_app(request, empresa, "puede_editar_historia_clinica", "puede_expediente_clinico")
+    can_edit = permiso_historia_app(request, empresa, tipo, editar=True)
     tipos = tipos_historia_creables_app(request, empresa, paciente)
     if contexto["can_view_history"]:
         regreso = contexto["app_patient_histories_url"]
@@ -151,7 +178,7 @@ def volver_historia_app(request, empresa, paciente, tipo, historia=None):
         destino = lectura
     elif contexto["can_view_history"]:
         destino = contexto["app_patient_histories_url"]
-    elif historia and permiso_pacientes_app(request, empresa, "puede_editar_historia_clinica", "puede_expediente_clinico"):
+    elif historia and permiso_historia_app(request, empresa, tipo, editar=True):
         destino = url_historia_form_app(empresa, paciente, tipo, historia)
     elif any(item["codigo"] == tipo for item in tipos_historia_creables_app(request, empresa, paciente)):
         destino = url_historia_form_app(empresa, paciente, tipo)

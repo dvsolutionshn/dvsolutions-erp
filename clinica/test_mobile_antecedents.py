@@ -84,7 +84,7 @@ class MobileAntecedentsIntegrationTests(TestCase):
         empresa = empresa or self.empresa
         historia = historia or self.especiales[(empresa.slug, codigo)]
         data = {name: getattr(historia, name) for name in HistoriaClinicaEspecialidadForm.Meta.fields if name not in {"profesional", "fecha_atencion"}}
-        data.update({"app": "1", "profesional": historia.profesional_id or "", "fecha_atencion": "2026-10-03T14:25", "plan_tratamiento": "Plan textual actualizado sin tocar JSON"})
+        data.update({"app": "1", "fecha_atencion": "2026-10-03T14:25", "plan_tratamiento": "Plan textual actualizado sin tocar JSON"})
         data.update(overrides)
         return data
 
@@ -374,13 +374,16 @@ class MobileAntecedentsIntegrationTests(TestCase):
                 self.assertTemplateUsed(web, "clinica/historia_especialidad_form.html")
         self.assertEqual(self.conteos(), before)
 
-    def test_generic_edit_exposes_all_original_seventeen_fields_not_json_or_structured_inputs(self):
+    def test_generic_edit_exposes_sixteen_fields_with_automatic_author_not_json_or_structured_inputs(self):
         for tipo in self.ESPECIALES:
             response = self.client.get(self.edit_url(tipo))
             form = response.context["form"]
             self.assertIsInstance(form, HistoriaClinicaEspecialidadForm)
             self.assertEqual(list(form.fields), HistoriaClinicaEspecialidadForm.Meta.fields)
-            self.assertEqual(len(form.fields), 17)
+            self.assertEqual(len(form.fields), 16)
+            self.assertNotIn("profesional", form.fields)
+            self.assertNotContains(response, 'name="profesional"')
+            self.assertContains(response, f"<span>Profesional: <strong>{self.usuario.username}</strong></span>", html=True)
             self.assertEqual(form.campos_estructurados, [])
             self.assertEqual(form.fields["fecha_atencion"].input_formats, ["%Y-%m-%dT%H:%M"])
             for field in form.fields:
@@ -388,7 +391,7 @@ class MobileAntecedentsIntegrationTests(TestCase):
             for field in ("datos_especialidad", "funcion_ojos", "examen_peso", "numero_sesion", "marca_lote"):
                 self.assertNotContains(response, f'name="{field}"')
 
-    def test_generic_edit_date_text_professional_state_actor_keep_exact_historical_json(self):
+    def test_generic_edit_date_text_authenticated_professional_state_actor_keep_exact_historical_json(self):
         for tipo in self.ESPECIALES:
             record = self.especiales[(self.empresa.slug, tipo)]
             original_json, created, creator = deepcopy(record.datos_especialidad), record.fecha_creacion, record.creado_por_id
@@ -402,6 +405,7 @@ class MobileAntecedentsIntegrationTests(TestCase):
             self.assertEqual(record.estado, "borrador")
             self.assertEqual((record.fecha_creacion, record.creado_por_id), (created, creator))
             self.assertEqual(record.actualizado_por_id, self.usuario.pk)
+            self.assertEqual(record.profesional_id, self.profesionales[self.empresa.slug].pk)
             audit = RegistroAuditoria.objects.get(modelo="historiaclinicaespecialidad", objeto_id=str(record.pk), accion="modificar", metodo_http="POST")
             self.assertNotIn("datos_especialidad", audit.cambios)
             self.assertEqual(audit.usuario_id, self.usuario.pk)
@@ -451,7 +455,7 @@ class MobileAntecedentsIntegrationTests(TestCase):
             base = QueryDict(mutable=True)
             for key, value in self.edit_data(tipo).items():
                 base.setlist(key, [str(value)])
-            for key in ("app", "fecha_atencion", "profesional", "estado"):
+            for key in ("app", "fecha_atencion", "estado"):
                 data = base.copy()
                 data.setlist(key, [base[key], base[key]])
                 self.assertIn(self.client.post(self.edit_url(tipo), data.urlencode(), content_type="application/x-www-form-urlencoded").status_code, (403, 404))
@@ -460,13 +464,17 @@ class MobileAntecedentsIntegrationTests(TestCase):
     def test_generic_foreign_record_patient_and_professional_cannot_modify_other_company(self):
         before = self.conteos()
         for tipo in self.ESPECIALES:
+            record = self.especiales[(self.empresa.slug, tipo)]
+            original = HistoriaClinicaEspecialidad.objects.filter(pk=record.pk).values().get()
             foreign = self.especiales[("medical_spa", tipo)]
             self.assertEqual(self.client.get(self.edit_url(tipo, historia=foreign)).status_code, 404)
             self.assertEqual(self.client.post(self.edit_url(tipo, historia=foreign), self.edit_data(tipo)).status_code, 404)
             self.assertEqual(self.client.get(self.edit_url(tipo, paciente=self.otro_paciente)).status_code, 404)
             response = self.client.post(self.edit_url(tipo), self.edit_data(tipo, profesional=self.profesionales["medical_spa"].pk))
-            self.assertEqual(response.status_code, 200)
-            self.assertIn("profesional", response.context["form"].errors)
+            self.assertEqual(response.status_code, 403)
+            record.refresh_from_db()
+            self.assertEqual(record.profesional_id, self.profesionales[self.empresa.slug].pk)
+            self.assertEqual(HistoriaClinicaEspecialidad.objects.filter(pk=record.pk).values().get(), original)
         self.assertEqual(self.conteos(), before)
 
     def test_generic_edit_preserves_non_dict_stale_json_values_without_normalizing(self):

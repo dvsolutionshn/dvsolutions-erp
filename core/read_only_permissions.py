@@ -76,6 +76,7 @@ PERMISOS_MODULO = {
     "clinica": {
         "puede_clinica", "puede_pacientes", "puede_expediente_clinico", "puede_tratamientos_clinicos",
         "puede_configuracion_clinica", "puede_ver_pacientes", "puede_ver_datos_generales_paciente",
+        "puede_buscar_pacientes_por_identidad",
         "puede_crear_pacientes", "puede_editar_pacientes", "puede_eliminar_pacientes",
         "puede_generar_enlace_paciente_nuevo", "puede_enviar_enlace_historia_clinica",
         "puede_crear_recordatorios_paciente", "puede_restringir_citas_paciente",
@@ -129,6 +130,7 @@ PERMISOS_LECTURA = {
     "clinica": {
         "puede_clinica", "puede_pacientes", "puede_expediente_clinico", "puede_tratamientos_clinicos",
         "puede_ver_pacientes", "puede_ver_datos_generales_paciente", "puede_ver_motivo_restriccion_paciente",
+        "puede_buscar_pacientes_por_identidad",
         "puede_ver_historia_clinica", "puede_ver_anexos_clinicos", "puede_descargar_anexos_clinicos",
         "puede_ver_recetas", "puede_ver_gastos_adicionales", "puede_ver_planes_tratamiento",
         "puede_ver_enfermeria", "puede_ver_terapias", "puede_ver_camara_hiperbarica",

@@ -2,7 +2,7 @@
 {% block mobile_title %}Resumen clínico{% endblock %}
 {% block mobile_back_url %}{% if can_view_patient %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
 {% block mobile_page_title %}Resumen clínico{% endblock %}
-{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
 {% block mobile_content %}
 <div class="mi-warning"><strong>Solo consulta</strong><p>Los datos corresponden al mismo expediente del sistema. Esta pantalla no modifica las historias clínicas.</p></div>
 {% if can_create_history %}<a class="mi-button secondary" href="{{ app_patient_event_url }}">+ Registrar evento del expediente</a>{% endif %}
@@ -18,7 +18,7 @@
 {% if can_view_history %}
 <section class="mi-card"><h2>Respuestas del paciente</h2><a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=motivo_consulta">Motivo de Consulta</a>{% if puede_ver_evaluacion or puede_editar_evaluacion %} · <a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=funciones_organicas">Funciones Orgánicas</a>{% endif %}{% if puede_ver_antecedentes %} · <a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=antecedentes">Antecedentes</a>{% endif %}</section>
 {% endif %}
-{% if paciente.es_alergico %}<div class="mi-warning danger"><strong>Paciente con alergias</strong><p>{{ paciente.alergias|default:'Sin detalle registrado' }}</p></div>{% endif %}
+{% if puede_ver_antecedentes and paciente.es_alergico %}<div class="mi-warning danger"><strong>Paciente con alergias</strong><p>{{ paciente.alergias|default:'Sin detalle registrado' }}</p></div>{% endif %}
 <section class="mi-card"><div class="mp-section-head"><h2>Notas clínicas</h2><span>{{ mobile_history_notes|length }}</span></div><div class="mp-note-list">{% for nota in mobile_history_notes %}{% include "clinica/mobile_patient_note.html" with nota=nota %}{% empty %}<p class="mi-muted">No hay notas clínicas para esta vista.</p>{% endfor %}</div></section>
 {% if bloques_preconsulta_enfoque %}<section class="mi-card"><h2>{{ informacion_titulo }}</h2><p class="mi-muted">{{ informacion_descripcion }}</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_preconsulta_enfoque %}</div></section>{% endif %}
 {% if seccion_activa == "funciones_organicas" and bloques_funciones_preconsulta %}<section class="mi-card"><h2>Funciones Orgánicas declaradas</h2><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_funciones_preconsulta %}</div></section>{% endif %}

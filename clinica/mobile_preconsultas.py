@@ -7,7 +7,10 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
 from core.access import interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, datos_paciente_limitados, rol_clinico_granular
+from core.clinical_permissions import (
+    EMPRESAS_CLINICAS_CON_ROLES, datos_paciente_limitados, permiso_historia_por_tipo,
+    rol_clinico_granular, rol_clinico_v2,
+)
 from .models import PreconsultaClinica
 from .preconsulta_respuestas import CAMPOS_GENERALES_LECTURA, CAMPOS_MODELO_LECTURA, registro_inicial_sin_historia
 
@@ -20,7 +23,7 @@ def es_preconsultas_app(request, empresa):
     )
 
 
-def preconsultas_disponibles_app(request, empresa, method="GET"):
+def preconsultas_disponibles_app(request, empresa, method="GET", *, _permiso=None):
     """Conservar el permiso original de cada método, incluido HEAD."""
     usuario = request.user
     if not (
@@ -33,8 +36,8 @@ def preconsultas_disponibles_app(request, empresa, method="GET"):
         and empresa.tiene_modulo_activo("clinica_medica")
     ):
         return False
-    permiso = "puede_expediente_clinico"
-    if rol_clinico_granular(usuario, empresa):
+    permiso = _permiso or "puede_expediente_clinico"
+    if _permiso is None and rol_clinico_granular(usuario, empresa):
         permiso = "puede_ver_historia_clinica" if method == "GET" else "puede_editar_historia_clinica"
     return usuario.tiene_permiso_erp(permiso, empresa)
 
@@ -53,7 +56,20 @@ def autorizar_preconsulta_app(request, empresa, paciente_id, preconsulta_id=None
     # Historias por área conserva su permiso de lectura para ambos métodos;
     # sólo la ruta de detalle tiene el mapper histórico HEAD -> editar.
     metodo_permiso = request.method if preconsulta_id is not None else "GET"
-    if request.method not in {"GET", "HEAD"} or not preconsultas_disponibles_app(request, empresa, metodo_permiso):
+    autorizado = request.method in {"GET", "HEAD"} and preconsultas_disponibles_app(request, empresa, metodo_permiso)
+    # La lectura de área autoriza su listado de notas; el detalle del
+    # formulario conserva el permiso general y su mapper histórico.
+    if (not autorizado and request.method in {"GET", "HEAD"}
+            and preconsulta_id is None and "tipo" in request.GET
+            and rol_clinico_v2(request.user, empresa)):
+        from .mobile_patients import tipo_historia_paciente_app
+
+        area = tipo_historia_paciente_app(request)
+        permiso_area = permiso_historia_por_tipo(area["codigo"])
+        autorizado = bool(permiso_area and preconsultas_disponibles_app(
+            request, empresa, "GET", _permiso=permiso_area,
+        ))
+    if not autorizado:
         raise PermissionDenied("No tiene permiso para consultar estas preconsultas.")
     if request.POST or request.FILES or request.body:
         raise PermissionDenied("La consulta de preconsultas no admite un cuerpo de datos.")

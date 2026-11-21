@@ -227,10 +227,16 @@ class MobileHistoriesIntegrationTests(TestCase):
                             self.directo(tipo, method="post", data=self.datos(tipo))
             self.assertEqual(self.conteos(), before)
 
-    def test_editor_only_can_edit_five_types_but_cannot_create_or_read_other_histories(self):
-        self.asignar_rol(puede_editar_historia_clinica=True)
+    def test_editor_only_needs_each_area_write_without_gaining_history_read(self):
         for tipo in self.TIPOS:
+            self.asignar_rol(puede_editar_historia_clinica=True)
             historia = self.historias[(self.empresa.slug, tipo)]
+            permiso_area = {"enfermeria": "puede_escribir_enfermeria", "terapias": "puede_escribir_terapias"}.get(tipo)
+            if permiso_area:
+                self.assertIn(self.client.get(self.url(tipo, historia)).status_code, (302, 403))
+                with self.assertRaises(PermissionDenied):
+                    self.directo(tipo, historia, method="post", data=self.datos(tipo))
+                self.asignar_rol(puede_editar_historia_clinica=True, **{permiso_area: True})
             response = self.client.get(self.url(tipo, historia))
             self.assertEqual(response.status_code, 200)
             self.assertFalse(response.context["can_view_history"])
@@ -238,8 +244,15 @@ class MobileHistoriesIntegrationTests(TestCase):
             self.assertFalse(response.context.get("historias_previas"))
             self.assertFalse(response.context.get("preconsultas_tipo"))
             self.assertFalse(response.context.get("clasificaciones_alopecia"))
-            with self.assertRaises(PermissionDenied):
-                self.directo(tipo, method="post", data=self.datos(tipo))
+            if not permiso_area:
+                with self.assertRaises(PermissionDenied):
+                    self.directo(tipo, method="post", data=self.datos(tipo))
+            else:
+                # Enfermería/Terapias usan una acción de escritura de su área
+                # tanto para crear como para editar; no concede otras lecturas.
+                otro_tipo = "terapias" if tipo == "enfermeria" else "enfermeria"
+                with self.assertRaises(PermissionDenied):
+                    self.directo(otro_tipo, self.historias[(self.empresa.slug, otro_tipo)], method="post", data=self.datos(otro_tipo))
         for route in ("clinica_historias_especialidad", "clinica_historial_clinico_consolidado"):
             self.assertIn(self.client.get(reverse(route, args=[self.empresa.slug, self.paciente.pk])+"?app=1").status_code, (302, 403))
 
@@ -420,7 +433,7 @@ class MobileHistoriesIntegrationTests(TestCase):
     def test_finalized_nursing_form_disabled_no_submit_and_post_cannot_mutate(self):
         historia = self.historias[(self.empresa.slug, "enfermeria")]
         HistoriaClinicaEspecialidad.objects.filter(pk=historia.pk).update(estado="finalizada")
-        self.asignar_rol(puede_editar_historia_clinica=True)
+        self.asignar_rol(puede_editar_historia_clinica=True, puede_escribir_enfermeria=True)
         before = self.conteos()
         response = self.client.get(self.url("enfermeria", historia))
         self.assertEqual(response.status_code, 200)
@@ -586,8 +599,11 @@ class MobileHistoriesIntegrationTests(TestCase):
         HistoriaClinicaEspecialidad.objects.filter(pk=locked.pk).update(estado="finalizada")
         unsupported = HistoriaClinicaEspecialidad.objects.create(empresa=self.empresa, paciente=self.paciente, tipo="camara_hiperbarica", observaciones="Nota antigua no adaptada")
         route = reverse("clinica_historias_especialidad", args=[self.empresa.slug, self.paciente.pk])+"?app=1"
-        for editar in (False, True):
-            self.asignar_rol(puede_ver_historia_clinica=True, puede_editar_historia_clinica=editar)
+        for editar, escribir_terapias in ((False, False), (True, False), (True, True)):
+            self.asignar_rol(
+                puede_ver_historia_clinica=True, puede_editar_historia_clinica=editar,
+                puede_escribir_terapias=escribir_terapias,
+            )
             response = self.client.get(route)
             self.assertEqual(response.status_code, 200)
             notes = {nota["id"]: nota for nota in response.context["mobile_history_notes"]}
@@ -595,8 +611,9 @@ class MobileHistoriesIntegrationTests(TestCase):
             self.assertFalse(notes[unsupported.pk].get("edit_url"))
             for tipo in ("capilar", "cirugia_plastica", "medicina_estetica", "terapias"):
                 historia = self.historias[(self.empresa.slug, tipo)]
-                self.assertEqual(bool(notes[historia.pk].get("edit_url")), editar)
-                if editar:
+                autorizado = editar and (tipo != "terapias" or escribir_terapias)
+                self.assertEqual(bool(notes[historia.pk].get("edit_url")), autorizado)
+                if autorizado:
                     self.assertEqual(notes[historia.pk]["edit_url"], self.url(tipo, historia))
                     self.assertEqual(self.client.get(notes[historia.pk]["edit_url"]).status_code, 200)
 
