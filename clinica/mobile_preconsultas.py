@@ -149,6 +149,10 @@ def _secciones_seguras(preconsulta, secciones_callback, *, incluir_datos_general
     if not isinstance(general, dict):
         raise PermissionDenied("La preconsulta contiene un formulario con estructura no compatible.")
     datos_lectura = {"formulario_general": _LecturaGeneral(general)}
+    # Esta marca distingue el registro básico de una historia respondida;
+    # conservar sólo el booleano evita inventar respuestas clínicas negativas.
+    if isinstance(datos, dict) and datos.get("formulario_general_pendiente_doctor") is True:
+        datos_lectura["formulario_general_pendiente_doctor"] = True
     if incluir_datos_generales and isinstance(datos, dict):
         snapshot = _LecturaGeneral(datos)
         for nombre in CAMPOS_GENERALES_LECTURA:

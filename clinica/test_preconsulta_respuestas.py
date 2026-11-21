@@ -132,3 +132,39 @@ class PreconsultaRespuestasTests(SimpleTestCase):
         self.assertTrue(registro_inicial_sin_historia(preconsulta))
         self.assertFalse(any(seccion["clave"] == "antecedentes" for seccion in secciones))
         self.assertTrue(any(seccion["clave"] == "consentimiento" for seccion in secciones))
+        self.assertEqual(secciones, _secciones_seguras(preconsulta, _secciones_preconsulta))
+
+    def test_app_conserva_solo_marca_booleana_y_distingue_respuestas_clinicas(self):
+        preconsulta = PreconsultaClinica(consentimiento_datos=True, datos_generales={
+            "formulario_general_pendiente_doctor": True,
+            "telefono": "Contacto fuera del alcance QA",
+            "privado": {"detalle": "Dato ajeno QA"},
+            "formulario_general": {"pendiente_doctor_desde_paso": 4},
+        })
+        lecturas = []
+
+        def leer(registro):
+            lecturas.append(registro)
+            return _secciones_preconsulta(registro, incluir_datos_generales=False)
+
+        for origen in ("inicial", "json_clinico", "modelo_clinico"):
+            with self.subTest(origen=origen):
+                preconsulta.datos_generales["formulario_general"] = {"pendiente_doctor_desde_paso": 4}
+                preconsulta.funciones_detalle = ""
+                if origen == "json_clinico":
+                    preconsulta.datos_generales["formulario_general"]["gine_gestas"] = 0
+                elif origen == "modelo_clinico":
+                    preconsulta.funciones_detalle = "Respuesta clínica conservada QA"
+                app = _secciones_seguras(preconsulta, leer, incluir_datos_generales=False)
+                self.assertEqual(app, _secciones_preconsulta(preconsulta, incluir_datos_generales=False))
+                self.assertEqual(registro_inicial_sin_historia(lecturas[-1]), origen == "inicial")
+                self.assertIs(lecturas[-1].datos_generales.get("formulario_general_pendiente_doctor"), True)
+                self.assertNotIn("telefono", lecturas[-1].datos_generales)
+                self.assertNotIn("privado", lecturas[-1].datos_generales)
+                self.assertNotIn("formulario_general_pendiente_doctor", str(app))
+
+        for marca_invalida in ({"privado": "Marca ajena QA"}, "Marca ajena QA", [True]):
+            with self.subTest(marca_invalida=marca_invalida):
+                preconsulta.datos_generales["formulario_general_pendiente_doctor"] = marca_invalida
+                _secciones_seguras(preconsulta, leer, incluir_datos_generales=False)
+                self.assertNotIn("formulario_general_pendiente_doctor", lecturas[-1].datos_generales)
