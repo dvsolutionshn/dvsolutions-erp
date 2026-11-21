@@ -2316,6 +2316,23 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                     )
                     self.fields[campo].disabled = not respuesta_anterior_enviada
 
+    @property
+    def campos_administrativos_reintento(self):
+        campos = {"errores": [], "conservar": []}
+        if not self.formulario_paciente_existente or not self.is_bound:
+            return campos
+        for nombre in self.fields:
+            if nombre == "sexo" or nombre not in self.CAMPOS_PASOS_INICIALES or self.add_prefix(nombre) not in self.data:
+                continue
+            campo = self[nombre]
+            if campo.errors:
+                if campo.is_hidden:
+                    campo.field.widget = forms.TextInput(attrs=campo.field.widget.attrs.copy())
+                campos["errores"].append(campo)
+            else:
+                campos["conservar"].append(campo)
+        return campos
+
     def clean_identidad(self):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
         if self.omitir_pasos_iniciales and not identidad:

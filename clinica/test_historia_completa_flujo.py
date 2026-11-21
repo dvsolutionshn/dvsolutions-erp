@@ -158,6 +158,16 @@ class HistoriaCompletaFlujoTests(TestCase):
         self.assertEqual(respuesta.status_code, 404)
         self.assertFalse(PreconsultaClinica.objects.exists())
 
+    def test_el_expediente_excluye_respuestas_de_otra_empresa(self):
+        empresa, paciente, _cita = self.casos[0]
+        PreconsultaClinica.objects.create(
+            empresa=self.casos[1][0], paciente=paciente, token_hash="a" * 64, token_preview="qa-ajeno",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=7), estado="completada",
+            fecha_completada=timezone.now(), motivo_consulta="Respuesta de otra empresa QA",
+        )
+        historial = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.pk])
+        self.assertNotContains(self.client.get(historial, {"seccion": "motivo_consulta"}), "Respuesta de otra empresa QA")
+
     def test_varias_citas_piden_elegir_y_conservan_respuestas_anteriores(self):
         empresa, paciente, cita = self.casos[0]
         segunda = CitaClinica.objects.create(empresa=empresa, paciente=paciente, fecha_hora=cita.fecha_hora + timezone.timedelta(days=5))

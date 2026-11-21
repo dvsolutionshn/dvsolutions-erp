@@ -37,6 +37,18 @@
         </div>
         {% if form.errors %}<div class="error-summary"><strong>No pudimos enviar todavía.</strong><p>Corrija los datos indicados a continuación. La información que ya escribió se mantiene en pantalla para que no tenga que comenzar desde cero.</p><ul>{% for field in form %}{% for error in field.errors %}<li><b>{{ field.label }}:</b> {{ error }}</li>{% endfor %}{% endfor %}{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul><p>Si el error parece técnico o continúa después de corregir lo indicado, contacte al admin DV Solutions.</p></div>{% endif %}
 
+        {% with correccion=form.campos_administrativos_reintento %}
+        {% if correccion.errores %}
+        <div class="patient-guide" data-legacy-correction>
+            <div class="guide-title">Corrija estos datos enviados anteriormente</div>
+            <div class="field-grid">
+                {% for field in correccion.errores %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if correccion.conservar %}<div hidden data-preserved-legacy>{% for field in correccion.conservar %}{{ field.as_hidden }}{% endfor %}</div>{% endif %}
+        {% endwith %}
+
         {% if form.formulario_paciente_existente %}
         <section class="form-step active" data-step="0" data-history-reason-step>
             <div class="step-kicker" data-step-number>Paso 1 de 7</div><h2>Motivo de Consulta</h2><p class="step-copy">Explique con sus propias palabras por qué agendó su cita.</p>
@@ -47,7 +59,7 @@
         </section>
         {% endif %}
         {% if omitir_pasos_iniciales %}
-        <div hidden aria-hidden="true">{% if not form.formulario_paciente_existente %}{{ form.sexo }}{% endif %}{{ form.motivo_categoria }}</div>
+        <div hidden aria-hidden="true">{% if not form.formulario_paciente_existente %}{{ form.sexo }}{% endif %}{% if not form.formulario_paciente_existente or not form.is_bound %}{{ form.motivo_categoria }}{% endif %}</div>
         {% else %}
         <section class="form-step active" data-step="0">
             <div class="step-kicker" data-step-number>Paso 1 de {% if flujo_paciente_nuevo_corto %}3{% else %}9{% endif %}</div><h2>Datos generales</h2><p class="step-copy">Iniciemos con su identificación y datos personales básicos. Esto ayuda a abrir correctamente su expediente clínico.</p>
@@ -279,7 +291,7 @@
     function toggleGineFields(){const sexo=form.querySelector('[name="sexo"]');const mostrar=existingPatientHistory||sexo&&sexo.value==="femenino";const gineStep=form.querySelector("[data-conditional-gine]");if(gineStep)gineStep.hidden=!mostrar;document.querySelectorAll(".gine-field").forEach(field=>{field.hidden=!mostrar;field.querySelectorAll("input,select,textarea").forEach(input=>{input.disabled=!mostrar;if(!mostrar){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});updateStepNumbers();refreshChecks();}
     function toggleReferral(){const field=form.querySelector('[name="referido_por"]');const show=field&&field.value==="referencia";document.querySelectorAll(".referral-detail").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
     function toggleInformante(){const field=form.querySelector('[name="informante"]');const show=field&&field.value&&field.value!=="yo_mismo";document.querySelectorAll(".informante-detail").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
-    function selectedMotivos(){return new Set([...form.querySelectorAll('[name="motivo_categoria"]:checked')].map(input=>input.value));}
+    function selectedMotivos(){const selected=new Set([...form.querySelectorAll('[name="motivo_categoria"]:checked')].map(input=>input.value));if(existingPatientHistory)form.querySelectorAll('[data-preserved-legacy] input[name="motivo_categoria"]').forEach(input=>selected.add(input.value));return selected;}
     function normalizeMotivoNoAplica(changed){if(!changed||changed.name!=="motivo_categoria")return;const noAplica=form.querySelector('[name="motivo_categoria"][value="no_aplica"]');if(!noAplica)return;if(changed.value==="no_aplica"&&changed.checked){form.querySelectorAll('[name="motivo_categoria"]').forEach(input=>{if(input!==noAplica)input.checked=false;});}else if(changed.checked){noAplica.checked=false;}}
     function isNoAplicaOption(input){
         if(!input)return false;

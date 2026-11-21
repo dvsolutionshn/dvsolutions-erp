@@ -2966,7 +2966,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
         tipo=area_app["codigo"] if area_app else None,
     ) if modo_preconsulta_app else []
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
-    preconsultas = paciente.preconsultas.filter(estado="completada").select_related("creada_por")
+    preconsultas = paciente.preconsultas.filter(empresa=empresa, estado="completada").select_related("creada_por")
     if rol_clinico_v2(request.user, empresa):
         tipos_permitidos = [
             codigo for codigo, _nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
@@ -3432,7 +3432,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     else:
         form_inline = None
     preconsultas = list(
-        paciente.preconsultas.filter(estado="completada")
+        paciente.preconsultas.filter(empresa=empresa, estado="completada")
         .select_related("creada_por", "cita")
         .order_by("-fecha_completada", "-fecha_creacion")
     )

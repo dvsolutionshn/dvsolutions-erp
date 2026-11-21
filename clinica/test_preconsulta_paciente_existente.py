@@ -127,6 +127,47 @@ class FormularioHistoriaPacienteExistenteTests(SimpleTestCase):
         self.assertTrue(form.fields["correo"].disabled)
         self.assertEqual(self.paciente.nombre, "Paciente QA")
 
+    def test_error_de_pagina_anterior_muestra_el_dato_recibido_y_permite_reintento(self):
+        datos = {
+            **self.respuestas(), "identidad": "0801199900099", "nombres": "Nombre digitado",
+            "motivo_categoria": ["cirugia_facial"], "procedimientos_interes": ["rinoplastia"],
+        }
+        form = self.formulario(datos, sin_datos_previos=True)
+        self.assertFalse(form.is_valid())
+        correccion = form.campos_administrativos_reintento
+        self.assertEqual([campo.name for campo in correccion["errores"]], ["identidad"])
+        html = render_to_string("clinica/preconsulta_publica.html", {
+            "form": form, "preconsulta": self.preconsulta, "omitir_pasos_iniciales": True,
+        })
+        self.assertIn('data-legacy-correction', html)
+        self.assertIn('name="identidad" value="0801199900099"', html)
+        self.assertNotIn(self.paciente.identidad, html)
+        self.assertIn('data-preserved-legacy', html)
+        self.assertIn('type="hidden" name="nombres" value="Nombre digitado"', html)
+        self.assertNotRegex(html, r'<(?:select|input)\b[^>]*\bname="sexo"')
+
+        enviados_nuevamente = dict(self.respuestas())
+        enviados_nuevamente.update({campo.name: campo.value() for campo in correccion["conservar"]})
+        enviados_nuevamente["identidad"] = self.paciente.identidad
+        reintento = self.formulario(enviados_nuevamente, sin_datos_previos=True)
+        self.assertTrue(reintento.is_valid(), reintento.errors.as_json())
+        self.assertEqual(reintento.datos_generales_limpios()["nombres"], "Nombre digitado")
+        self.assertEqual(reintento.cleaned_data["motivo_consulta"], datos["motivo_consulta"])
+
+    def test_error_de_componente_oculto_del_nombre_tiene_campo_visible(self):
+        datos = {**self.respuestas(), "primer_nombre": "A" * 81}
+        form = self.formulario(datos, sin_datos_previos=True)
+        self.assertFalse(form.is_valid())
+        self.assertIn("primer_nombre", form.errors)
+        campos = form.campos_administrativos_reintento["errores"]
+        self.assertEqual([campo.name for campo in campos], ["primer_nombre"])
+        self.assertFalse(campos[0].is_hidden)
+        html = render_to_string("clinica/preconsulta_publica.html", {
+            "form": form, "preconsulta": self.preconsulta, "omitir_pasos_iniciales": True,
+        })
+        self.assertIn('type="text" name="primer_nombre"', html)
+        self.assertNotIn('type="hidden" name="primer_nombre"', html)
+
     def test_sexo_sin_registrar_no_produce_error_de_opcion_oculta(self):
         self.paciente.sexo = "no_indicado"
         form = self.formulario(self.respuestas(), sin_datos_previos=True)
