@@ -1,28 +1,46 @@
 {% extends "clinica/mobile_patient_base.html" %}
-{% block mobile_title %}Resumen clínico{% endblock %}
+{% block mobile_title %}Historial clínico{% endblock %}
 {% block mobile_back_url %}{% if can_view_patient %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
-{% block mobile_page_title %}Resumen clínico{% endblock %}
+{% block mobile_page_title %}Historial clínico{% endblock %}
 {% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
 {% block mobile_content %}
-<div class="mi-warning"><strong>Solo consulta</strong><p>Los datos corresponden al mismo expediente del sistema. Esta pantalla no modifica las historias clínicas.</p></div>
+<div class="mi-warning"><strong>Historial clínico del paciente</strong><p>Las respuestas recibidas se muestran en su sección y se conservan por fecha y cita. Las notas profesionales se registran por separado.</p></div>
+<nav class="mi-card" aria-label="Secciones del historial clínico"><h2>Secciones del historial</h2>
+{% if can_view_history %}<a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=motivo_consulta#motivo-consulta">Motivo de Consulta</a>{% endif %}
+{% if puede_ver_evaluacion %}<a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=funciones_organicas#funciones-organicas">Funciones Orgánicas</a>{% endif %}
+{% if puede_ver_examen %}<a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=examen_fisico#examen-fisico">Examen Físico</a>{% endif %}
+{% if puede_ver_antecedentes %}<a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=antecedentes#antecedentes">Antecedentes</a>{% endif %}
+{% if not erp_access.datos_paciente_limitados %}<a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=datos_generales#datos-generales-declarados">Datos generales declarados</a>{% endif %}
+{% if can_view_history %}<a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=completa">Ver historial completo</a>{% endif %}
+</nav>
+{% if seccion_activa == 'completa' or seccion_activa == 'motivo_consulta' %}{% if can_view_history %}
+<section class="mi-card" id="motivo-consulta" data-respuestas-seccion="motivo_consulta"><h2>Motivo de Consulta</h2><p class="mi-muted">Motivo y procedimientos declarados por el paciente.</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_motivo abrir_reciente=True %}</div>{% if not bloques_motivo %}<p class="mi-muted">Todavía no hay respuestas del paciente en esta sección.</p>{% endif %}</section>
+{% endif %}{% endif %}
+{% if seccion_activa == 'completa' or seccion_activa == 'funciones_organicas' %}{% if puede_ver_evaluacion %}
+<section class="mi-card" id="funciones-organicas" data-respuestas-seccion="funciones_organicas"><h2>Funciones Orgánicas</h2><p class="mi-muted">Funciones y detalles recibidos para cada consulta.</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_funciones_preconsulta abrir_reciente=True %}</div>{% if not bloques_funciones_preconsulta %}<p class="mi-muted">Todavía no hay respuestas del paciente en esta sección.</p>{% endif %}</section>
+{% endif %}{% endif %}
+{% if seccion_activa == 'completa' or seccion_activa == 'examen_fisico' %}{% if puede_ver_examen %}
+<section class="mi-card" id="examen-fisico" data-respuestas-seccion="examen_fisico"><h2>Examen Físico</h2><p class="mi-muted">Mediciones declaradas en los formularios recibidos.</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_examen_preconsulta abrir_reciente=True %}</div>{% if not bloques_examen_preconsulta %}<p class="mi-muted">Todavía no hay mediciones del paciente en esta sección.</p>{% endif %}</section>
+{% endif %}{% endif %}
+{% if seccion_activa == 'completa' or seccion_activa == 'antecedentes' %}{% if puede_ver_antecedentes %}
+<section class="mi-card" id="antecedentes" data-respuestas-seccion="antecedentes"><h2>Antecedentes</h2><p class="mi-muted">Condiciones, alergias, medicamentos, cirugías, hábitos, familiares, ginecología, riesgos y consentimiento.</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_antecedentes abrir_reciente=True %}</div>{% if not bloques_antecedentes %}<p class="mi-muted">Todavía no hay respuestas del paciente en esta sección.</p>{% endif %}</section>
+{% endif %}{% endif %}
+{% if seccion_activa == 'completa' or seccion_activa == 'datos_generales' %}{% if not erp_access.datos_paciente_limitados %}
+<section class="mi-card" id="datos-generales-declarados" data-respuestas-seccion="datos_generales"><h2>Datos generales declarados</h2><p class="mi-muted">Datos recibidos en cada formulario, conservados con su consulta original.</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_datos_generales abrir_reciente=True %}</div>{% if not bloques_datos_generales %}<p class="mi-muted">Todavía no hay datos generales declarados en los formularios recibidos.</p>{% endif %}</section>
+{% endif %}{% endif %}
+{% if seccion_activa == 'especialidad' and bloques_preconsulta_enfoque %}<section class="mi-card"><h2>{{ informacion_titulo }}</h2><p class="mi-muted">{{ informacion_descripcion }}</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_preconsulta_enfoque abrir_reciente=True %}</div></section>{% endif %}
+{% if puede_ver_antecedentes and paciente.es_alergico %}<div class="mi-warning danger"><strong>Paciente con alergias</strong><p>{{ paciente.alergias|default:'Sin detalle registrado' }}</p></div>{% endif %}
 {% if can_create_history %}<a class="mi-button secondary" href="{{ app_patient_event_url }}">+ Registrar evento del expediente</a>{% endif %}
 {% include "clinica/mobile_special_history_links.html" %}
 {% include "clinica/mobile_control_links.html" %}
 {% include "clinica/mobile_antecedents_links.html" %}
-<section class="mi-card"><h2>Vista del historial</h2>
+<section class="mi-card"><h2>Notas profesionales por área</h2>
   <form method="get" action="{{ app_patient_history_url }}" class="mp-area-filter"><input type="hidden" name="app" value="1"><input type="hidden" name="seccion" value="especialidad">
     <div class="mi-field"><label for="mp-area-filter">Área clínica</label><select name="tipo" id="mp-area-filter"><option value="">Todas las áreas</option>{% for tipo in mobile_history_types %}<option value="{{ tipo.codigo }}"{% if tipo_enfoque == tipo.codigo %} selected{% endif %}>{{ tipo.nombre }}</option>{% endfor %}</select></div>
     <button class="mi-button secondary" type="submit">Aplicar</button>
   </form><a class="mi-link" href="{{ app_patient_history_url }}">Ver todas las notas</a>
 </section>
-{% if can_view_history %}
-<section class="mi-card"><h2>Respuestas del paciente</h2><a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=motivo_consulta">Motivo de Consulta</a>{% if puede_ver_evaluacion or puede_editar_evaluacion %} · <a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=funciones_organicas">Funciones Orgánicas</a>{% endif %}{% if puede_ver_antecedentes %} · <a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=antecedentes">Antecedentes</a>{% endif %}</section>
-{% endif %}
-{% if puede_ver_antecedentes and paciente.es_alergico %}<div class="mi-warning danger"><strong>Paciente con alergias</strong><p>{{ paciente.alergias|default:'Sin detalle registrado' }}</p></div>{% endif %}
 <section class="mi-card"><div class="mp-section-head"><h2>Notas clínicas</h2><span>{{ mobile_history_notes|length }}</span></div><div class="mp-note-list">{% for nota in mobile_history_notes %}{% include "clinica/mobile_patient_note.html" with nota=nota %}{% empty %}<p class="mi-muted">No hay notas clínicas para esta vista.</p>{% endfor %}</div></section>
-{% if bloques_preconsulta_enfoque %}<section class="mi-card"><h2>{{ informacion_titulo }}</h2><p class="mi-muted">{{ informacion_descripcion }}</p><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_preconsulta_enfoque %}</div></section>{% endif %}
-{% if seccion_activa == "funciones_organicas" and bloques_funciones_preconsulta %}<section class="mi-card"><h2>Funciones Orgánicas declaradas</h2><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_funciones_preconsulta %}</div></section>{% endif %}
-{% if seccion_activa == "examen_fisico" and bloques_examen_preconsulta %}<section class="mi-card"><h2>Examen Físico declarado</h2><div class="mp-note-list">{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=bloques_examen_preconsulta %}</div></section>{% endif %}
 {% if antecedente_adicional %}<section class="mi-card"><h2>Antecedente adicional</h2><p class="mp-note">{{ antecedente_adicional.contenido }}</p>{% if historial_antecedente_adicional %}<details class="mp-read-fold"><summary>Ver cambios registrados</summary><div class="mp-timeline">{% for cambio in historial_antecedente_adicional %}<details class="mp-timeline-item"><summary><strong>{{ cambio.responsable_display }}</strong><span>{{ cambio.fecha|date:'d/m/Y H:i' }}</span></summary>{% if cambio.texto_anterior %}<div class="mp-read-field"><span>Anterior</span><p>{{ cambio.texto_anterior }}</p></div>{% endif %}<div class="mp-read-field"><span>Actualizado</span><p>{{ cambio.texto_nuevo }}</p></div></details>{% endfor %}</div></details>{% endif %}</section>{% endif %}
 {% if eventos %}<section class="mi-card"><h2>Eventos del expediente</h2><div class="mp-timeline">{% for evento in eventos %}{% include "clinica/mobile_patient_event.html" with evento=evento %}{% endfor %}</div></section>{% endif %}
 {% endblock %}

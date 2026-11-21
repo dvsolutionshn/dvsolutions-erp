@@ -265,6 +265,7 @@
         {% if puede_ver_evaluacion or puede_editar_evaluacion %}<a href="?seccion=funciones_organicas#funciones-organicas">Funciones orgánicas</a>{% endif %}
         {% if puede_ver_examen or puede_editar_examen %}<a href="?seccion=examen_fisico#examen-fisico">Examen físico</a>{% endif %}
         {% if puede_ver_antecedentes or puede_editar_antecedentes %}<a href="?seccion=antecedentes#informacion-paciente">Antecedentes</a>{% endif %}
+        {% if bloques_datos_generales %}<a href="?seccion=datos_generales#datos-generales-paciente">Datos generales declarados</a>{% endif %}
         {% if puede_ver_diagnosticos or puede_editar_diagnosticos %}<a href="?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>{% endif %}
         {% if erp_access.ver_planes_tratamiento %}<a href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}">Plan y tratamiento</a>{% endif %}
         <a href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Especialidades</a>
@@ -275,17 +276,42 @@
         <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
     </nav>
 
-    {% if seccion_activa == "completa" or seccion_activa == "motivo_consulta" or seccion_activa == "antecedentes" or seccion_activa == "especialidad" %}
+    {% if seccion_activa == "completa" or seccion_activa == "motivo_consulta" %}
+    {% if erp_access.ver_historia_clinica or bloques_motivo %}
     <section class="sheet-panel" id="informacion-paciente">
-        <div class="panel-head">
-            <div>
-                <div class="erp-kpi-label">Información recibida</div>
-                <h3>{{ informacion_titulo }}</h3>
-                <p>{{ informacion_descripcion }}</p>
-            </div>
+        <div class="panel-head"><div><div class="erp-kpi-label">Respuestas del paciente</div><h3>Motivo de consulta</h3><p>Motivo y procedimientos de interés declarados en cada consulta.</p></div></div>
+        <div class="panel-body" data-respuestas-seccion="motivo_consulta">
+            {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_motivo %}
         </div>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    {% if seccion_activa == "especialidad" %}
+    <section class="sheet-panel" id="informacion-paciente">
+        <div class="panel-head"><div><div class="erp-kpi-label">Información recibida</div><h3>{{ informacion_titulo }}</h3><p>{{ informacion_descripcion }}</p></div></div>
+        <div class="panel-body">{% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_preconsulta_enfoque %}</div>
+    </section>
+    {% endif %}
+
+    {% if puede_ver_evaluacion or puede_editar_evaluacion or bloques_funciones_preconsulta %}{% if seccion_activa == "completa" or seccion_activa == "funciones_organicas" %}
+    {% include "clinica/includes/historial_funciones_organicas.html" %}
+    {% endif %}{% endif %}
+    {% if puede_ver_examen or puede_editar_examen or bloques_examen_preconsulta %}{% if seccion_activa == "completa" or seccion_activa == "examen_fisico" %}
+    {% include "clinica/includes/historial_examen_fisico.html" %}
+    {% endif %}{% endif %}
+
+    {% if seccion_activa == "completa" or seccion_activa == "antecedentes" %}
+    {% if puede_ver_antecedentes or puede_editar_antecedentes or bloques_antecedentes %}
+    <section class="sheet-panel" id="{% if seccion_activa == 'antecedentes' %}informacion-paciente{% else %}antecedentes-paciente{% endif %}">
+        <div class="panel-head"><div><div class="erp-kpi-label">Historial clínico</div><h3>Antecedentes</h3><p>Antecedentes personales, familiares y ginecológicos, alergias, medicamentos, hábitos y riesgos declarados.</p></div></div>
         <div class="panel-body">
-            {% if seccion_activa == "completa" or seccion_activa == "antecedentes" %}
+            {% if puede_ver_antecedentes or bloques_antecedentes %}
+            <div data-respuestas-seccion="antecedentes">
+                <h4>Respuestas del paciente</h4>
+                {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_antecedentes %}
+            </div>
+            {% endif %}
             {% if puede_ver_antecedentes or puede_editar_antecedentes %}
             <article class="additional-history" id="antecedentes-adicionales">
                 <div class="additional-history-head">
@@ -340,18 +366,22 @@
                 {% endif %}
             </article>
             {% endif %}
-            {% endif %}
-            {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_preconsulta_enfoque %}
         </div>
     </section>
     {% endif %}
+    {% endif %}
 
-    {% if puede_ver_evaluacion or puede_editar_evaluacion %}{% if seccion_activa == "completa" or seccion_activa == "funciones_organicas" %}
-    {% include "clinica/includes/historial_funciones_organicas.html" %}
-    {% endif %}{% endif %}
-    {% if puede_ver_examen or puede_editar_examen %}{% if seccion_activa == "completa" or seccion_activa == "examen_fisico" %}
-    {% include "clinica/includes/historial_examen_fisico.html" %}
-    {% endif %}{% endif %}
+    {% if seccion_activa == "completa" or seccion_activa == "datos_generales" %}
+    {% if bloques_datos_generales %}
+    <section class="sheet-panel" id="datos-generales-paciente">
+        <div class="panel-head"><div><div class="erp-kpi-label">Respuestas del paciente</div><h3>Datos generales declarados</h3><p>Datos recibidos con cada formulario y conservados por consulta.</p></div></div>
+        <div class="panel-body" data-respuestas-seccion="datos_generales">
+            {% include "clinica/includes/respuestas_preconsulta.html" with bloques=bloques_datos_generales %}
+        </div>
+    </section>
+    {% endif %}
+    {% endif %}
+
     {% if seccion_activa == "completa" %}
     {% include "clinica/includes/historial_controles_especiales.html" %}
     {% endif %}

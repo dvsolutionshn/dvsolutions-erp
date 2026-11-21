@@ -3131,11 +3131,13 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     secciones_validas = {
         "completa", "motivo_consulta", "funciones_organicas", "examen_fisico",
         "antecedentes", "diagnostico", "plan_tratamiento", "tricopigmentacion",
-        "especialidad",
+        "especialidad", "datos_generales",
     }
     seccion_activa = (request.GET.get("seccion") or "completa").strip().lower()
     if seccion_activa not in secciones_validas:
         seccion_activa = "completa"
+    if seccion_activa == "datos_generales" and datos_paciente_limitados(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para consultar datos generales del paciente.")
     tipo_enfoque = (request.GET.get("tipo") or "").strip()
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
@@ -3459,7 +3461,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     preconsultas = list(
         paciente.preconsultas.filter(empresa=empresa, estado="completada")
         .select_related("creada_por", "cita")
-        .order_by("-fecha_completada", "-fecha_creacion")
+        .order_by(F("fecha_completada").desc(nulls_last=True), "-fecha_creacion", "-id")
     ) if puede_ver_formularios_paciente else []
     historias = list(
         paciente.historias_especialidad.select_related("profesional", "actualizado_por")
@@ -3567,38 +3569,19 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         for preconsulta in preconsultas
     ]
     bloques_preconsulta = [bloque for bloque in bloques_preconsulta if bloque["secciones"]]
-    bloques_motivo = [
-        {
-            **bloque,
-            "secciones": [
-                seccion for seccion in bloque["secciones"]
-                if "Motivo" in seccion.get("titulo", "")
-            ],
-        }
-        for bloque in bloques_preconsulta
-    ]
-    bloques_antecedentes = [
-        {
-            **bloque,
-            "secciones": [
-                seccion for seccion in bloque["secciones"]
-                if seccion.get("clave") in {"antecedentes", "habitos", "familiares", "consentimiento", "datos_generales"}
-            ],
-        }
-        for bloque in bloques_preconsulta
-    ]
-    bloques_motivo = [bloque for bloque in bloques_motivo if bloque["secciones"]]
-    bloques_antecedentes = [bloque for bloque in bloques_antecedentes if bloque["secciones"]]
-    bloques_funciones_preconsulta = []
-    bloques_examen_preconsulta = []
-    for bloque in bloques_preconsulta:
-        for clave, destino in (
-            ("funciones_organicas", bloques_funciones_preconsulta),
-            ("examen_fisico", bloques_examen_preconsulta),
-        ):
-            secciones = [seccion for seccion in bloque["secciones"] if seccion.get("clave") == clave]
+    def bloques_de_seccion(*claves):
+        resultado = []
+        for bloque in bloques_preconsulta:
+            secciones = [seccion for seccion in bloque["secciones"] if seccion.get("clave") in claves]
             if secciones:
-                destino.append({**bloque, "secciones": secciones})
+                resultado.append({**bloque, "secciones": secciones})
+        return resultado
+
+    bloques_motivo = bloques_de_seccion("motivo_consulta")
+    bloques_antecedentes = bloques_de_seccion("antecedentes", "habitos", "familiares", "consentimiento")
+    bloques_datos_generales = bloques_de_seccion("datos_generales")
+    bloques_funciones_preconsulta = bloques_de_seccion("funciones_organicas")
+    bloques_examen_preconsulta = bloques_de_seccion("examen_fisico")
     if permisos_v2 and not puede_ver_antecedentes:
         bloques_antecedentes = []
     if seccion_activa == "motivo_consulta":
@@ -3609,14 +3592,30 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         bloques_preconsulta_enfoque = bloques_antecedentes
         informacion_titulo = "Antecedentes"
         informacion_descripcion = "Antecedentes, alergias, medicamentos, hábitos y riesgos clínicos."
+    elif seccion_activa == "funciones_organicas":
+        bloques_preconsulta_enfoque = bloques_funciones_preconsulta
+        informacion_titulo = "Funciones Orgánicas"
+        informacion_descripcion = "Respuestas del paciente sobre sus funciones orgánicas."
+    elif seccion_activa == "examen_fisico":
+        bloques_preconsulta_enfoque = bloques_examen_preconsulta
+        informacion_titulo = "Examen Físico"
+        informacion_descripcion = "Mediciones declaradas por el paciente en su consulta."
+    elif seccion_activa == "datos_generales":
+        bloques_preconsulta_enfoque = bloques_datos_generales
+        informacion_titulo = "Datos generales declarados"
+        informacion_descripcion = "Datos recibidos con cada formulario, conservados por consulta."
     elif seccion_activa == "especialidad":
         bloques_preconsulta_enfoque = bloques_preconsulta
         informacion_titulo = "Respuestas recibidas del paciente"
         informacion_descripcion = "Formulario respondido por el paciente para consultar durante la atención de esta especialidad."
-    else:
+    elif seccion_activa == "completa":
         bloques_preconsulta_enfoque = bloques_preconsulta
         informacion_titulo = "Formulario clínico recibido"
         informacion_descripcion = "Motivo, antecedentes y respuestas clínicas del paciente."
+    else:
+        bloques_preconsulta_enfoque = []
+        informacion_titulo = "Respuestas del paciente"
+        informacion_descripcion = "Respuestas recibidas para esta sección del historial."
     tipos = []
     ahora = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
     for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES:
@@ -3732,6 +3731,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "bloques_preconsulta": bloques_preconsulta,
             "bloques_motivo": bloques_motivo,
             "bloques_antecedentes": bloques_antecedentes,
+            "bloques_datos_generales": bloques_datos_generales,
             "bloques_funciones_preconsulta": bloques_funciones_preconsulta,
             "bloques_examen_preconsulta": bloques_examen_preconsulta,
             "bloques_preconsulta_enfoque": bloques_preconsulta_enfoque,

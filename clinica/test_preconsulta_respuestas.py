@@ -122,3 +122,13 @@ class PreconsultaRespuestasTests(SimpleTestCase):
         preconsulta.datos_generales["formulario_general"].pop("gine_gestas")
         preconsulta.funciones_detalle = "Respuesta clínica recibida QA"
         self.assertFalse(registro_inicial_sin_historia(preconsulta))
+
+    def test_registro_inicial_no_inventa_respuesta_negativa_de_hospitalizaciones(self):
+        preconsulta = PreconsultaClinica(consentimiento_datos=True, datos_generales={
+            "formulario_general_pendiente_doctor": True,
+            "formulario_general": {"pendiente_doctor_desde_paso": 4, "motivo_categoria": ["no_aplica"]},
+        })
+        secciones = _secciones_preconsulta(preconsulta)
+        self.assertTrue(registro_inicial_sin_historia(preconsulta))
+        self.assertFalse(any(seccion["clave"] == "antecedentes" for seccion in secciones))
+        self.assertTrue(any(seccion["clave"] == "consentimiento" for seccion in secciones))

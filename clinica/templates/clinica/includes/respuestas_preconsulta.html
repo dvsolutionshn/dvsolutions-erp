@@ -1,12 +1,12 @@
 {% for bloque in bloques %}
-<article class="single-note">
+<article class="single-note" data-preconsulta-id="{{ bloque.preconsulta.id }}">
     <div class="note-title">
         <div>
-            <h4>{{ bloque.preconsulta.get_tipo_display }} · {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i" }}</h4>
+            <h4>{{ bloque.preconsulta.get_tipo_display }} · {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i"|default:"Sin registro" }}</h4>
             <small>Formulario completado por el paciente</small>
             <p>{% if bloque.preconsulta.cita_id %}Cita {{ bloque.preconsulta.cita_id }} · {{ bloque.preconsulta.cita.fecha_hora|date:"d/m/Y H:i" }}{% else %}Cita vinculada · Sin registro{% endif %}</p>
         </div>
-        <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id bloque.preconsulta.id %}">Ver original</a>
+        {% if erp_access.ver_historia_clinica %}<a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id bloque.preconsulta.id %}">Ver original</a>{% endif %}
     </div>
     {% if bloque.registro_inicial_pendiente %}<p class="erp-card-muted"><strong>Registro inicial del paciente.</strong> Este envío contiene datos generales y procedimientos de interés. Las preguntas de historia clínica completa todavía no fueron respondidas en este formulario.</p>{% endif %}
     {% for seccion in bloque.secciones %}
@@ -26,5 +26,5 @@
     {% endfor %}
 </article>
 {% empty %}
-<div class="empty-sheet">Todavía no hay formularios completados por el paciente.</div>
+<div class="empty-sheet">No hay respuestas del paciente para esta sección.</div>
 {% endfor %}

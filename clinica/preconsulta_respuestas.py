@@ -64,7 +64,7 @@ def completar_secciones_preconsulta(preconsulta, secciones):
     hospitalarios = getattr(preconsulta, "antecedentes_hospitalarios", False)
     _agregar_campos(antecedentes, [
         _campo_respuesta("antecedentes_hospitalarios", hospitalarios, "Hospitalizaciones, accidentes, fracturas o cirugías previas")
-        if hospitalarios or tiene_consentimiento else None,
+        if hospitalarios or (tiene_consentimiento and not registro_inicial_sin_historia(preconsulta)) else None,
         _campo_respuesta("antecedentes_hospitalarios_detalle", getattr(preconsulta, "antecedentes_hospitalarios_detalle", ""), "Hospitalizaciones o cirugías previas"),
         _campo_respuesta("antecedentes_personales_detalle", getattr(preconsulta, "antecedentes_personales_detalle", ""), "Detalle de antecedentes"),
         _campo_respuesta("medicamentos_habituales_detalle", getattr(preconsulta, "medicamentos_habituales_detalle", ""), "Detalle medicamentos habituales"),
