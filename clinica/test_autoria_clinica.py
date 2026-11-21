@@ -170,14 +170,21 @@ class AutoriaClinicaTests(TestCase):
     def test_inline_evaluacion_y_tricopigmentacion_tambien_usan_sesion(self):
         for empresa in self.empresas.values():
             url = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, self.pacientes[empresa.slug].pk])
+            pagina = self.client.get(url)
+            self.assertEqual(pagina.status_code, 200)
+            medicina_estetica = next(tipo for tipo in pagina.context["tipos"] if tipo["codigo"] == "medicina_estetica")
+            self.assertNotIn("profesional", medicina_estetica["form"].fields)
+            self.assertNotContains(pagina, 'name="historia_medicina_estetica-profesional"')
+            self.assertContains(pagina, f"<span>Profesional: <strong>{self.autor.username}</strong></span>", html=True)
             for tipo, prefijo, accion in (
                 ("capilar", "historia_capilar", None),
+                ("medicina_estetica", "historia_medicina_estetica", None),
                 ("evaluacion_integral", "evaluacion", "guardar_evaluacion_integral"),
                 ("tricopigmentacion", "tricopigmentacion", "guardar_tricopigmentacion"),
             ):
                 datos = {f"{prefijo}-fecha_atencion": "2026-11-04T11:00", f"{prefijo}-estado": "borrador"}
-                if tipo == "capilar":
-                    datos.update({f"{prefijo}-{campo}": valor for campo, valor in self.datos_historia().items()})
+                if tipo in {"capilar", "medicina_estetica"}:
+                    datos.update({f"{prefijo}-{campo}": valor for campo, valor in self.datos_historia(tipo).items()})
                     datos["tipo_historia"] = tipo
                 else:
                     datos["accion"] = accion
@@ -191,18 +198,20 @@ class AutoriaClinicaTests(TestCase):
                     historia = HistoriaClinicaEspecialidad.objects.get(empresa=empresa, tipo=tipo)
                     self.assert_autoria(historia, empresa)
 
-    def test_formularios_moviles_capilar_guardan_autor_sin_selector(self):
+    def test_formularios_moviles_capilar_y_estetica_guardan_autor_sin_selector(self):
         for empresa in self.empresas.values():
-            url = self.url_historia(empresa, app=True)
-            pagina = self.client.get(url)
-            self.assertEqual(pagina.status_code, 200)
-            self.assertNotIn("profesional", pagina.context["form"].fields)
-            self.assertNotContains(pagina, '<select name="profesional"')
-            self.assertContains(pagina, f"<span>Profesional: <strong>{self.autor.username}</strong></span>", html=True)
-            respuesta = self.client.post(url, self.datos_historia() | {"app": "1"})
-            self.assertEqual(respuesta.status_code, 302)
-            historia = HistoriaClinicaEspecialidad.objects.get(empresa=empresa, tipo="capilar")
-            self.assert_autoria(historia, empresa)
+            for tipo in ("capilar", "medicina_estetica"):
+                with self.subTest(empresa=empresa.slug, tipo=tipo):
+                    url = self.url_historia(empresa, tipo=tipo, app=True)
+                    pagina = self.client.get(url)
+                    self.assertEqual(pagina.status_code, 200)
+                    self.assertNotIn("profesional", pagina.context["form"].fields)
+                    self.assertNotContains(pagina, '<select name="profesional"')
+                    self.assertContains(pagina, f"<span>Profesional: <strong>{self.autor.username}</strong></span>", html=True)
+                    respuesta = self.client.post(url, self.datos_historia(tipo) | self.falsificacion() | {"app": "1"})
+                    self.assertEqual(respuesta.status_code, 302)
+                    historia = HistoriaClinicaEspecialidad.objects.get(empresa=empresa, tipo=tipo)
+                    self.assert_autoria(historia, empresa)
 
     def test_evento_receta_incapacidad_y_tratamiento_ignoran_profesional_enviado(self):
         for empresa in self.empresas.values():
