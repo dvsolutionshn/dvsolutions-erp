@@ -13,6 +13,7 @@
   <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}" crossorigin="use-credentials">
   <link rel="icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
   <link rel="apple-touch-icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
+  {% if citas_busqueda_disponible %}<link rel="stylesheet" href="{% static 'crm/mobile_appointment_search.css' %}?v=20261123">{% endif %}
   {% if puede_ver_modulos_app %}<link rel="stylesheet" href="{% static 'crm/mobile_modules.css' %}?v=categories-20261013">{% endif %}
   {% if puede_ver_modulos_app %}<script src="{% static 'crm/mobile_modules.js' %}" defer></script>{% endif %}
   <style>
@@ -451,6 +452,7 @@
           <h2>Facturas</h2>
           <p>Consulta el documento completo en PDF o abre el detalle para ver su historial y las acciones disponibles.</p>
         </header>
+        {% if busqueda_facturas_app %}{% include "crm/mobile_invoice_search.html" %}{% endif %}
         <div class="mobile-invoices-list">
           {% for factura in facturas_app %}
           <article class="mobile-invoice-row">
@@ -587,11 +589,13 @@
     {% if hospital_mia_app_premium %}
     <header class="premium-calendar-top">
       <div class="premium-calendar-top-row">
-        <div><small>Agenda clínica</small><h2>{{ titulo_periodo }}</h2></div>
+        <div><small>Agenda clínica</small><h2>{% if citas_busqueda_activa %}Citas por paciente{% else %}{{ titulo_periodo }}{% endif %}</h2></div>
         {% if agenda_permisos_accion.crear %}<button class="premium-calendar-create" type="button" data-open-editor>+ Nueva cita</button>{% endif %}
       </div>
     </header>
     {% endif %}
+    {% include "crm/mobile_appointment_search.html" %}
+    {% if not citas_busqueda_activa %}
     <div class="mobile-view-switch" id="calendario">
       {% if hospital_mia_app_premium %}
       <a class="{% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}&app=agenda#agenda-app">Día</a>
@@ -748,6 +752,7 @@
     </section>
     {% endif %}
     {% if es_clinica and puede_gestionar_bloqueos and not agenda_solo_consulta %}<button class="availability-mobile-trigger" type="button" data-open-availability>Bloquear horario / No disponible</button>{% endif %}
+    {% endif %}
     </section>
   </div>
 

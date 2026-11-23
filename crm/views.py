@@ -2701,6 +2701,24 @@ def agenda_mobile(request, empresa_slug):
     contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
     contexto["app_scope_url"] = reverse("dashboard", args=[empresa.slug])
     contexto.update(construir_contexto_modulos_app(request, empresa))
+    contexto["busqueda_facturas_app"] = (
+        empresa.slug in EMPRESAS_CLINICAS_CON_ROLES and contexto["hospital_mia_app_premium"]
+    )
+    from .mobile_appointment_search import construir_contexto_busqueda_citas_app
+
+    contexto.update(construir_contexto_busqueda_citas_app(
+        request,
+        empresa,
+        empresa_agenda,
+        es_clinica=contexto["es_clinica"],
+        agenda_solo_consulta=contexto["agenda_solo_consulta"],
+        agenda_ver_detalles_clinicos=contexto["agenda_ver_detalles_clinicos"],
+    ))
+    contexto["citas_busqueda_calendario_url"] = (
+        f"{reverse('agenda_mobile', args=[empresa.slug])}?"
+        f"{urlencode({'vista': contexto['vista'], 'fecha': seleccionada.isoformat(), 'app': 'agenda'})}"
+        f"{contexto['filtros_query']}#agenda-app"
+    )
     response = render(request, "crm/agenda_mobile.html", contexto)
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response["Pragma"] = "no-cache"

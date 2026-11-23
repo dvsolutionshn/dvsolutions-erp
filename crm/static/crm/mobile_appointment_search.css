@@ -1,0 +1,21 @@
+.mobile-appointment-search,.mobile-appointment-result,.mobile-appointment-results>header{min-width:0;padding:16px;border:1px solid #d7e5ee;border-radius:20px;background:#fff;box-shadow:0 10px 24px rgba(18,50,74,.05)}
+.mobile-appointment-search h3,.mobile-appointment-results h3{margin:0;color:#183e50;font-size:15px;overflow-wrap:anywhere}
+.mobile-appointment-search p,.mobile-appointment-results p{margin:7px 0 12px;color:#637e8d;font-size:12px;line-height:1.5}
+.mobile-appointment-search form{display:grid;gap:8px}
+.mobile-appointment-search label{color:#446574;font-size:11px;font-weight:800}
+.mobile-appointment-search input,.mobile-appointment-search select{width:100%;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #bdd2de;border-radius:13px;background:#fff;color:#17384c;font-size:16px}
+.mobile-appointment-search button,.appointment-search-back,.mobile-appointment-result a,.appointment-search-pagination a{display:flex;align-items:center;justify-content:center;min-height:44px;padding:10px 13px;border:0;border-radius:13px;background:#155668;color:#fff;text-decoration:none;font-weight:800;font-size:12px}
+.mobile-appointment-search button{margin-top:5px}
+.appointment-search-back{margin-top:10px;background:#eaf5f6;color:#14586a}
+.mobile-appointment-results{display:grid;gap:10px;min-width:0}
+.mobile-appointment-results>header p{margin-bottom:0}
+.mobile-appointment-result{display:grid;gap:8px}
+.appointment-result-head{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;min-width:0}
+.appointment-result-head strong{min-width:0;font-size:14px;overflow-wrap:anywhere}
+.appointment-result-state{flex-shrink:0;max-width:42%;padding:5px 7px;border-radius:999px;background:#e9f5f3;color:#166f68;font-size:10px;font-weight:800;overflow-wrap:anywhere}
+.mobile-appointment-result time{color:#163e54;font-size:13px;font-weight:850}
+.mobile-appointment-result>span{color:#637e8d;font-size:12px;overflow-wrap:anywhere}
+.mobile-appointment-result a{justify-self:start;margin-top:4px;background:#eaf5f6;color:#14586a}
+.appointment-search-pagination{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;min-width:0}
+.appointment-search-pagination span{font-size:11px;color:#496a7b}
+.mobile-appointment-search :is(input,select,button,a):focus-visible,.mobile-appointment-results a:focus-visible{outline:3px solid #22b8ad;outline-offset:2px}

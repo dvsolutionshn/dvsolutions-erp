@@ -1,0 +1,53 @@
+{% if citas_busqueda_disponible %}
+<section class="mobile-appointment-search" aria-labelledby="appointmentSearchTitle">
+  <h3 id="appointmentSearchTitle">Buscar citas de un paciente</h3>
+  <p>Consulta sus citas por nombre, en todas las fechas.</p>
+  <form method="get" action="{% url 'agenda_mobile' empresa.slug %}#agenda-app" role="search" aria-label="Buscar citas por nombre">
+    <input type="hidden" name="app" value="agenda">
+    <input type="hidden" name="vista" value="{{ vista }}">
+    <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+    {% if filtro_servicio %}<input type="hidden" name="servicio" value="{{ filtro_servicio }}">{% endif %}
+    {% if filtro_profesional %}<input type="hidden" name="profesional" value="{{ filtro_profesional }}">{% endif %}
+    {% if filtro_estado %}<input type="hidden" name="estado" value="{{ filtro_estado }}">{% endif %}
+    {% if paciente_historial_id %}<input type="hidden" name="paciente_historial" value="{{ paciente_historial_id }}">{% endif %}
+    <label for="appointmentNameSearch">Nombre del paciente</label>
+    <input id="appointmentNameSearch" type="search" name="citas_q" value="{{ citas_busqueda_q }}" placeholder="Buscar por nombre..." maxlength="100" required autocomplete="off">
+    <label for="appointmentSearchPeriod">Citas que deseas consultar</label>
+    <select id="appointmentSearchPeriod" name="citas_periodo">
+      <option value="todas"{% if citas_busqueda_periodo == "todas" %} selected{% endif %}>Todas las citas</option>
+      <option value="anteriores"{% if citas_busqueda_periodo == "anteriores" %} selected{% endif %}>Anteriores</option>
+      <option value="futuras"{% if citas_busqueda_periodo == "futuras" %} selected{% endif %}>Futuras</option>
+    </select>
+    <button type="submit">Buscar citas</button>
+  </form>
+  {% if citas_busqueda_activa %}
+  <a class="appointment-search-back" href="{{ citas_busqueda_calendario_url }}">Volver al calendario</a>
+  {% endif %}
+</section>
+{% if citas_busqueda_activa %}
+<section class="mobile-appointment-results" aria-labelledby="appointmentResultsTitle">
+  <header>
+    <h3 id="appointmentResultsTitle">{{ citas_busqueda_total }} resultado{{ citas_busqueda_total|pluralize:"s" }} para «{{ citas_busqueda_q }}»</h3>
+    <p>{% if citas_busqueda_periodo == "futuras" %}Próximas citas primero.{% else %}Citas más recientes primero.{% endif %} La búsqueda no se limita a la fecha del calendario.</p>
+  </header>
+  {% for cita in citas_busqueda_page %}
+  <article class="mobile-appointment-result">
+    <div class="appointment-result-head"><strong>{{ cita.nombre }}</strong><span class="appointment-result-state">{{ cita.estado_label }}</span></div>
+    <time datetime="{{ cita.fecha|date:'c' }}">{{ cita.fecha|date:"d/m/Y" }} · {{ cita.fecha|date:"h:i A" }}</time>
+    {% if cita.servicio %}<span>{{ cita.servicio }}</span>{% endif %}
+    {% if cita.profesional %}<span>{{ cita.profesional }}</span>{% endif %}
+    <a href="{{ cita.agenda_url }}">Ver en la agenda</a>
+  </article>
+  {% empty %}
+  <div class="app-empty">No se encontraron citas con ese nombre en el período seleccionado.</div>
+  {% endfor %}
+  {% if citas_busqueda_page.paginator.num_pages > 1 %}
+  <nav class="appointment-search-pagination" aria-label="Páginas de citas">
+    {% if citas_busqueda_prev_url %}<a href="{{ citas_busqueda_prev_url }}">Anterior</a>{% endif %}
+    <span>Página {{ citas_busqueda_page.number }} de {{ citas_busqueda_page.paginator.num_pages }}</span>
+    {% if citas_busqueda_next_url %}<a href="{{ citas_busqueda_next_url }}">Siguiente</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endif %}
+{% endif %}

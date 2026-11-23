@@ -1,0 +1,17 @@
+{% load static %}
+<style>
+  #facturas-app .mobile-invoice-search{display:grid;gap:8px;min-width:0;padding:14px;border:1px solid #d8e7ee;border-radius:19px;background:#fff}
+  #facturas-app .mobile-invoice-search label{color:var(--navy);font-size:12px;font-weight:900}
+  #facturas-app .mobile-invoice-search input{width:100%;min-width:0;min-height:48px;padding:10px 13px;border:1px solid #bfd0db;border-radius:13px;background:#fff;color:var(--ink);font:inherit;font-size:16px}
+  #facturas-app .mobile-invoice-search input:focus-visible{outline:3px solid #22b8ad;outline-offset:2px}
+  #facturas-app .mobile-invoice-search-count{margin:0;color:var(--muted);font-size:11px;line-height:1.5}
+  #facturas-app .mobile-invoice-search-empty{margin:0;padding:11px;border-radius:12px;background:#f0f7f8;color:var(--navy);font-size:12px;line-height:1.5}
+  #facturas-app .mobile-invoice-search[hidden],#facturas-app .mobile-invoice-search-empty[hidden],#facturas-app .mobile-invoice-row[hidden]{display:none!important}
+</style>
+<section class="mobile-invoice-search" data-mobile-invoice-search hidden aria-label="Buscar facturas por cliente">
+  <label for="mobileInvoiceSearch">Buscar por cliente</label>
+  <input id="mobileInvoiceSearch" type="search" placeholder="Nombre del cliente..." autocomplete="off" aria-describedby="mobileInvoiceSearchCount">
+  <p class="mobile-invoice-search-count" id="mobileInvoiceSearchCount" role="status" aria-live="polite" aria-atomic="true"></p>
+  <p class="mobile-invoice-search-empty" data-invoice-search-empty hidden>No hay facturas para ese cliente en esta empresa. Probá con otro nombre.</p>
+</section>
+<script src="{% static 'crm/mobile_invoice_search.js' %}?v=20261123" defer></script>
