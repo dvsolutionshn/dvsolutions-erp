@@ -1708,21 +1708,24 @@ def paciente_detalle(request, empresa_slug, paciente_id):
 
 
 @login_required
+@transaction.atomic
 def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
     from .mobile_general_history import (
-        autorizar_historia_general_app, es_historia_general_app, identidad_historia_general_app,
+        CAMPOS_HISTORIA_GENERAL_APP, autorizar_historia_general_app, es_historia_general_app, identidad_historia_general_app,
         render_historia_general_app, validar_datos_generales_app, validar_generales_paciente_app,
         validar_relaciones_guardado_app, volver_historia_general_app,
     )
+    from .preconsulta_respuestas import bloques_respuestas_paciente
 
     empresa = _empresa_desde_slug(empresa_slug)
     modo_app = es_historia_general_app(request, empresa)
     if modo_app:
         autorizar_historia_general_app(request, empresa, paciente_id, PreconsultaClinicaPublicaForm)
-    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    pacientes = Paciente.objects.select_for_update() if request.method == "POST" else Paciente.objects.all()
+    paciente = get_object_or_404(pacientes, id=paciente_id, empresa=empresa)
     if modo_app:
         validar_generales_paciente_app(empresa, paciente, paciente.preconsultas.filter(tipo="general"))
-    preconsulta = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
+    preconsulta = paciente.preconsultas.filter(empresa=empresa, tipo="general").order_by("-fecha_creacion", "-id").first()
     if modo_app and request.method == "POST":
         validar_relaciones_guardado_app(paciente, preconsulta)
     if preconsulta is None:
@@ -1735,11 +1738,29 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
             token_preview=token_preview,
             fecha_expiracion=timezone.now() + timezone.timedelta(days=30),
             creada_por=request.user,
-            datos_generales={"formulario_general_pendiente_doctor": True},
+            datos_generales={"formulario_general_pendiente_doctor": True, "registro_interno": True},
         )
     if modo_app:
         validar_datos_generales_app(preconsulta, PreconsultaClinicaPublicaForm)
         identidad_app = identidad_historia_general_app(empresa, paciente, preconsulta)
+    # Esta pantalla interna no edita todas las respuestas del enlace. ModelForm
+    # también limpia los campos que no tienen un control en su HTML; guardar ese
+    # resultado borraba silenciosamente el motivo, detalles y mediciones previas.
+    campos_fuera_del_formulario = {
+        campo.name: deepcopy(getattr(preconsulta, campo.name))
+        for campo in PreconsultaClinica._meta.concrete_fields
+        if campo.name in PreconsultaClinicaPublicaForm._meta.fields
+        and campo.name not in CAMPOS_HISTORIA_GENERAL_APP
+    }
+    datos_originales = deepcopy(preconsulta.datos_generales) if isinstance(preconsulta.datos_generales, dict) else {}
+    general_original = datos_originales.get("formulario_general") or {}
+    requiere_registro_interno = (
+        preconsulta.estado != "completada" and datos_originales.get("registro_interno") is not True
+    )
+    finalizacion_original = (
+        (preconsulta.fecha_completada, preconsulta.ip_completada)
+        if preconsulta.estado == "completada" else None
+    )
     form = PreconsultaClinicaPublicaForm(
         request.POST or None,
         request.FILES or None,
@@ -1747,14 +1768,54 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
         paciente=paciente,
         empresa=empresa,
     )
+    if request.method == "POST" and any(
+        form.add_prefix(nombre) in request.POST
+        for nombre, _etiqueta in PreconsultaClinicaPublicaForm.FUNCIONES_ORGANICAS_CAMPOS
+    ):
+        # Este valor no tiene widget propio: resume las funciones que sí se
+        # editan y debe actualizarse cuando se reciben esas respuestas.
+        campos_fuera_del_formulario.pop("funciones_organicas", None)
     if request.method == "POST" and form.is_valid():
+        # Mantener también cleaned_data impide que la compatibilidad histórica
+        # archive como cambiado un texto que esta pantalla no llegó a editar.
+        form.cleaned_data.update(campos_fuera_del_formulario)
         preconsulta = form.save(commit=False)
+        for nombre, valor in campos_fuera_del_formulario.items():
+            setattr(preconsulta, nombre, valor)
         datos = form.datos_generales_limpios()
+        if isinstance(general_original, dict):
+            datos.setdefault("formulario_general", {}).update({
+                nombre: valor for nombre, valor in general_original.items()
+                if nombre not in CAMPOS_HISTORIA_GENERAL_APP
+            })
+        if requiere_registro_interno:
+            # Un enlace todavía pendiente puede estar abierto por el paciente.
+            # El registro profesional debe ser independiente: cerrarlo aquí
+            # hacía que el paciente recibiera éxito sin guardar sus respuestas.
+            _token_raw, token_hash, token_preview = generar_token_preconsulta()
+            preconsulta.pk = None
+            preconsulta._state.adding = True
+            preconsulta.token_hash = token_hash
+            preconsulta.token_preview = token_preview
+            preconsulta.fecha_expiracion = timezone.now() + timezone.timedelta(days=30)
+            preconsulta.sin_datos_previos = False
+            preconsulta.creada_por = request.user
+            preconsulta.fecha_primera_apertura = None
+            preconsulta.fecha_ultima_actividad = None
+            preconsulta.fecha_ultimo_intento = None
+            preconsulta.cantidad_aperturas = 0
+            preconsulta.intentos_envio = 0
+            preconsulta.paso_maximo = 0
+            preconsulta.ultimo_resultado = "sin_intento"
+            datos["registro_interno"] = True
         datos.pop("formulario_general_pendiente_doctor", None)
         preconsulta.datos_generales = datos
         preconsulta.estado = "completada"
-        preconsulta.fecha_completada = timezone.now()
-        preconsulta.ip_completada = _ip_cliente(request)
+        if finalizacion_original is None:
+            preconsulta.fecha_completada = timezone.now()
+            preconsulta.ip_completada = _ip_cliente(request)
+        else:
+            preconsulta.fecha_completada, preconsulta.ip_completada = finalizacion_original
         preconsulta.creada_por = preconsulta.creada_por or request.user
         preconsulta.save()
         _actualizar_paciente_desde_preconsulta(paciente, form)
@@ -1762,8 +1823,12 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
         if modo_app:
             return volver_historia_general_app(request, empresa, paciente)
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    respuestas_recibidas = bloques_respuestas_paciente(request.user, empresa, paciente, modo_app=modo_app)
     if modo_app:
-        return render_historia_general_app(request, empresa, paciente, preconsulta, form, identidad_app)
+        return render_historia_general_app(
+            request, empresa, paciente, preconsulta, form, identidad_app,
+            respuestas_recibidas=respuestas_recibidas,
+        )
     return render(
         request,
         "clinica/preconsulta_publica.html",
@@ -1771,9 +1836,11 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
             "form": form,
             "preconsulta": preconsulta,
             "paciente": paciente,
+            "empresa": empresa,
             "registro_interno": True,
             "modo_doctor_completar_historia": True,
             "inicio_paso": 3,
+            "respuestas_paciente_recibidas": respuestas_recibidas,
         },
     )
 
@@ -3565,6 +3632,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "preconsulta": preconsulta,
             "secciones": _secciones_preconsulta_usuario(preconsulta, request.user, empresa),
             "registro_inicial_pendiente": registro_inicial_sin_historia(preconsulta),
+            "registro_interno": isinstance(preconsulta.datos_generales, dict)
+            and preconsulta.datos_generales.get("registro_interno") is True,
         }
         for preconsulta in preconsultas
     ]
@@ -4927,15 +4996,37 @@ def preconsulta_publica(request, token):
                         request, "clinica/preconsulta_publica_finalizada.html",
                         {"completada": completada}, status=200 if completada else 410,
                     )
+                # Los enlaces antiguos podían llevar respuestas precargadas
+                # que el formulario público actual ya no representa. Ausencia
+                # de esos controles no equivale a que el paciente los borre.
+                campos_heredados = {
+                    nombre: deepcopy(getattr(preconsulta, nombre))
+                    for nombre in ("revision_sistemas", "revision_sistemas_detalle", "habitos")
+                    if nombre not in request.POST
+                }
+                datos_heredados = preconsulta.datos_generales if isinstance(preconsulta.datos_generales, dict) else {}
+                general_heredado = datos_heredados.get("formulario_general") or {}
+                respuestas_heredadas = {
+                    nombre: deepcopy(general_heredado[nombre])
+                    for nombre in (
+                        "historia_mejorar", "historia_tiempo_preocupacion", "historia_tratamientos_previos", "historia_expectativas",
+                        "examen_peso", "examen_talla", "examen_imc", "examen_pa", "examen_fc", "examen_sato2",
+                    )
+                    if isinstance(general_heredado, dict) and nombre in general_heredado and nombre not in request.POST
+                }
                 form = PreconsultaClinicaPublicaForm(
                     request.POST, request.FILES, instance=preconsulta, paciente=paciente,
                     empresa=preconsulta.empresa, omitir_pasos_iniciales=True,
                     sin_datos_previos=preconsulta.sin_datos_previos, formulario_paciente_existente=True,
                 )
                 if form.is_valid():
+                    form.cleaned_data.update(campos_heredados)
                     preconsulta = form.save(commit=False)
+                    for nombre, valor in campos_heredados.items():
+                        setattr(preconsulta, nombre, valor)
                     registrar_actividad_preconsulta(preconsulta, "intento")
                     preconsulta.datos_generales = form.datos_generales_limpios()
+                    preconsulta.datos_generales.setdefault("formulario_general", {}).update(respuestas_heredadas)
                     preconsulta.estado = "completada"
                     preconsulta.fecha_completada = timezone.now()
                     preconsulta.fecha_ultima_actividad = preconsulta.fecha_completada

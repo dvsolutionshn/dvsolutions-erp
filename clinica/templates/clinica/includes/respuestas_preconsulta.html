@@ -2,8 +2,8 @@
 <article class="single-note" data-preconsulta-id="{{ bloque.preconsulta.id }}">
     <div class="note-title">
         <div>
-            <h4>{{ bloque.preconsulta.get_tipo_display }} · {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i"|default:"Sin registro" }}</h4>
-            <small>Formulario completado por el paciente</small>
+            <h4>{% if bloque.registro_interno %}Registro interno del expediente{% elif bloque.registro_inicial_pendiente %}Registro inicial del paciente{% else %}Historia clínica respondida · {{ bloque.preconsulta.get_tipo_display }}{% endif %} · {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i"|default:"Sin registro" }}</h4>
+            <small>Respuestas guardadas en este formulario</small>
             <p>{% if bloque.preconsulta.cita_id %}Cita {{ bloque.preconsulta.cita_id }} · {{ bloque.preconsulta.cita.fecha_hora|date:"d/m/Y H:i" }}{% else %}Cita vinculada · Sin registro{% endif %}</p>
         </div>
         {% if erp_access.ver_historia_clinica %}<a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id bloque.preconsulta.id %}">Ver original</a>{% endif %}

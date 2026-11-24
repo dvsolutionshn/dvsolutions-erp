@@ -217,6 +217,8 @@ class HistorialRespuestasSeccionesTests(TestCase):
         self.assertFalse(HistoriaClinicaEspecialidad.objects.exists())
 
     def test_envio_importado_sin_fecha_no_desplaza_la_ultima_respuesta_fechada(self):
+        from .preconsulta_respuestas import bloques_respuestas_paciente
+
         empresa, paciente = self.casos[0]
         fechada, _campos = self.publicar(empresa, paciente, "actual")
         importada, _campos_importados = self.publicar(empresa, paciente, "anterior")
@@ -231,5 +233,9 @@ class HistorialRespuestasSeccionesTests(TestCase):
             if app:
                 self.assertEqual([registro["abierto"] for registro in registros], [True, False])
             self.assertIn("Sin registro", dom.texto("motivo_consulta"))
+            bloques = bloques_respuestas_paciente(
+                self.doctora, empresa, paciente, claves={"motivo_consulta"}, modo_app=app,
+            )
+            self.assertEqual([bloque["preconsulta"].id for bloque in bloques], [fechada.pk, importada.pk])
         importada.refresh_from_db()
         self.assertIsNone(importada.fecha_completada)

@@ -1811,6 +1811,20 @@ PSICOLOGICA_HISTORICA_CHOICES = [
 
 
 class PreconsultaClinicaPublicaForm(forms.ModelForm):
+    # Sólo respuestas clínicas de texto admiten la respuesta explícita «No aplica».
+    # No se usa para formatos administrativos (correo, fecha, teléfono, etc.).
+    CAMPOS_NO_APLICA_CLINICOS = frozenset({
+        "motivo_consulta", "funciones_detalle", "revision_sistemas_detalle",
+        "antecedentes_hospitalarios_detalle", "diagnostico_medico_detalle",
+        "alergias_detalle", "medicamentos_detalle", "antecedentes_familiares_detalle",
+        "habitos", "antecedentes_infecciosos", "historia_mejorar",
+        "historia_tiempo_preocupacion", "historia_tratamientos_previos", "historia_expectativas",
+        "quirurgicos_detalle", "consumo_riesgo_detalle", "riesgo_tromboembolico_otros",
+        "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos",
+        "gine_ultima_menstruacion", "decision_cirugia_otros", "evaluacion_psicologica_detalle",
+        "examen_peso", "examen_talla", "examen_imc", "examen_pa", "examen_fc", "examen_sato2",
+        "procedimientos_interes_otros",
+    })
     FUNCIONES_ORGANICAS_CAMPOS = [
         ("funcion_apetito", "Apetito"),
         ("funcion_sueno", "Sueño"),
@@ -2315,6 +2329,17 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                         and self.add_prefix(campo) in self.data
                     )
                     self.fields[campo].disabled = not respuesta_anterior_enviada
+        self._campos_no_aplica = set()
+        for nombre in self.CAMPOS_NO_APLICA_CLINICOS:
+            campo = self.fields.get(nombre)
+            if not isinstance(campo, forms.CharField) or campo.required or campo.disabled:
+                continue
+            marcador = self.add_prefix(f"no_aplica_{nombre}")
+            campo.widget.attrs["data-no-aplica-name"] = marcador
+            valores = self.data.getlist(marcador) if hasattr(self.data, "getlist") else [self.data.get(marcador)]
+            if self.is_bound and valores == ["1"]:
+                self._campos_no_aplica.add(nombre)
+                campo.widget.attrs["data-no-aplica-selected"] = "true"
 
     @property
     def campos_administrativos_reintento(self):
@@ -2364,6 +2389,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        for campo in self._campos_no_aplica:
+            if campo not in self._errors:
+                cleaned_data[campo] = "No aplica"
         if self.modo_basico_paciente_nuevo:
             cleaned_data["consentimiento_datos"] = True
         for campo, valor in self.CHECKBOX_DEFAULTS.items():

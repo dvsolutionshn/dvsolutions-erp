@@ -16,6 +16,12 @@
 <body>
 <main class="public-shell"><div class="public-wrap">
     <header class="public-brand"><div class="brand-mark">{% if preconsulta.empresa.logo %}<div class="brand-symbol"><img src="{{ preconsulta.empresa.logo.url }}" alt="Logo {{ preconsulta.empresa.nombre }}"></div>{% else %}<div class="brand-symbol is-fallback">{{ preconsulta.empresa.nombre|slice:":3"|upper }}</div>{% endif %}<div><strong>{{ preconsulta.empresa.nombre }}</strong><span>Formulario de historia clinica</span></div></div><div class="secure-note">{% if registro_interno %}Registro interno - Sesion protegida{% else %}Enlace privado - Uso medico{% endif %}</div></header>
+    {% if registro_interno and respuestas_paciente_recibidas %}
+    <section class="public-card" data-respuestas-recibidas-internas>
+        <div class="public-head"><h2>Respuestas recibidas del paciente</h2><p>Consulte aquí los envíos anteriores antes de completar la historia. Las respuestas que esta pantalla no permite editar se conservan al guardar.</p></div>
+        <div class="public-head">{% include "clinica/includes/respuestas_preconsulta.html" with bloques=respuestas_paciente_recibidas %}</div>
+    </section>
+    {% endif %}
     <form method="post" enctype="multipart/form-data" class="public-card" id="preconsultaForm" novalidate>
         {% csrf_token %}
         <div class="public-head"><h1>Formulario de historia clinica</h1><p>{% if form.formulario_paciente_existente %}Cuéntenos por qué agendó su cita y continúe con las preguntas de su historia clínica. Sus respuestas quedarán vinculadas a esta atención.{% elif modo_edicion_paciente %}Actualice los datos generales del paciente usando el mismo formulario oficial del enlace y del registro de paciente nuevo.{% elif modo_doctor_completar_historia %}Complete las preguntas clinicas pendientes del expediente del paciente. Esta parte queda para uso del doctor y personal autorizado.{% elif registro_interno and flujo_paciente_nuevo_corto %}Complete los datos basicos del paciente con el mismo formulario oficial del enlace. El resto de la historia clinica quedara pendiente para la doctora.{% elif registro_interno %}Complete el mismo formulario general que recibe el paciente por enlace. Al guardar se creara el expediente y quedara registrada la historia clinica general.{% elif flujo_paciente_nuevo_corto %}Complete sus datos basicos para crear el expediente. El resto de la historia clinica sera completado por la doctora durante su atencion.{% elif omitir_pasos_iniciales %}Sus datos generales, contacto y motivo de consulta ya forman parte de su expediente. Continúe desde el paso 4 para completar su historia clínica.{% else %}Preparemos su consulta con una historia clínica ordenada y fácil de entender. Puede seleccionar una o varias respuestas por pregunta y agregar detalles cuando lo necesite.{% endif %}</p><p class="privacy">Este formulario es privado y confidencial. La información será revisada solamente por el doctor y el personal autorizado para su atención médica.</p></div>
@@ -362,8 +368,13 @@
             field.classList.add("no-apply-ready","needs-answer");
             const label=document.createElement("label");
             label.className="no-apply-toggle";
-            label.innerHTML='<input type="checkbox" data-no-apply-for="'+control.name+'"><span>No aplica</span>';
+            const marker=control.getAttribute("data-no-aplica-name");
+            label.innerHTML='<input type="checkbox" data-no-apply-for="'+control.name+'"'+(marker?' name="'+marker+'" value="1"':'')+'><span>'+(marker?'No aplica':'Dejar en blanco')+'</span>';
             field.appendChild(label);
+            const toggle=label.querySelector("input");
+            if(marker&&(control.getAttribute("data-no-aplica-selected")==="true"||(control.value||"").trim().toLowerCase()==="no aplica")){
+                toggle.checked=true;updateNoApply(toggle);
+            }
         });
     }
     function isNoApplyChecked(field){return !!field?.querySelector("[data-no-apply-for]:checked");}
@@ -374,6 +385,12 @@
         control.closest(".no-apply-toggle")?.classList.toggle("is-selected",control.checked);
         const target=field.querySelector("textarea,input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='file'])");
         if(target&&control.checked){target.value="";target.dispatchEvent(new Event("input",{bubbles:true}));}
+    }
+    function clearNoAplicaOnInput(control){
+        const toggle=control.closest(".field")?.querySelector("[data-no-apply-for]");
+        if(toggle?.checked&&control.name&&control.type!=="checkbox"&&(control.value||"").trim()){
+            toggle.checked=false;updateNoApply(toggle);
+        }
     }
     function show(index, options={}){
         if(steps[index]?.hidden){const visibles=visibleSteps(),actual=steps[current],pos=Math.max(0,visibles.indexOf(actual));index=steps.indexOf(visibles[Math.min(pos,visibles.length-1)]||visibles[0]);}
@@ -594,7 +611,7 @@
         submitting=false;
         if(existingPatientHistory)form.querySelectorAll('button[type="submit"]').forEach(button=>button.disabled=false);
     });
-    document.addEventListener("input",event=>{if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
+    document.addEventListener("input",event=>{if(event.target.closest("#preconsultaForm")){clearNoAplicaOnInput(event.target);saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
     document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"],[name="diagnostico_medico"],[name="alergias_respuesta"],[name="medicamentos_respuesta"],[name="consumo_riesgo"],[name="evaluacion_psicologica"]'))toggleConditionalDetails();if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
     document.getElementById("missingModalClose")?.addEventListener("click",closeMissingModal);
     document.getElementById("missingModal")?.addEventListener("click",event=>{if(event.target.id==="missingModal")closeMissingModal();});
@@ -602,7 +619,7 @@
     window.addEventListener("unhandledrejection",()=>showTechnicalSupport("Sus respuestas siguen guardadas en este navegador. Si el problema continúa, contacte al admin DV Solutions."));
     form.querySelectorAll(".field-error").forEach(error=>{const container=fieldContainer(error);if(container)container.classList.add("is-missing");});
     const firstError=form.querySelector(".field-error");if(firstError){const errorStep=firstError.closest(".form-step");if(errorStep)show(steps.indexOf(errorStep));}
-    installNoAplicaControls();restoreDraft();show(Math.min(current,steps.length-1),{keepScroll:true});refreshChecks();toggleGineFields();toggleReferral();toggleInformante();toggleProcedureGroups();toggleMamografiaFecha();toggleConditionalDetails();applyNoAplicaLocks(document);
+    installNoAplicaControls();restoreDraft();form.querySelectorAll("[data-no-apply-for]:checked").forEach(updateNoApply);show(Math.min(current,steps.length-1),{keepScroll:true});refreshChecks();toggleGineFields();toggleReferral();toggleInformante();toggleProcedureGroups();toggleMamografiaFecha();toggleConditionalDetails();applyNoAplicaLocks(document);
 
     const photoInput=document.getElementById("id_foto_perfil");
     if(photoInput){

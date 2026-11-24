@@ -134,6 +134,7 @@ def bloques_respuestas_paciente(usuario, empresa, paciente, claves=None, *, modo
     from types import SimpleNamespace
 
     from django.core.exceptions import PermissionDenied
+    from django.db.models import F
 
     from core.clinical_permissions import datos_paciente_limitados
     from .models import PreconsultaClinica
@@ -151,7 +152,7 @@ def bloques_respuestas_paciente(usuario, empresa, paciente, claves=None, *, modo
         "cita_id", "cita__id", "cita__empresa_id", "cita__paciente_id", "cita__fecha_hora",
         "datos_generales", "antecedentes_personales", "medicamentos_habituales",
         "antecedentes_familiares", "antecedentes_infecciosos", *CAMPOS_MODELO_LECTURA,
-    ).order_by("-fecha_completada", "-fecha_creacion", "-id")
+    ).order_by(F("fecha_completada").desc(nulls_last=True), "-fecha_creacion", "-id")
     if tipos is not None:
         registros = registros.filter(tipo__in=tipos)
     bloques = []
@@ -181,5 +182,7 @@ def bloques_respuestas_paciente(usuario, empresa, paciente, claves=None, *, modo
             bloques.append({
                 "preconsulta": preconsulta, "secciones": secciones,
                 "registro_inicial_pendiente": registro_inicial_sin_historia(registro),
+                "registro_interno": isinstance(registro.datos_generales, dict)
+                and registro.datos_generales.get("registro_interno") is True,
             })
     return bloques

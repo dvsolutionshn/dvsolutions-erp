@@ -210,7 +210,7 @@ def volver_historia_general_app(request, empresa, paciente):
     return redirect(_navegacion(request, empresa, paciente)["app_complete_history_back_url"])
 
 
-def render_historia_general_app(request, empresa, paciente, preconsulta, form, identidad):
+def render_historia_general_app(request, empresa, paciente, preconsulta, form, identidad, *, respuestas_recibidas=None):
     # Sólo formato del widget nativo de esta instancia; datos e input_formats
     # originales permanecen intactos, incluidos strings recibidos con errores.
     for nombre in CAMPOS_HISTORIA_GENERAL_APP:
@@ -228,6 +228,7 @@ def render_historia_general_app(request, empresa, paciente, preconsulta, form, i
             for clave, titulo, nombres in SECCIONES_HISTORIA_GENERAL_APP
         ],
         "mobile_complete_history_hidden_fields": [form[nombre] for nombre in CAMPOS_OCULTOS_HISTORIA_GENERAL_APP],
+        "respuestas_paciente_recibidas": respuestas_recibidas or [],
     }
     response = render(request, "clinica/mobile_general_history_form.html", contexto)
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"

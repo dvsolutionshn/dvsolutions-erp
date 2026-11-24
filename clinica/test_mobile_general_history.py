@@ -64,6 +64,7 @@ class MobileGeneralHistoryIntegrationTests(TestCase):
         "motivo_categoria", "procedimientos_interes", "antecedentes_hospitalarios", "quirurgicos_operado", "consumo_riesgo", "dieta", "ejercicio",
         "antecedentes_familiares", "riesgo_tromboembolico", "gine_embarazada", "gine_lactancia", "gine_mamografia", "evaluacion_psicologica", "decision_cirugia"})
     DATA = {
+        "registro_interno": True,
         "formulario_general_pendiente_doctor": True,
         "unknown_top": {"nested": ["UNUSED-PRIVATE-JSON", {"kept": False}]},
         "formulario_general": {"diagnostico_medico": "si", "diagnostico_medico_detalle": "Asma histórica sintética",
@@ -183,7 +184,7 @@ class MobileGeneralHistoryIntegrationTests(TestCase):
         record = PreconsultaClinica.objects.get(paciente=patient, tipo="general")
         self.assertEqual(record.empresa_id, patient.empresa_id); self.assertEqual(record.creada_por_id, self.usuario.pk)
         self.assertEqual(record.estado, "pendiente"); self.assertEqual(record.fecha_expiracion, self.NOW + timedelta(days=30))
-        self.assertEqual(record.datos_generales, {"formulario_general_pendiente_doctor": True})
+        self.assertEqual(record.datos_generales, {"formulario_general_pendiente_doctor": True, "registro_interno": True})
         self.assertEqual(record.token_preview, "GENERAL-PRIVATE-PREVIEW")
         audit = RegistroAuditoria.objects.filter(app_label="clinica", modelo="preconsultaclinica", objeto_id=str(record.pk)).get()
         self.assertEqual(audit.accion, "crear"); self.assertEqual(audit.usuario_id, self.usuario.pk); self.assertEqual(audit.metodo_http, method)
@@ -416,11 +417,17 @@ class MobileGeneralHistoryIntegrationTests(TestCase):
     def test_full_original_form_expected_model_and_json_match_valid_app(self):
         payload = self.data(diagnostico_medico="si", diagnostico_medico_detalle="Asma controlada", alergias_respuesta="si", alergias_detalle="Alergia sintética", medicamentos_respuesta="si", medicamentos_detalle="Medicación sintética", funcion_sed="alterada")
         expected = PreconsultaClinicaPublicaForm(payload, instance=PreconsultaClinica.objects.get(pk=self.preconsulta.pk), paciente=self.paciente, empresa=self.empresa)
-        self.assertTrue(expected.is_valid(), expected.errors); expected_record = expected.save(commit=False); expected_data = expected.datos_generales_limpios(); expected_data.pop("formulario_general_pendiente_doctor", None)
+        self.assertTrue(expected.is_valid(), expected.errors)
+        # Esta respuesta no tiene control en la pantalla interna y se conserva.
+        expected.cleaned_data["funciones_detalle"] = "Texto histórico"
+        expected_record = expected.save(commit=False); expected_data = expected.datos_generales_limpios(); expected_data.pop("formulario_general_pendiente_doctor", None)
         response = self.client.post(self.url(), payload); self.assertEqual(response.status_code, 302); self.preconsulta.refresh_from_db()
         self.assertEqual(self.preconsulta.datos_generales, expected_data)
         for field in PreconsultaClinica._meta.concrete_fields:
             if field.name in {"id", "datos_generales", "estado", "fecha_completada", "ip_completada", "creada_por", "fecha_actualizacion"}: continue
+            if field.name == "funciones_detalle":
+                self.assertEqual(self.preconsulta.funciones_detalle, "Texto histórico")
+                continue
             self.assertEqual(field.value_from_object(self.preconsulta), field.value_from_object(expected_record), field.name)
 
     def test_historical_arrays_unknown_keys_and_model_backups_remain_original(self):
@@ -464,12 +471,13 @@ class MobileGeneralHistoryIntegrationTests(TestCase):
             self.assertEqual(copy.rtn, self.paciente.identidad); self.assertEqual(copy.nombre, self.paciente.nombre)
             self.assertTrue(Paciente.objects.filter(empresa=copy.empresa, cliente=copy).exists())
 
-    def test_original_sync_failure_keeps_narrow_existing_partial_state_not_new_atomicity(self):
+    def test_sync_failure_rolls_back_history_patient_and_audit(self):
         before = self.snapshot()
         with patch.object(views, "_sincronizar_cliente_facturacion_paciente", side_effect=RuntimeError("Synthetic original sync failure")):
             with self.assertRaisesRegex(RuntimeError, "Synthetic original sync failure"): self.client.post(self.url(), self.data())
-        self.preconsulta.refresh_from_db(); self.paciente.refresh_from_db(); self.assertEqual(self.preconsulta.estado, "completada"); self.assertTrue(self.paciente.nombre.startswith("Ana Actualizada"))
-        self.assertEqual(self.changed(before), {"clinica.preconsultaclinica", "clinica.paciente", "core.registroauditoria"})
+        self.preconsulta.refresh_from_db(); self.paciente.refresh_from_db()
+        self.assertEqual(self.preconsulta.estado, "pendiente")
+        self.assertEqual(self.changed(before), set())
 
     def test_writer_only_success_returns_to_authorized_app_without_patient_grant(self):
         self.assertFalse(self.usuario.tiene_permiso_erp("puede_ver_datos_generales_paciente", self.empresa))

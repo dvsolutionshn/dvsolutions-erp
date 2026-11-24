@@ -16,6 +16,7 @@
 {% endblock %}
 {% block mobile_content %}
 <section class="mi-card mgh-intro"><span class="mgh-private">Formulario privado</span><h2>Historia general del expediente</h2><p>Complete y revise la información del formulario original. Puede abrir cada sección para consultar o corregir sus datos.</p><p class="mgh-caption">Al guardar se actualizan el formulario general y los datos del paciente con las reglas actuales del sistema. Esta pantalla no crea una nota de consulta por especialidad.</p></section>
+{% if respuestas_paciente_recibidas %}<section class="mi-card" data-respuestas-recibidas-internas><h2>Respuestas recibidas del paciente</h2><p class="mi-muted">Envíos anteriores conservados por consulta. Las respuestas que esta pantalla no permite editar se conservan al guardar.</p>{% include "clinica/includes/respuestas_preconsulta_mobile.html" with bloques=respuestas_paciente_recibidas abrir_reciente=True %}</section>{% endif %}
 <form method="post" action="{{ app_complete_history_form_url }}" id="mobileGeneralHistoryForm" class="mgh-form" data-submit-once>
   {% csrf_token %}<input type="hidden" name="app" value="1">
   {% for field in mobile_complete_history_hidden_fields %}{{ field }}{% for error in field.errors %}<div class="mi-error-box" role="alert">{{ field.label }}: {{ error }}</div>{% endfor %}{% endfor %}
