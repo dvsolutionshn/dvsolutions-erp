@@ -155,6 +155,9 @@ class AppSearchReleaseTests(unittest.TestCase):
         self.assertEqual(result["status"], "DEPLOY_OK")
         self.assertEqual(result["app_search_commit"], deployment.FIX_COMMIT)
         self.assertEqual(result["changed_files"], sorted(self.files))
+        navigation = "crm/templates/crm/mobile_agenda_navigation.html"
+        self.assertEqual(len(result["changed_files"]), 8)
+        self.assertIn(navigation, result["changed_files"])
         self.assertFalse(result["migrations"])
         self.assertFalse(result["shared_static_changed"])
         release, backup, dropin = Path(result["release"]), Path(result["backup"]), Path(result["dropin"])
@@ -175,6 +178,8 @@ class AppSearchReleaseTests(unittest.TestCase):
         self.assertEqual((backup / "crm/views.py").read_bytes(), before["crm/views.py"])
         self.assertEqual((backup / "crm/templates/crm/agenda_mobile.html").read_bytes(), before["crm/templates/crm/agenda_mobile.html"])
         self.assertFalse((backup / "facturacion/inventory-overlay.txt").exists())
+        self.assertFalse((self.active / navigation).exists())
+        self.assertFalse((backup / navigation).exists())
         self.assert_original_preserved(before)
         self.run.assert_not_called()
 
@@ -273,6 +278,7 @@ class AppSearchPreflightTests(unittest.TestCase):
         self.assertEqual(second[-2], "-c")
         self.assertIn("crm/mobile_appointment_search.py", second[-1])
         self.assertIn("get_template", second[-1])
+        self.assertIn("mobile_agenda_navigation.html", second[-1])
         for forbidden in ("migrate", "collectstatic", "procesar_recordatorios", "create_user", "enviar_"):
             self.assertNotIn(forbidden, " ".join(first + second))
 

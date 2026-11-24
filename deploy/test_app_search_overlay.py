@@ -2,6 +2,7 @@
 import ast
 from pathlib import Path
 import stat
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -38,6 +39,7 @@ class AppSearchOverlayTests(unittest.TestCase):
             overlay.NEW_FILES[2]: b'(() => { "use strict"; })();\n',
             overlay.NEW_FILES[3]: b'<section>Buscar citas</section>\n',
             overlay.NEW_FILES[4]: b'<section>Buscar facturas</section>\n',
+            overlay.NEW_FILES[5]: b'<script>window.mobileAgendaNavigation = {};</script>\n',
         }
         updates = (
             patch.object(overlay, "BASE_FUNCTION_HASH", overlay._function_digest(overlay._function_block(self.base_source)[2])),
@@ -67,7 +69,7 @@ class AppSearchOverlayTests(unittest.TestCase):
     def build(self, root=None):
         return overlay.build_overlay(root or self.active, self.root)
 
-    def test_build_is_read_only_exact_seven_files_and_preserves_other_functions(self):
+    def test_build_is_read_only_exact_eight_files_and_preserves_other_functions(self):
         before = self.snapshot(self.active)
         result = self.build()
         self.assertEqual(set(result), set(overlay.RUNTIME_FILES))
@@ -223,6 +225,112 @@ class AppSearchOverlayTests(unittest.TestCase):
         linked_root.symlink_to(self.active, target_is_directory=True)
         with self.assertRaisesRegex(overlay.OverlayError, "directorio regular"):
             self.build(linked_root)
+
+
+class PublishedAppSearchCompatibilityTests(unittest.TestCase):
+    """Reproduce the observed variant solely from immutable published commits."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="app-search-published-")
+        self.addCleanup(self.temp.cleanup)
+        self.active = Path(self.temp.name)
+        self.repo = Path(__file__).resolve().parent.parent
+        for name in overlay.RUNTIME_FILES:
+            (self.active / name).parent.mkdir(parents=True, exist_ok=True)
+        self.base_views = overlay._git_file(self.repo, overlay.BASE_COMMIT, overlay.VIEWS)
+        self.base_template = overlay._git_file(self.repo, overlay.BASE_COMMIT, overlay.TEMPLATE)
+        (self.active / overlay.VIEWS).write_bytes(self.base_views)
+        (self.active / overlay.TEMPLATE).write_bytes(self.base_template)
+
+    def reconstruct_live_template(self):
+        # Reverse the date fix using its original full-context patch, in the
+        # disposable fixture only. Never run a fuzzy patch against a release.
+        date_patch = subprocess.check_output([
+            "git", "-C", str(self.repo), "diff", "--unified=3",
+            "f912467001bdf1a208da754fb188540435d9c209^",
+            "f912467001bdf1a208da754fb188540435d9c209", "--", overlay.TEMPLATE,
+        ])
+        result = subprocess.run(
+            ["git", "-c", "core.autocrlf=false", "apply", "--reverse"],
+            cwd=self.active, input=date_patch, capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, "Pinned date patch did not match the disposable fixture.")
+        content = (self.active / overlay.TEMPLATE).read_bytes().decode().replace("\r\n", "\n")
+        navigation_patch = subprocess.check_output([
+            "git", "-C", str(self.repo), "diff", "--unified=3",
+            "e5642bff02fbd1f5ba1c14bfa59878d425880828^",
+            "e5642bff02fbd1f5ba1c14bfa59878d425880828", "--", overlay.TEMPLATE,
+        ]).decode().replace("\r\n", "\n")
+        # Later reception changes affect context adjacent to the include, not
+        # the extraction itself. Reverse only each exact changed-line group,
+        # anchoring deleted groups to a unique retained subsequent context.
+        hunks, current = [], None
+        for line in navigation_patch.splitlines(keepends=True):
+            if line.startswith("@@"):
+                if current is not None:
+                    hunks.append(current)
+                current = []
+            elif current is not None and line[:1] in (" ", "+", "-"):
+                current.append(line)
+        if current is not None:
+            hunks.append(current)
+        self.assertTrue(hunks)
+        for hunk in hunks:
+            cursor = 0
+            while cursor < len(hunk):
+                if hunk[cursor][:1] == " ":
+                    cursor += 1
+                    continue
+                old, new = [], []
+                while cursor < len(hunk) and hunk[cursor][:1] in ("+", "-"):
+                    (new if hunk[cursor][0] == "+" else old).append(hunk[cursor][1:])
+                    cursor += 1
+                old, new = "".join(old), "".join(new)
+                if new:
+                    self.assertEqual(content.count(new), 1, "Changed navigation lines must be unique.")
+                    content = content.replace(new, old, 1)
+                else:
+                    context = ""
+                    for retained in hunk[cursor:]:
+                        if retained[0] != " ":
+                            break
+                        context += retained[1:]
+                        if content.count(context) == 1:
+                            break
+                    self.assertTrue(context)
+                    self.assertEqual(content.count(context), 1, "Retained navigation context must be unique.")
+                    content = content.replace(context, old + context, 1)
+        return content.encode()
+
+    def test_exact_observed_variant_installs_navigation_date_and_search_target(self):
+        variant = self.reconstruct_live_template()
+        self.assertEqual(overlay._file_digest(variant), overlay.COMPATIBLE_TEMPLATE_HASH)
+        self.assertEqual(overlay._file_digest(variant), "d9ca0818966df43cfd612bb587fba2a91c09da9b691f66f4082144e1306ecb10")
+        (self.active / overlay.TEMPLATE).write_bytes(variant.replace(b"\n", b"\r\n"))
+        self.assertFalse((self.active / overlay.NEW_FILES[-1]).exists())
+        files = overlay.build_overlay(self.active, self.repo)
+        self.assertEqual(len(files), 8)
+        self.assertEqual((self.active / overlay.VIEWS).read_bytes(), self.base_views)
+        overlay.apply_overlay(self.active, files)  # This is an inactive temporary fixture.
+        for name in (overlay.TEMPLATE, *overlay.NEW_FILES):
+            self.assertEqual((self.active / name).read_bytes(), overlay._git_file(self.repo, overlay.FIX_COMMIT, name))
+        _, _, base_function = overlay._function_block(self.base_views.decode())
+        view = (self.active / overlay.VIEWS).read_bytes().decode()
+        _, _, new_function = overlay._function_block(view)
+        self.assertEqual(view.replace(new_function, base_function, 1), self.base_views.decode())
+        self.assertIn('name="fecha"', (self.active / overlay.TEMPLATE).read_text(encoding="utf-8"))
+        self.assertIn('window.mobileAgendaNavigation', (self.active / overlay.NEW_FILES[-1]).read_text(encoding="utf-8"))
+        self.assertEqual(overlay.build_overlay(self.active, self.repo), files)
+
+    def test_single_unreviewed_byte_in_observed_variant_is_rejected(self):
+        variant = self.reconstruct_live_template() + b"\n"
+        template = self.active / overlay.TEMPLATE
+        template.write_bytes(variant)
+        with self.assertRaisesRegex(overlay.OverlayError, "plantilla movil"):
+            overlay.build_overlay(self.active, self.repo)
+        self.assertEqual(template.read_bytes(), variant)
+        self.assertEqual((self.active / overlay.VIEWS).read_bytes(), self.base_views)
+        self.assertTrue(all(not (self.active / name).exists() for name in overlay.NEW_FILES))
 
 
 if __name__ == "__main__":

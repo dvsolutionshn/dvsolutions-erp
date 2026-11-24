@@ -27,11 +27,16 @@ NEW_FILES = (
     "crm/static/crm/mobile_invoice_search.js",
     "crm/templates/crm/mobile_appointment_search.html",
     "crm/templates/crm/mobile_invoice_search.html",
+    "crm/templates/crm/mobile_agenda_navigation.html",
 )
 RUNTIME_FILES = (VIEWS, TEMPLATE, *NEW_FILES)
 BASE_FUNCTION_HASH = "614f872b17010cfaee5ad32e8a9e5431ee40ebb5ae2c5f16c17cde96a6ee1856"
 TARGET_FUNCTION_HASH = "8aa596a8c844bfdf0ce90472c80ab0c49f00616845d8799c8a271fe35ae20aa2"
 BASE_TEMPLATE_HASH = "00b4b848723801a72bad1dc1d2f30fa835e4b9af7dc6985cadbd5aaf597dd532"
+# Observed live template: BASE_COMMIT with ONLY the reviewed APP navigation
+# extraction (e5642bff) and date-form fix (f9124670) absent. Independently
+# reconstructed and hash-matched; later reception/clinical restrictions remain.
+COMPATIBLE_TEMPLATE_HASH = "d9ca0818966df43cfd612bb587fba2a91c09da9b691f66f4082144e1306ecb10"
 TARGET_FILE_HASHES = {
     TEMPLATE: "762c68957202314d456f3a3dd2fc19df5d1e6ec3c2e865aaadb0cdcf11ab7c40",
     NEW_FILES[0]: "bc2d95a7f8ee2613d5c0d7d5945524db86830bc59f5da5c0a915d83ace08b200",
@@ -39,6 +44,7 @@ TARGET_FILE_HASHES = {
     NEW_FILES[2]: "42336532333f8165acc3c2922619325843c60f1318644ee65c1b5232cd914189",
     NEW_FILES[3]: "0fb610e84ea324199d7507e56943076744e8663600efbba892f9915e2b9134f8",
     NEW_FILES[4]: "c4ed14eb6c5656f28758d89bec35b133683f976302e40b01833a079d4de4b608",
+    NEW_FILES[5]: "044313e58d70554f5753d5c3092c83a261d096bc2c2b2b61c70bd8fbe5276c27",
 }
 
 
@@ -112,7 +118,7 @@ def _paths(root):
 
 def _validate_target(files):
     if set(files) != set(RUNTIME_FILES) or any(not isinstance(content, bytes) or not content for content in files.values()):
-        raise OverlayError("El overlay debe contener exactamente siete archivos revisados.")
+        raise OverlayError("El overlay debe contener exactamente ocho archivos revisados.")
     _, _, function = _function_block(_decode(files[VIEWS]))
     if _function_digest(function) != TARGET_FUNCTION_HASH:
         raise OverlayError("La funcion propuesta no coincide con el commit revisado.")
@@ -127,7 +133,7 @@ def _validate_active(paths):
     _, _, function = _function_block(_decode(paths[VIEWS].read_bytes()))
     if _function_digest(function) not in {BASE_FUNCTION_HASH, TARGET_FUNCTION_HASH}:
         raise OverlayError("agenda_mobile contiene cambios activos no revisados.")
-    if _file_digest(paths[TEMPLATE].read_bytes()) not in {BASE_TEMPLATE_HASH, TARGET_FILE_HASHES[TEMPLATE]}:
+    if _file_digest(paths[TEMPLATE].read_bytes()) not in {BASE_TEMPLATE_HASH, COMPATIBLE_TEMPLATE_HASH, TARGET_FILE_HASHES[TEMPLATE]}:
         raise OverlayError("La plantilla movil activa contiene cambios no revisados.")
     # Individually reviewed baseline/target files allow safe partial deployment
     # completion. Unknown existing content is never silently overwritten.
@@ -153,7 +159,7 @@ def build_overlay(active, repo, commit=FIX_COMMIT):
 
 
 def apply_overlay(destination, files):
-    """Write only the reviewed seven files to an inactive release copy.
+    """Write only the reviewed eight files to an inactive release copy.
 
     All paths and contents are checked before the first write. Activation and
     rollback belong to the orchestrator; this utility never restarts a service.

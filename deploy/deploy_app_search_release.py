@@ -109,7 +109,7 @@ def django_app_check(release, user, group):
         f"expected=Path({str(release)!r});"
         "assert Path(views.__file__).resolve()==expected/'crm/views.py';"
         "assert Path(mobile_appointment_search.__file__).resolve()==expected/'crm/mobile_appointment_search.py';"
-        "templates=['agenda_mobile.html','mobile_invoice_search.html','mobile_appointment_search.html'];"
+        "templates=['agenda_mobile.html','mobile_invoice_search.html','mobile_appointment_search.html','mobile_agenda_navigation.html'];"
         "assert all(Path(get_template('crm/'+name).origin.name).resolve()==expected/'crm/templates/crm'/name for name in templates);"
         "assert Path(settings.STATIC_ROOT).resolve()==(expected/'staticfiles').resolve();"
         "print('APP_SEARCH_RUNTIME_OK')"

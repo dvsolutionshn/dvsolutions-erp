@@ -5,10 +5,13 @@ El servicio de produccion puede ejecutar una copia en
 `/var/www/dvsolutions-erp`. Un `git pull` en el repositorio y un reinicio no
 actualizan por si solos esa copia.
 
-Este actualizador aplica **solo** los siete archivos de los buscadores moviles
+Este actualizador aplica **solo** los ocho archivos de los buscadores moviles
 del commit `bd49c1b89c25507ac434aeeafb98679b7bacfdce`. No es un desplegador
 generico de futuros commits. Copia la version activa, conserva sus otros
 parches y rechaza modificaciones no reconocidas en los archivos afectados.
+Incluye la dependencia de navegacion del template y reconoce exclusivamente
+la variante historica revisada que no tenia aun las correcciones de navegacion
+y fecha. Una variante diferente vuelve a detener el despliegue.
 
 En una consola Linux autenticada como root:
 
