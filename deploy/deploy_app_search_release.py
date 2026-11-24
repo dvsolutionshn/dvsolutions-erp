@@ -10,7 +10,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import re
 import shutil
 import subprocess
 import sys
@@ -119,6 +120,20 @@ def django_app_check(release, user, group):
         raise DeploymentError("La copia no cargo los modulos y templates revisados.")
 
 
+def choose_dropin(stamp):
+    # systemd applies drop-ins by filename, not by creation date. Existing
+    # deployments can already use 99-zz... or z... names; never guess priority.
+    names = [PurePosixPath(path).name for path in property_value("DropInPaths").split()]
+    names.extend(path.name for path in DROPINS.glob("*.conf"))
+    if any(not re.fullmatch(r"[A-Za-z0-9_.-]+\.conf", name) for name in names):
+        raise DeploymentError("Un override existente tiene un nombre no previsto; no se modifico.")
+    leading = max((len(name) - len(name.lstrip("z")) for name in names), default=0)
+    name = "z" * (leading + 1) + f"-app-search-{stamp}.conf"
+    if len(name.encode("utf-8")) > 240 or any(name <= existing for existing in names):
+        raise DeploymentError("No se pudo elegir un override con prioridad segura.")
+    return DROPINS / name
+
+
 def activate_app(release, active, dropin, timer_before, webhook_before, routes_before):
     activate(release, dropin, timer_before, webhook_before, commit=FIX_COMMIT)
     routes_after = {path: http_status(path) for path in APP_ROUTES}
@@ -168,7 +183,7 @@ def deploy():
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
         release = RELEASES / f"app-search-{stamp}-{FIX_COMMIT[:8]}"
         backup = BACKUPS / f"app-search-{stamp}-{FIX_COMMIT[:8]}"
-        dropin = DROPINS / f"99-zz-app-search-{stamp}.conf"
+        dropin = choose_dropin(stamp)
         if release.exists() or backup.exists() or dropin.exists() or dropin.is_symlink():
             raise DeploymentError("La copia, respaldo u override ya existe; no se sobrescribio.")
         timer_before = state(TIMER)

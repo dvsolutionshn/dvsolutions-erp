@@ -33,7 +33,7 @@ class AppSearchReleaseTests(unittest.TestCase):
         self.write(self.active / "crm/templates/crm/agenda_mobile.html", b"SYNTHETIC_OLD_TEMPLATE\n")
         self.write(self.active / "facturacion/inventory-overlay.txt", b"KEEP_INVENTORY\n")
         self.write(self.active / "crm/whatsapp-overlay.txt", b"KEEP_WHATSAPP\n")
-        self.values = {"WorkingDirectory": str(self.active), "MainPID": "406005", "User": "dvsolutions", "Group": "www-data"}
+        self.values = {"WorkingDirectory": str(self.active), "MainPID": "406005", "User": "dvsolutions", "Group": "www-data", "DropInPaths": self.old_dropin.as_posix()}
         self.output = io.StringIO()
         self.patch("LIVE", self.live)
         self.patch("RELEASES", self.releases)
@@ -164,7 +164,8 @@ class AppSearchReleaseTests(unittest.TestCase):
         self.assertEqual(release.parent, self.releases)
         self.assertEqual(backup.parent, self.backups)
         self.assertEqual(dropin.parent, self.dropins)
-        self.assertTrue(dropin.name.startswith("99-zz-app-search-"))
+        self.assertTrue(dropin.name.startswith("z-app-search-"))
+        self.assertGreater(dropin.name, self.old_dropin.name)
         self.copy.assert_called_once_with(self.active, release)
         self.apply.assert_called_once_with(release, self.files)
         self.check.assert_called_once_with(release, "dvsolutions", "www-data")
@@ -214,6 +215,70 @@ class AppSearchReleaseTests(unittest.TestCase):
             deployment.deploy()
         self.activate_app.assert_not_called()
         self.assertEqual(list(self.backups.iterdir()), [])
+
+    def test_existing_candidate_override_is_not_overwritten(self):
+        before = self.old_dropin.read_bytes()
+        with patch.object(deployment, "choose_dropin", return_value=self.old_dropin):
+            with self.assertRaisesRegex(deployment.DeploymentError, "no se sobrescribio"):
+                deployment.deploy()
+        self.copy.assert_not_called()
+        self.activate_app.assert_not_called()
+        self.assertEqual(self.old_dropin.read_bytes(), before)
+
+
+class AppSearchDropinOrderingTests(unittest.TestCase):
+    STAMP = "20261123-120000-123456"
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="app-search-dropin-test-")
+        self.addCleanup(temporary.cleanup)
+        self.dropins = Path(temporary.name).resolve()
+        override = patch.object(deployment, "DROPINS", self.dropins)
+        override.start()
+        self.addCleanup(override.stop)
+
+    def choose(self, basenames):
+        metadata = " ".join("/etc/systemd/system/dvsolutions.service.d/" + name for name in basenames)
+        with patch.object(deployment, "property_value", return_value=metadata) as value:
+            result = deployment.choose_dropin(self.STAMP)
+        value.assert_called_once_with("DropInPaths")
+        self.assertEqual(result.parent, deployment.DROPINS)
+        self.assertLessEqual(len(result.name), 240)
+        for name in basenames:
+            self.assertGreater(result.name, name)
+        return result
+
+    def test_many_existing_99_internal_z_names_sort_before_the_new_prefix(self):
+        names = ["99-" + "z" * length + "-respuestas-app-248c10ed.conf" for length in range(1, 16)]
+        result = self.choose(names)
+        self.assertEqual(result.name, f"z-app-search-{self.STAMP}.conf")
+
+    def test_previous_z_prefixes_are_outsorted_without_changing_them(self):
+        names = ["z-app-search-old.conf", "zz-clinica.conf", "zzzzzzzz-whatsapp.conf", "99-existing.conf"]
+        result = self.choose(names)
+        self.assertEqual(result.name, f"{'z' * 9}-app-search-{self.STAMP}.conf")
+
+    def test_empty_metadata_uses_safe_simple_name(self):
+        result = self.choose([])
+        self.assertEqual(result.name, f"z-app-search-{self.STAMP}.conf")
+
+    def test_unloaded_override_on_disk_also_determines_safe_ordering(self):
+        unloaded = self.dropins / "zzzz-not-yet-loaded.conf"
+        unloaded.write_bytes(b"PRESERVE_UNLOADED\n")
+        result = self.choose([])
+        self.assertEqual(result.name, f"zzzzz-app-search-{self.STAMP}.conf")
+        self.assertEqual(unloaded.read_bytes(), b"PRESERVE_UNLOADED\n")
+
+    def test_unknown_non_ascii_or_unsafe_filenames_are_rejected(self):
+        for name in ("zz~late.conf", "zz;command.conf", "zz-résumé.conf", "zz-no-extension", "zz-other.config", "zz\\escaped.conf"):
+            with self.subTest(name=name), patch.object(deployment, "property_value", return_value="/etc/systemd/system/dvsolutions.service.d/" + name):
+                with self.assertRaises(deployment.DeploymentError):
+                    deployment.choose_dropin(self.STAMP)
+
+    def test_prefix_that_would_exceed_safe_filename_length_is_rejected(self):
+        with patch.object(deployment, "property_value", return_value="/etc/systemd/system/dvsolutions.service.d/" + "z" * 230 + ".conf"):
+            with self.assertRaises(deployment.DeploymentError):
+                deployment.choose_dropin(self.STAMP)
 
 
 class AppSearchActivationTests(unittest.TestCase):
