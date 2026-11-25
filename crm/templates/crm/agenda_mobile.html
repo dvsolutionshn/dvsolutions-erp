@@ -114,6 +114,7 @@
   </style>
 </head>
 <body class="{% if hospital_mia_app_premium %}hospital-mia-premium-app{% endif %}">
+{% include "crm/mobile_app_recovery.html" %}
 <main class="app" data-mobile-calendar-swipe data-prev-url="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}" data-next-url="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
   <header class="hero">
     <div class="hero-top">
@@ -989,6 +990,7 @@
 (() => {
   const editor=document.getElementById("editor");
   const agendaCentralizada={{ agenda_espejo|yesno:"true,false" }};
+  const appRecovery={% if empresa.slug == "hospital_mia" or empresa.slug == "medical_spa" or empresa.slug == "luque_aestetic" or empresa.slug == "serviciosmedicos" %}window.mobileAppRecovery&&typeof window.mobileAppRecovery.markFeaturesReady==="function"?window.mobileAppRecovery:null{% else %}null{% endif %};
   const {open:openAppPanel,openSheet,closeSheet}=window.mobileAgendaNavigation;
   const availabilityForm=document.querySelector("[data-mobile-availability-form]");
   if(availabilityForm){const full=availabilityForm.querySelector("#id_dia_completo"),times=["#id_hora_inicio","#id_hora_inicio_periodo","#id_hora_fin","#id_hora_fin_periodo"].map(selector=>availabilityForm.querySelector(selector));const toggleAvailabilityTimes=()=>{const disabled=Boolean(full?.checked);times.forEach(field=>{if(field)field.disabled=disabled})};full?.addEventListener("change",toggleAvailabilityTimes);toggleAvailabilityTimes()}
@@ -1069,25 +1071,41 @@
   let sw=null;
   const upcoming=JSON.parse(document.getElementById("upcomingAppointments").textContent||"[]");
   async function registerApp(){
-    if(!("serviceWorker" in navigator))return;
-    sw=await navigator.serviceWorker.register("{% url 'agenda_mobile_service_worker' empresa.slug %}",{scope:"{{ app_scope_url|escapejs }}"});
-    if("setAppBadge" in navigator)navigator.setAppBadge({{ pendientes_hoy }}).catch(()=>{});
-    scheduleVisibleReminders();
+    try{
+      if(!("serviceWorker" in navigator))return;
+      sw=await navigator.serviceWorker.register("{% url 'agenda_mobile_service_worker' empresa.slug %}",{scope:"{{ app_scope_url|escapejs }}"});
+      if("setAppBadge" in navigator){
+        if(appRecovery)Promise.resolve(navigator.setAppBadge({{ pendientes_hoy }})).catch(()=>{});
+        else navigator.setAppBadge({{ pendientes_hoy }}).catch(()=>{});
+      }
+      scheduleVisibleReminders();
+    }catch(error){if(!appRecovery)throw error;sw=null;}
   }
   function scheduleVisibleReminders(){
     if(!("Notification" in window)||Notification.permission!=="granted"||!sw)return;
     const now=Date.now();
     upcoming.forEach(item=>{
       const alertAt=item.at-(30*60*1000),delay=Math.max(800,alertAt-now),key=`mia-notified-${item.id}-${item.at}`;
-      if(alertAt<now-60000||delay>86400000||localStorage.getItem(key))return;
-      setTimeout(async()=>{const active=await navigator.serviceWorker.ready;active.active?.postMessage({type:"SHOW_APPOINTMENT",payload:{...item,icon:"{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}"}});localStorage.setItem(key,"1")},delay);
+      if(alertAt<now-60000||delay>86400000||(appRecovery?appRecovery.readPreference(key,null):localStorage.getItem(key)))return;
+      setTimeout(async()=>{
+        try{
+          const active=await navigator.serviceWorker.ready;
+          active.active?.postMessage({type:"SHOW_APPOINTMENT",payload:{...item,icon:"{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}"}});
+          if(appRecovery)appRecovery.writePreference(key,"1");else localStorage.setItem(key,"1");
+        }catch(error){if(!appRecovery)throw error;}
+      },delay);
     });
   }
   document.getElementById("notificationButton").addEventListener("click",async()=>{
     if(!("Notification" in window)){installNote.textContent="Este navegador no admite notificaciones.";installNote.classList.add("show");return}
-    const permission=await Notification.requestPermission();
-    installNote.textContent=permission==="granted"?"Notificaciones activadas. Te avisaremos 30 minutos antes mientras la app esté activa.":"No se autorizaron las notificaciones.";
-    installNote.classList.add("show");scheduleVisibleReminders();
+    try{
+      const permission=await Notification.requestPermission();
+      installNote.textContent=permission==="granted"?"Notificaciones activadas. Te avisaremos 30 minutos antes mientras la app esté activa.":"No se autorizaron las notificaciones.";
+      installNote.classList.add("show");scheduleVisibleReminders();
+    }catch(error){
+      if(!appRecovery)throw error;
+      installNote.textContent="No se pudieron activar las notificaciones en este navegador. Podés seguir usando la app.";installNote.classList.add("show");
+    }
   });
   registerApp();
 
@@ -1345,7 +1363,10 @@
   const patientFavoriteKey=`${appCompanySlug}_patient_favorites`;
   let patientFilter="todos",patientView="grid",visiblePatients=16,activeProfilePatient=null;
   let patientFavorites=new Set();
-  try{patientFavorites=new Set(JSON.parse(localStorage.getItem(patientFavoriteKey)||"[]").map(String))}catch(error){patientFavorites=new Set()}
+  try{
+    const savedFavorites=JSON.parse((appRecovery?appRecovery.readPreference(patientFavoriteKey,"[]"):localStorage.getItem(patientFavoriteKey))||"[]");
+    patientFavorites=new Set((appRecovery?(Array.isArray(savedFavorites)?savedFavorites:[]):savedFavorites).map(String));
+  }catch(error){patientFavorites=new Set()}
   const fallbackCopyPatientInvite=text=>{
     if(!patientInviteLink)return false;
     patientInviteLink.hidden=false;
@@ -1431,7 +1452,10 @@
     if(patientFilter==="frecuentes")matches.sort((a,b)=>Number(b.frecuencia||0)-Number(a.frecuencia||0));
     return matches;
   };
-  const persistPatientFavorites=()=>localStorage.setItem(patientFavoriteKey,JSON.stringify(Array.from(patientFavorites)));
+  const persistPatientFavorites=()=>{
+    const value=JSON.stringify(Array.from(patientFavorites));
+    if(appRecovery)appRecovery.writePreference(patientFavoriteKey,value);else localStorage.setItem(patientFavoriteKey,value);
+  };
   const patientAppointmentMarkup=patient=>{
     if(!patient.proxima_cita)return '<div class="premium-patient-badge">Sin cita próxima</div>';
     return `<div class="premium-next-appointment"><div class="premium-next-date"><strong>${escapeHtml(patient.proxima_cita.fecha)}</strong><span>${escapeHtml(patient.proxima_cita.hora)}</span></div><div class="premium-next-copy"><strong>${escapeHtml(patient.proxima_cita.servicio||"Próxima atención")}</strong><span>${escapeHtml(patient.proxima_cita.profesional||"Profesional por confirmar")}</span></div></div>`;
@@ -1622,11 +1646,16 @@
   let quickSubmitting=false;
   const quickPricesIncludeTax={{ precios_incluyen_impuesto_app|yesno:"true,false" }};
   const quickRecentIds=()=>{
-    try{return JSON.parse(localStorage.getItem(`${appCompanySlug}_quick_products`)||"[]")}catch(error){return []}
+    try{
+      const key=`${appCompanySlug}_quick_products`;
+      const value=JSON.parse((appRecovery?appRecovery.readPreference(key,"[]"):localStorage.getItem(key))||"[]");
+      return appRecovery?(Array.isArray(value)?value:[]):value;
+    }catch(error){return []}
   };
   const rememberQuickProduct=id=>{
     const updated=[String(id),...quickRecentIds().filter(item=>String(item)!==String(id))].slice(0,12);
-    localStorage.setItem(`${appCompanySlug}_quick_products`,JSON.stringify(updated));
+    if(appRecovery)appRecovery.writePreference(`${appCompanySlug}_quick_products`,JSON.stringify(updated));
+    else localStorage.setItem(`${appCompanySlug}_quick_products`,JSON.stringify(updated));
   };
   const setQuickStatus=(message,isError=false)=>{
     if(!quickStatus)return;
@@ -1944,7 +1973,15 @@
       if(patientPicker&&!patientPicker.contains(event.target))hidePatientResults();
     });
   }
-  document.getElementById("newPatientButton")?.addEventListener("click",()=>patientDialog?.showModal());
+  document.getElementById("newPatientButton")?.addEventListener("click",()=>{
+    if(!appRecovery){patientDialog?.showModal();return;}
+    if(!patientDialog)return;
+    if(typeof patientDialog.showModal!=="function"){
+      appRecovery.showHelp("Este navegador no puede abrir la ventana de nuevo paciente. No se envió el formulario. Podés seguir usando las demás opciones o abrir el acceso desde un navegador actualizado.");return;
+    }
+    try{if(!patientDialog.open)patientDialog.showModal();}
+    catch(error){appRecovery.showHelp("No se pudo abrir la ventana de nuevo paciente. Los datos de esta pantalla se conservan; no se envió el formulario.");}
+  });
   document.getElementById("closePatientDialog")?.addEventListener("click",()=>patientDialog.close());
   document.getElementById("cancelPatient")?.addEventListener("click",()=>patientDialog.close());
   patientForm?.addEventListener("submit",async event=>{
@@ -1954,6 +1991,7 @@
     if(!response.ok||!data.ok){Object.entries(data.errors||{}).forEach(([name,errors])=>{const target=patientForm.querySelector(`[data-error="${name}"]`);if(target)target.textContent=errors.join(" ")});return}
     const select=document.querySelector('[name="paciente"]'),option=new Option(data.paciente.label,data.paciente.id,true,true);select.add(option);choosePatient(data.paciente);patientDialog.close();
   });
+  if(appRecovery)appRecovery.markFeaturesReady();
 })();
 </script>
 {% if agenda_cirugia_extendida %}

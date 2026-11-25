@@ -1,6 +1,7 @@
 <script id="mobileAgendaNavigation">
 (() => {
   // Keep these controls independent of the data, forms and notifications below.
+  const appRecovery={% if empresa.slug == "hospital_mia" or empresa.slug == "medical_spa" or empresa.slug == "luque_aestetic" or empresa.slug == "serviciosmedicos" %}window.mobileAppRecovery&&typeof window.mobileAppRecovery.markNavigationReady==="function"?window.mobileAppRecovery:null{% else %}null{% endif %};
   const home = document.getElementById("inicio");
   const screens = Array.from(document.querySelectorAll(".mobile-app-screen"));
   const bottomLinks = document.querySelectorAll(".bottom [data-app-open]");
@@ -22,7 +23,8 @@
     closeCompanyMenu();
     screens.forEach(screen => screen.classList.toggle("active", screen === panel));
     bottomLinks.forEach(link => link.classList.toggle("active", link.dataset.appOpen === panel.id));
-    requestAnimationFrame(() => panel.scrollIntoView({behavior: "smooth", block: "start"}));
+    if(appRecovery)appRecovery.scrollToElement(panel);
+    else requestAnimationFrame(() => panel.scrollIntoView({behavior: "smooth", block: "start"}));
   }
 
   function close() {
@@ -96,5 +98,6 @@
   if (requestedPanel === "inicio") close();
   else if (!(deepLinks.includes(requestedPanel) && open(requestedPanel))
            && new URLSearchParams(window.location.search).get("app") === "agenda") open("agenda-app");
+  if(appRecovery)appRecovery.markNavigationReady();
 })();
 </script>

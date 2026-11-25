@@ -2904,6 +2904,12 @@ self.addEventListener("message", event => {{
   }});
 }});
 """
+    if empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"}:
+        # Recovery is confined to the installed clinical APP entrypoint. Other
+        # companies retain their original notification-only worker.
+        from django.template.loader import render_to_string
+
+        script = render_to_string("crm/mobile_app_service_worker.js", {"app_home": inicio})
     response = HttpResponse(script, content_type="application/javascript")
     response["Service-Worker-Allowed"] = reverse("dashboard", args=[empresa.slug])
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"

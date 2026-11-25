@@ -1,0 +1,115 @@
+{% if empresa.slug == "hospital_mia" or empresa.slug == "medical_spa" or empresa.slug == "luque_aestetic" or empresa.slug == "serviciosmedicos" %}
+<style>
+  .mobile-app-recovery{position:relative;box-sizing:border-box;max-width:728px;width:calc(100% - 24px);margin:12px auto;padding:15px;border:1px solid #bfd6df;border-radius:18px;background:#fff;color:#14283b;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  .mobile-app-recovery[hidden]{display:none!important}
+  .mobile-app-recovery strong{display:block;font-size:15px}
+  .mobile-app-recovery p{margin:8px 0}
+  .mobile-app-recovery-actions{display:flex;flex-wrap:wrap;gap:8px}
+  .mobile-app-recovery-actions a,.mobile-app-recovery-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 13px;border:1px solid #bfd6df;border-radius:12px;background:#12324a;color:#fff;font:inherit;text-decoration:none}
+  .mobile-app-recovery-actions button{background:#fff;color:#185d68}
+</style>
+<section class="mobile-app-recovery" id="mobileAppRecovery" hidden role="status" aria-live="polite" aria-atomic="true">
+  <strong>Ayuda para abrir la app</strong>
+  <p id="mobileAppRecoveryMessage">La interfaz no terminó de iniciar. Podés abrir el inicio de nuevo para verificar el acceso.</p>
+  <p>Si escribiste datos sin guardar en esta pantalla, volver al inicio puede descartarlos.</p>
+  <div class="mobile-app-recovery-actions">
+    <a id="mobileAppRecoveryHome" href="{% url 'agenda_mobile' empresa.slug %}">Abrir inicio de nuevo</a>
+    <button id="mobileAppRecoveryDismiss" type="button">Seguir aquí</button>
+  </div>
+</section>
+<noscript>
+  <section class="mobile-app-recovery" id="mobileAppNoScript" role="note">
+    <strong>JavaScript está desactivado</strong>
+    <p>La app necesita JavaScript para abrir sus pantallas y controles. Habilitalo en la configuración del navegador y volvé a abrir este acceso. No hace falta borrar datos.</p>
+  </section>
+</noscript>
+<script id="mobileAppRecoveryBootstrap">
+(function () {
+  "use strict";
+  if (window.mobileAppRecovery && typeof window.mobileAppRecovery === "object" && typeof window.mobileAppRecovery.markNavigationReady === "function") return;
+  var region = document.getElementById("mobileAppRecovery");
+  var message = document.getElementById("mobileAppRecoveryMessage");
+  var home = document.getElementById("mobileAppRecoveryHome");
+  var dismiss = document.getElementById("mobileAppRecoveryDismiss");
+  if (!region || !message || !home || !dismiss) return;
+  var navigationReady = false;
+  var featuresReady = false;
+  var dismissed = false;
+  var warningKind = "";
+  var preferences = Object.create(null);
+  var own = Object.prototype.hasOwnProperty;
+  var timer;
+
+  function scrollToElement(element) {
+    function scroll() {
+      if (!element || typeof element.scrollIntoView !== "function") return;
+      try { element.scrollIntoView({behavior: "smooth", block: "start"}); }
+      catch (error) { try { element.scrollIntoView(); } catch (ignored) {} }
+    }
+    if (typeof window.requestAnimationFrame === "function") {
+      try { window.requestAnimationFrame(scroll); } catch (error) { scroll(); }
+    } else scroll();
+  }
+
+  function hideStartupWarning() {
+    if (navigationReady && featuresReady) {
+      window.clearTimeout(timer);
+      if (warningKind === "startup") region.hidden = true;
+    }
+  }
+
+  function check() {
+    if (navigationReady && featuresReady) return true;
+    if (!dismissed && warningKind !== "compatibility") {
+      warningKind = "startup";
+      message.textContent = "La interfaz no terminó de iniciar. Podés abrir el inicio de nuevo para verificar el acceso.";
+      region.hidden = false;
+    }
+    return false;
+  }
+
+  function showHelp(text) {
+    warningKind = "compatibility";
+    dismissed = false;
+    message.textContent = text;
+    region.hidden = false;
+    scrollToElement(region);
+  }
+
+  function readPreference(key, fallback) {
+    if (own.call(preferences, key)) return preferences[key];
+    try {
+      var value = window.localStorage.getItem(key);
+      return value === null ? fallback : value;
+    } catch (error) { return fallback; }
+  }
+
+  function writePreference(key, value) {
+    // Only the existing optional preference keys use this helper. Never store
+    // clinical forms, invoices, passwords or a business-operation draft here.
+    preferences[key] = String(value);
+    try { window.localStorage.setItem(key, String(value)); return true; }
+    catch (error) { return false; }
+  }
+
+  home.addEventListener("click", function (event) {
+    var confirmed = false;
+    try {
+      confirmed = typeof window.confirm === "function" && window.confirm("¿Abrir el inicio de nuevo? Los datos sin guardar en esta pantalla pueden perderse. No se reenviará ningún formulario.");
+    } catch (error) { confirmed = false; }
+    if (!confirmed) event.preventDefault();
+  });
+  dismiss.addEventListener("click", function () { dismissed = true; region.hidden = true; });
+  window.mobileAppRecovery = {
+    markNavigationReady: function () { navigationReady = true; hideStartupWarning(); },
+    markFeaturesReady: function () { featuresReady = true; hideStartupWarning(); },
+    check: check,
+    showHelp: showHelp,
+    readPreference: readPreference,
+    writePreference: writePreference,
+    scrollToElement: scrollToElement
+  };
+  timer = window.setTimeout(check, 10000);
+}());
+</script>
+{% endif %}
