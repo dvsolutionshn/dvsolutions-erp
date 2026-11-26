@@ -15,14 +15,14 @@ import subprocess
 import sys
 
 try:
-    from .virtual_appointments_overlay import FIX_COMMIT, OverlayError, RUNTIME_FILES, apply_overlay, build_overlay
+    from .virtual_appointments_overlay import FIX_COMMIT, OverlayError, WATCH_FILES, apply_overlay, build_overlay
     from .deploy_app_search_release import APP_ROUTES, DROPINS, choose_dropin, deployment_lock, process_cwd
     from .deploy_inventory_release import (
         BACKUPS, ENV_FILE, LIVE, RELEASES, WEB, TIMER, DeploymentError,
         activate, copy_release, healthy, http_status, inside, property_value, run, state,
     )
 except ImportError:
-    from virtual_appointments_overlay import FIX_COMMIT, OverlayError, RUNTIME_FILES, apply_overlay, build_overlay
+    from virtual_appointments_overlay import FIX_COMMIT, OverlayError, WATCH_FILES, apply_overlay, build_overlay
     from deploy_app_search_release import APP_ROUTES, DROPINS, choose_dropin, deployment_lock, process_cwd
     from deploy_inventory_release import (
         BACKUPS, ENV_FILE, LIVE, RELEASES, WEB, TIMER, DeploymentError,
@@ -55,7 +55,7 @@ def code_snapshot(root):
 
 
 def snapshot(root):
-    return {name: (root / name).read_bytes() if (root / name).is_file() else None for name in RUNTIME_FILES}
+    return {name: (root / name).read_bytes() if (root / name).is_file() else None for name in WATCH_FILES}
 
 
 def django_virtual_check(release, user, group):

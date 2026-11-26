@@ -13,7 +13,7 @@ except ImportError:
     from app_startup_overlay import digest, decode, checked_root
 
 BASE_COMMIT = "e3874fdf29e09ad4b32e5811dd1af080a37dabf9"
-FIX_COMMIT = "ecdd23a89259ff717a23ecf2668314611b4e04cc"
+FIX_COMMIT = "a6937a1e2227d0092cb1d9cdaa17b29619fbcf13"
 BLOCKS = {
     "crm/models.py": ("CitaCliente",),
     "crm/forms.py": ("CitaClienteForm",),
@@ -33,8 +33,14 @@ NEW_FILES = (
     "crm/migrations/0027_citacliente_virtual.py",
     "clinica/migrations/0039_citaclinica_virtual.py",
     "deploy/virtual_appointments_schema.py",
+    "deploy/migration_templates/merge_virtual_webhooks.py",
 )
 RUNTIME_FILES = (*BLOCKS, *FILES, *NEW_FILES)
+OPTIONAL_MERGE = "crm/migrations/0028_merge_citas_virtuales_webhooks.py"
+MERGE_TEMPLATE = "deploy/migration_templates/merge_virtual_webhooks.py"
+COMPAT_BRANCH = "crm/migrations/0027_whatsapp_webhooks.py"
+COMPAT_BRANCH_HASH = "0e1044498d83888ef6e28e90db91ccdc387e36501c873ae1de8017ef58e8c060"
+WATCH_FILES = (*RUNTIME_FILES, OPTIONAL_MERGE, COMPAT_BRANCH)
 TARGET_HASHES = {
     "crm/models.py::CitaCliente": "3ba9d69fd7d8ae17036e8ce51045e5b62886c46fcc83a323c5ee66412e15c1eb",
     "crm/forms.py::CitaClienteForm": "e8414fc89b8e5dda70fa579af9c529a094ee4235d2779ee93a743006ec5edd11",
@@ -50,7 +56,9 @@ TARGET_HASHES = {
     "crm/templates/crm/includes/appointment_virtual_badge.html": "09c4145f2e46aedbd39c0346619b5200f5ee1ba707cd626e4b07334e84237eca",
     "crm/migrations/0027_citacliente_virtual.py": "1286e3de7f600f9304dea4c4a59590ba2846f03c461875068ec36aff313de749",
     "clinica/migrations/0039_citaclinica_virtual.py": "aa2057a763cab9bd61087f40ac67288bc41de361c9c09c651d6cd24423e17e8b",
-    "deploy/virtual_appointments_schema.py": "ef5fc1d3be3e0452eed155e6fa19f8466b09d7ffdbac1f3612010e060dfa3182"
+    "deploy/virtual_appointments_schema.py": "2d8ac9540c8c0af84baa0d3f3afe380e95f32956d5932724a6ba3290237c3c97",
+    "deploy/migration_templates/merge_virtual_webhooks.py": "f9b761706bde955737b46e77e8e109a229832a12a2a671087ec5f412a6e504c7",
+    "crm/migrations/0028_merge_citas_virtuales_webhooks.py": "f9b761706bde955737b46e77e8e109a229832a12a2a671087ec5f412a6e504c7"
 }
 ADDED_IMPORT = "from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES\n"
 IMPORT_FILES = {"crm/forms.py", "clinica/forms.py"}
@@ -103,9 +111,9 @@ def ensure_import(source):
 
 
 def validate(files):
-    if set(files) != set(RUNTIME_FILES) or any(not isinstance(data, bytes) or not data for data in files.values()):
+    if set(files) not in (set(RUNTIME_FILES), {*RUNTIME_FILES, OPTIONAL_MERGE}) or any(not isinstance(data, bytes) or not data for data in files.values()):
         raise OverlayError("El overlay de citas no contiene exactamente los archivos revisados.")
-    expected = {*FILES, *NEW_FILES, *(path + "::" + name for path, names in BLOCKS.items() for name in names)}
+    expected = {*FILES, *NEW_FILES, OPTIONAL_MERGE, *(path + "::" + name for path, names in BLOCKS.items() for name in names)}
     if set(TARGET_HASHES) != expected:
         raise OverlayError("Falta el manifiesto revisado de citas virtuales.")
     for path, data in files.items():
@@ -128,9 +136,19 @@ def validate(files):
 def build_overlay(active, repo):
     active = checked_root(active)
     desired = {path: _git_file(Path(repo), FIX_COMMIT, path) for path in RUNTIME_FILES}
+    branch = _checked_path(active, COMPAT_BRANCH)
+    merge = _checked_path(active, OPTIONAL_MERGE)
+    if branch.exists():
+        if digest(branch.read_bytes()) != COMPAT_BRANCH_HASH:
+            raise OverlayError("La rama previa de WhatsApp no coincide con la version revisada; no se modifico.")
+        # A standard empty merge belongs only in releases which actually have
+        # this already-installed branch. The clean Git tree never imports it.
+        desired[OPTIONAL_MERGE] = desired[MERGE_TEMPLATE]
+    elif merge.exists():
+        raise OverlayError("Existe una union de migraciones sin su rama previa; no se forzo el cambio.")
     validate(desired)
-    for path in RUNTIME_FILES:
-        target = _checked_path(active, path, required=path not in NEW_FILES)
+    for path in desired:
+        target = _checked_path(active, path, required=path not in (*NEW_FILES, OPTIONAL_MERGE))
         if path in BLOCKS:
             baseline = decode(_git_file(Path(repo), BASE_COMMIT, path))
             proposed = decode(desired[path])
@@ -147,7 +165,7 @@ def build_overlay(active, repo):
             desired[path] = (ensure_import(result) if path in IMPORT_FILES else result).encode()
         elif target.exists():
             allowed = {digest(desired[path])}
-            if path not in NEW_FILES:
+            if path not in NEW_FILES and path != OPTIONAL_MERGE:
                 allowed.add(digest(_git_file(Path(repo), BASE_COMMIT, path)))
             if digest(target.read_bytes()) not in allowed:
                 raise OverlayError("Un archivo activo de citas contiene cambios no revisados: " + path)
@@ -160,14 +178,14 @@ def apply_overlay(destination, files, repo):
     destination = checked_root(destination)
     if build_overlay(destination, repo) != files:
         raise OverlayError("La copia cambio durante la preparacion de citas virtuales.")
-    paths = {path: _checked_path(destination, path, required=path not in NEW_FILES) for path in RUNTIME_FILES}
-    # Only the new includes directory may be absent in an older active release.
+    paths = {path: _checked_path(destination, path, required=path not in (*NEW_FILES, OPTIONAL_MERGE)) for path in files}
+    # Only these two reviewed code directories may be added to the copy.
     for path in paths.values():
         if not path.parent.is_dir():
-            if path.parent.name != "includes" or not path.parent.parent.is_dir():
+            if path.parent.relative_to(destination).as_posix() not in {"crm/templates/crm/includes", "deploy/migration_templates"} or not path.parent.parent.is_dir():
                 raise OverlayError("Falta un directorio requerido de citas virtuales.")
             path.parent.mkdir(mode=0o755)
-    for name in (*NEW_FILES, *FILES, *BLOCKS):
+    for name in (*NEW_FILES, *((OPTIONAL_MERGE,) if OPTIONAL_MERGE in files else ()), *FILES, *BLOCKS):
         path = _checked_path(destination, name)
         info = path.stat() if path.exists() else None
         descriptor, temporary = tempfile.mkstemp(prefix=".virtual-appointments-", dir=path.parent)

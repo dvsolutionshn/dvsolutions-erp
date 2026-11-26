@@ -1,6 +1,10 @@
 """Closed migration safety tests: no configured Django database or transport."""
 
 import importlib
+import hashlib
+from pathlib import Path
+import sys
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
@@ -23,6 +27,10 @@ def reviewed_migration(app, name):
 
 class VirtualAppointmentSchemaSafetyTests(unittest.TestCase):
     def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="virtual-schema-review-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.enterContext(patch.object(schema, "_candidate_root", return_value=self.root))
         self.disk = {target: reviewed_migration(*target) for target in schema.TARGETS}
         self.applied = set()
         self.present = set()
@@ -47,13 +55,41 @@ class VirtualAppointmentSchemaSafetyTests(unittest.TestCase):
         return [SimpleNamespace(name="virtual", type_code="boolean", null_ok=False, default="false")] if app in self.present else []
 
     def plan(self, targets):
-        self.assertEqual(targets, list(schema.TARGETS))
-        return [(self.disk[target], False) for target in schema.TARGETS if target not in self.applied]
+        with_merge = schema.MERGE_TARGET in self.disk
+        expected = [schema.TARGETS[0], schema.MERGE_TARGET] if with_merge else list(schema.TARGETS)
+        self.assertEqual(targets, expected)
+        pending = (*schema.TARGETS, schema.MERGE_TARGET) if with_merge else schema.TARGETS
+        return [(self.disk[target], False) for target in pending if target not in self.applied]
 
     def migrate(self, targets):
-        self.assertEqual(targets, list(schema.TARGETS))
+        expected = [schema.TARGETS[0], schema.MERGE_TARGET] if schema.MERGE_TARGET in self.disk else list(schema.TARGETS)
+        self.assertEqual(targets, expected)
         self.applied.update(schema.TARGETS)
+        if schema.MERGE_TARGET in self.disk:
+            self.applied.add(schema.MERGE_TARGET)
         self.present.update(schema.TABLES)
+
+    def known_merge(self):
+        directory = self.root / "crm" / "migrations"
+        directory.mkdir(parents=True)
+        legacy_file = directory / (schema.LEGACY_WEBHOOKS[1] + ".py")
+        merge_file = directory / (schema.MERGE_TARGET[1] + ".py")
+        legacy_body = b"# Closed synthetic witness; never import or run this branch.\n"
+        legacy_file.write_bytes(legacy_body)
+        merge_body = ("from django.db import migrations\n\n\nclass Migration(migrations.Migration):\n"
+            "    atomic = True\n    dependencies = " + repr(list(schema.MERGE_DEPENDENCIES)) + "\n    operations = []\n")
+        merge_file.write_text(merge_body, encoding="utf-8")
+        self.enterContext(patch.object(schema, "LEGACY_WEBHOOKS_HASH", hashlib.sha256(legacy_body).hexdigest()))
+        self.enterContext(patch.object(schema, "_assert_migration_path"))
+        legacy = Migration(schema.LEGACY_WEBHOOKS[1], schema.LEGACY_WEBHOOKS[0])
+        legacy.dependencies = [("crm", "0026_bloqueo_disponibilidad_fecha_fin")]
+        merge = Migration(schema.MERGE_TARGET[1], schema.MERGE_TARGET[0])
+        merge.dependencies = list(schema.MERGE_DEPENDENCIES)
+        merge.operations = []
+        self.disk[schema.LEGACY_WEBHOOKS] = legacy
+        self.disk[schema.MERGE_TARGET] = merge
+        self.applied.add(schema.LEGACY_WEBHOOKS)
+        return legacy_file, merge_file
 
     def assert_refused(self):
         with self.assertRaises(schema.SchemaSafetyError):
@@ -245,6 +281,142 @@ class VirtualAppointmentSchemaSafetyTests(unittest.TestCase):
         with self.assertRaises(schema.SchemaSafetyError):
             schema.apply_schema()
         self.executor.migrate.assert_not_called()
+
+    def test_clean_source_has_no_optional_merge_witness(self):
+        self.assertFalse(schema._merge_witness())
+        _, plan = schema.inspect_schema()
+        self.assertEqual(len(plan), 2)
+        self.assertEqual(self.executor._virtual_effective_targets, schema.TARGETS)
+
+    def test_known_already_applied_branch_allows_only_two_fields_plus_empty_merge(self):
+        self.known_merge()
+        self.assertTrue(schema._merge_witness())
+        expected = [*schema.TARGETS, schema.MERGE_TARGET]
+        self.assertEqual(schema.apply_schema(), expected)
+        self.executor.migrate.assert_called_once_with([schema.TARGETS[0], schema.MERGE_TARGET])
+        self.assertEqual(schema.apply_schema(), [])
+        self.assertEqual(self.executor.migrate.call_count, 1)
+        self.assertIn(schema.LEGACY_WEBHOOKS, self.applied)
+
+    def test_already_added_columns_can_record_only_empty_merge_without_reapplying_fields(self):
+        self.known_merge()
+        self.applied.update(schema.TARGETS)
+        self.present.update(schema.TABLES)
+        self.assertEqual(schema.apply_schema(), [schema.MERGE_TARGET])
+        self.executor.migrate.assert_called_once_with([schema.TARGETS[0], schema.MERGE_TARGET])
+
+    def test_known_branch_must_already_be_recorded_not_scheduled_or_faked(self):
+        self.known_merge()
+        self.applied.remove(schema.LEGACY_WEBHOOKS)
+        self.assert_refused()
+        self.executor.migration_plan.assert_not_called()
+
+    def test_changed_legacy_witness_is_rejected_before_executor_or_sql(self):
+        legacy, _ = self.known_merge()
+        legacy.write_bytes(legacy.read_bytes() + b"# unknown byte\n")
+        self.assert_refused()
+        self.factory.assert_not_called()
+        self.cursor.execute.assert_not_called()
+
+    def test_missing_legacy_or_merge_file_is_rejected_before_executor(self):
+        legacy, merge = self.known_merge()
+        legacy_body, merge_body = legacy.read_bytes(), merge.read_bytes()
+        for missing in (legacy, merge):
+            with self.subTest(missing=missing.name):
+                missing.unlink()
+                self.assert_refused()
+                self.factory.assert_not_called()
+                legacy.write_bytes(legacy_body)
+                merge.write_bytes(merge_body)
+
+    def test_histories_or_loaded_branches_without_files_cannot_look_like_clean_source(self):
+        for key in (schema.LEGACY_WEBHOOKS, schema.MERGE_TARGET):
+            with self.subTest(key=key):
+                self.applied.add(key)
+                self.assert_refused()
+                self.applied.clear()
+
+    def test_known_files_with_missing_loaded_branch_or_merge_are_rejected(self):
+        self.known_merge()
+        for key in (schema.LEGACY_WEBHOOKS, schema.MERGE_TARGET):
+            with self.subTest(key=key):
+                original = self.disk.pop(key)
+                self.assert_refused()
+                self.disk[key] = original
+
+    def test_merge_file_requires_exact_declarative_dependencies_empty_ops_and_atomicity(self):
+        _, merge = self.known_merge()
+        original = merge.read_text(encoding="utf-8")
+        invalid = [
+            original.replace("atomic = True", "atomic = False"),
+            original.replace("operations = []", "operations = [1]"),
+            original.replace(repr(list(schema.MERGE_DEPENDENCIES)), "[]"),
+            original + "\nraise RuntimeError('must never run')\n",
+            original.replace("    operations = []", "    operations = []\n    replaces = []"),
+            original.replace("    operations = []", "    operations = []\n    def apply(self): pass"),
+            original.replace("    operations = []", "    operations = list()"),
+        ]
+        for text in invalid:
+            with self.subTest(text=text):
+                merge.write_text(text, encoding="utf-8")
+                self.assert_refused()
+                self.factory.assert_not_called()
+
+    def test_loaded_merge_metadata_cannot_add_operations_dependencies_or_replacements(self):
+        self.known_merge()
+        for attribute, value in (
+            ("dependencies", []), ("operations", [RemoveField(model_name="citacliente", name="virtual")]),
+            ("atomic", False), ("replaces", [schema.LEGACY_WEBHOOKS]), ("run_before", [("auth", "0001_initial")]),
+        ):
+            with self.subTest(attribute=attribute):
+                merge = self.disk[schema.MERGE_TARGET]
+                original = getattr(merge, attribute)
+                setattr(merge, attribute, value)
+                self.assert_refused()
+                setattr(merge, attribute, original)
+
+    def test_old_branch_never_allowed_in_forward_or_backward_plan_even_with_witness(self):
+        self.known_merge()
+        for backwards in (False, True):
+            with self.subTest(backwards=backwards):
+                self.executor.migration_plan.side_effect = lambda targets: [(self.disk[schema.LEGACY_WEBHOOKS], backwards)]
+                with self.assertRaises(schema.SchemaSafetyError):
+                    schema.apply_schema()
+                self.executor.migrate.assert_not_called()
+
+    def test_merge_plan_without_witness_and_reverse_merge_are_always_refused(self):
+        merge = Migration(schema.MERGE_TARGET[1], schema.MERGE_TARGET[0])
+        with self.assertRaises(schema.SchemaSafetyError):
+            schema.validate_plan([(merge, False)])
+        with self.assertRaises(schema.SchemaSafetyError):
+            schema.validate_plan([(merge, True)], allow_merge=True)
+        self.executor.migration_plan.side_effect = lambda targets: [(merge, False)]
+        self.assert_refused()
+
+    def test_other_conflicts_still_block_known_merge(self):
+        self.known_merge()
+        self.executor.loader.detect_conflicts.return_value = {"crm": [schema.MERGE_TARGET[1], "9999_unreviewed"]}
+        self.assert_refused()
+        self.executor.migration_plan.assert_not_called()
+
+    def test_witness_accepts_only_line_ending_normalization_not_content_changes(self):
+        legacy, merge = self.known_merge()
+        legacy.write_bytes(legacy.read_bytes().replace(b"\n", b"\r\n"))
+        merge.write_bytes(merge.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertTrue(schema._merge_witness())
+
+    def test_loaded_migration_module_must_come_from_exact_candidate_file(self):
+        module_name = "closed_virtual_migration_test_module"
+        expected = self.root / "expected.py"
+        expected.write_text("# no imports or transports\n", encoding="utf-8")
+        migration_class = type("Migration", (Migration,), {"__module__": module_name})
+        migration = migration_class("synthetic", "crm")
+        with patch.dict(sys.modules, {module_name: SimpleNamespace(__file__=str(expected))}):
+            schema._assert_migration_path(migration, expected)
+        for module in (SimpleNamespace(__file__=str(self.root / "elsewhere.py")), SimpleNamespace()):
+            with self.subTest(module=module), patch.dict(sys.modules, {module_name: module}):
+                with self.assertRaises(schema.SchemaSafetyError):
+                    schema._assert_migration_path(migration, expected)
 
 
 if __name__ == "__main__":

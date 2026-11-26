@@ -41,6 +41,7 @@ class VirtualAppointmentOverlayTests(unittest.TestCase):
                                for block, (_, _, text) in overlay.blocks(overlay.decode(data), overlay.BLOCKS[name]).items()})
             else:
                 hashes[name] = overlay.digest(data)
+        hashes[overlay.OPTIONAL_MERGE] = overlay.digest(self.target[overlay.MERGE_TEMPLATE])
         for update in (
             patch.dict(overlay.TARGET_HASHES, hashes, clear=True),
             patch.object(overlay, "_git_file", side_effect=self.git_file),
@@ -94,6 +95,41 @@ class VirtualAppointmentOverlayTests(unittest.TestCase):
                     self.assertIn('"target"', text)
                 if name in overlay.IMPORT_FILES:
                     self.assertEqual(changed.count(overlay.ADDED_IMPORT), 1)
+
+    def test_known_installed_branch_gets_empty_merge_without_replacing_branch(self):
+        branch = b'# Existing integration code is not part of this change\n'
+        self.install_file(self.active, overlay.COMPAT_BRANCH, branch)
+        before = self.snapshot(self.active)
+        with patch.object(overlay, 'COMPAT_BRANCH_HASH', overlay.digest(branch)):
+            files = overlay.build_overlay(self.active, self.root)
+            self.assertEqual(files[overlay.OPTIONAL_MERGE], self.target[overlay.MERGE_TEMPLATE])
+            self.assertNotIn(overlay.COMPAT_BRANCH, files)
+            copy = self.root / 'known-branch-copy'
+            shutil.copytree(self.active, copy)
+            overlay.apply_overlay(copy, files, self.root)
+            self.assertEqual((copy / overlay.COMPAT_BRANCH).read_bytes(), branch)
+            self.assertEqual(overlay.build_overlay(copy, self.root), files)
+        self.assertEqual(self.snapshot(self.active), before)
+
+    def test_unknown_old_branch_or_orphan_merge_fails_before_writes(self):
+        self.install_file(self.active, overlay.COMPAT_BRANCH, b'unknown integration code')
+        before = self.snapshot(self.active)
+        with self.assertRaises(overlay.OverlayError):
+            overlay.build_overlay(self.active, self.root)
+        self.assertEqual(self.snapshot(self.active), before)
+        other = self.release('orphan-merge')
+        self.install_file(other, overlay.OPTIONAL_MERGE, self.target[overlay.MERGE_TEMPLATE])
+        with self.assertRaises(overlay.OverlayError):
+            overlay.build_overlay(other, self.root)
+
+    def test_existing_custom_merge_is_not_overwritten(self):
+        branch = b'# Existing reviewed integration\n'
+        self.install_file(self.active, overlay.COMPAT_BRANCH, branch)
+        self.install_file(self.active, overlay.OPTIONAL_MERGE, b'custom merge code')
+        before = self.snapshot(self.active)
+        with patch.object(overlay, 'COMPAT_BRANCH_HASH', overlay.digest(branch)), self.assertRaises(overlay.OverlayError):
+            overlay.build_overlay(self.active, self.root)
+        self.assertEqual(self.snapshot(self.active), before)
 
     def test_apply_only_inactive_copy_and_repeat_is_idempotent(self):
         files = overlay.build_overlay(self.active, self.root)

@@ -35,6 +35,16 @@ Cada migración contiene únicamente un `AddField`, sin `RunPython` ni cambios
 de permisos/cuentas. Se verifica el plan antes de escribir: si requiere otras
 migraciones, reversas, reparaciones de historial o un esquema inesperado, se detiene.
 
+La producción ya contiene una rama de migraciones de WhatsApp que no pertenece
+a este bloque. Sólo si su archivo coincide con el hash revisado y ya figura
+aplicado, el actualizador instala en la copia una migración de unión **vacía**.
+La plantilla vive fuera del directorio de migraciones de Git, para no introducir
+dependencias inexistentes en instalaciones limpias. Esa unión sólo registra el
+encuentro de ramas; nunca vuelve a ejecutar WhatsApp ni importa su backend ajeno
+al repositorio. Archivos desconocidos, rama sin aplicar o unión alterada bloquean
+el proceso. El plan permitido es los dos `AddField` y, cuando corresponda, esa
+única unión sin operaciones.
+
 Ambos campos usan `default=False` **y `db_default=False` permanente**. Esto
 conserva las citas anteriores como presenciales y permite que la versión anterior
 siga insertando citas durante la transición o una restauración. Los espejos,
