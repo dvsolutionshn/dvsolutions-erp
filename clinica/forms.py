@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from core.access import manuales_pdf_habilitados
+from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
 from .widgets_citas import PacienteCitaSelect
 from .autoria import asignar_autoria_clinica
 
@@ -289,10 +290,12 @@ class CitaClinicaForm(BaseClinicaForm):
 
     class Meta:
         model = CitaClinica
-        fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "pagada", "cortesia", "sala", "observaciones"]
+        fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "pagada", "cortesia", "virtual", "sala", "observaciones"]
 
     def __init__(self, *args, empresa=None, usuario=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
+        if not (empresa and empresa.slug in EMPRESAS_CLINICAS_CON_ROLES):
+            self.fields.pop("virtual", None)
         self.usuario = usuario
         self._paciente_original_id = self.instance.paciente_id
         self.instance._restriccion_usuario = usuario
@@ -328,7 +331,7 @@ class CitaClinicaForm(BaseClinicaForm):
             })
         self.order_fields([
             "paciente", "profesional", "servicio", "fecha_cita", "hora_cita",
-            "periodo_cita", "estado", "canal", "motivo", "pagada", "cortesia", "sala", "observaciones",
+            "periodo_cita", "estado", "canal", "motivo", "pagada", "cortesia", "virtual", "sala", "observaciones",
         ])
 
     def clean(self):

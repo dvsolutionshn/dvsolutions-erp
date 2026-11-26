@@ -94,7 +94,7 @@ def construir_contexto_busqueda_citas_app(
     citas = citas.select_related(
         "paciente", "cliente", "servicio_clinico", "producto", "profesional_salud",
     ).only(
-        "id", "paciente_id", "cliente_id", "fecha_hora", "estado", "titulo",
+        "id", "paciente_id", "cliente_id", "fecha_hora", "estado", "titulo", "virtual",
         "servicio_clinico_id", "producto_id", "profesional_salud_id", "responsable",
         "opcion_servicio", "fase_servicio", "sesion_servicio",
         "paciente__nombre", "cliente__nombre", "servicio_clinico__nombre",
@@ -135,6 +135,7 @@ def construir_contexto_busqueda_citas_app(
             "fecha": fecha,
             "estado": cita.estado,
             "estado_label": cita.get_estado_display(),
+            "virtual": cita.virtual,
             "servicio": cita.display_servicio if mostrar_detalles else "",
             "profesional": cita.display_responsable if mostrar_detalles else "",
             "es_futura": cita.fecha_hora >= ahora,

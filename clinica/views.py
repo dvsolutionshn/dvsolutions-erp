@@ -363,6 +363,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
             "estado": estados.get(cita.estado, "pendiente"),
             "pagada": cita.pagada,
             "cortesia": cita.cortesia,
+            "virtual": cita.virtual,
             "observacion": cita.observaciones or cita.motivo,
             "enviar_confirmacion_whatsapp": not es_recordatorio,
             "recordatorio_semana_whatsapp": True,
@@ -380,6 +381,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
     agenda.estado = estados.get(cita.estado, "pendiente")
     agenda.pagada = cita.pagada
     agenda.cortesia = cita.cortesia
+    agenda.virtual = cita.virtual
     agenda.observacion = cita.observaciones or cita.motivo
     agenda.enviar_confirmacion_whatsapp = not es_recordatorio
     agenda.recordatorio_semana_whatsapp = True

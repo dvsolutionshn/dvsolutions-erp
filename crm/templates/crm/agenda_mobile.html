@@ -5,6 +5,7 @@
 <script src="{% static 'clinica/restricciones_citas.js' %}" defer></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  {% include "crm/includes/appointment_virtual_badge.html" with badge_styles=True %}
   <meta name="theme-color" content="#12324a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -694,7 +695,7 @@
           <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada and not agenda_solo_consulta %}is-paid{% endif %} {% if cita.cortesia and not agenda_solo_consulta %}is-courtesy{% endif %}" data-cita-actions="{{ cita.id }}">
             <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
             <div class="appointment-avatar">{{ cita.display_cliente|slice:":1"|upper }}</div>
-            <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{{ cita.display_servicio }}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada and not agenda_solo_consulta %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia and not agenda_solo_consulta %}<em class="status courtesy">Cortesía</em>{% endif %}</div>
+            <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{{ cita.display_servicio }}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada and not agenda_solo_consulta %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia and not agenda_solo_consulta %}<em class="status courtesy">Cortesía</em>{% endif %}{% include "crm/includes/appointment_virtual_badge.html" %}</div>
             <button class="more" type="button" data-cita-actions="{{ cita.id }}" aria-label="{% if agenda_solo_consulta %}Ver detalle de la cita{% else %}Ver acciones de la cita{% endif %}">•••</button>
           </article>
           {% endfor %}
@@ -712,7 +713,7 @@
         <div class="mobile-period-card-head"><strong>{{ mes.nombre }}</strong><em>{{ mes.total }} cita{{ mes.total|pluralize:"s" }}</em></div>
         <span>Toca para abrir este mes completo.</span>
         <div class="mobile-mini-list">
-          {% for cita in mes.citas %}<b>{{ cita.fecha_hora|date:"d/m" }} · {{ cita.display_cliente }}</b>{% empty %}<b>Sin citas programadas</b>{% endfor %}
+          {% for cita in mes.citas %}<b{% if cita.virtual %} class="appointment-virtual-preview"{% endif %}>{{ cita.fecha_hora|date:"d/m" }} · {{ cita.display_cliente }} {% include "crm/includes/appointment_virtual_badge.html" %}</b>{% empty %}<b>Sin citas programadas</b>{% endfor %}
         </div>
       </a>
       {% endfor %}
@@ -726,7 +727,7 @@
         <span>Toca para ver el detalle del día.</span>
         <div class="mobile-mini-list">
           {% for bloqueo in dia.bloqueos %}<b>No disponible · {{ bloqueo.profesional.nombre }}</b>{% endfor %}
-          {% for cita in dia.citas|slice:":4" %}<b>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.display_cliente }}</b>{% endfor %}
+          {% for cita in dia.citas|slice:":4" %}<b{% if cita.virtual %} class="appointment-virtual-preview"{% endif %}>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.display_cliente }} {% include "crm/includes/appointment_virtual_badge.html" %}</b>{% endfor %}
           {% if not dia.citas and not dia.bloqueos %}<b>Sin citas ni bloqueos</b>{% endif %}
         </div>
       </a>
@@ -745,7 +746,7 @@
       <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada and not agenda_solo_consulta %}is-paid{% endif %} {% if cita.cortesia and not agenda_solo_consulta %}is-courtesy{% endif %}" data-cita-actions="{{ cita.id }}">
         <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
         {% if hospital_mia_app_premium %}<div class="appointment-avatar">{{ cita.display_cliente|slice:":1"|upper }}</div>{% endif %}
-        <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{% if es_clinica %}{{ cita.display_servicio }}{% else %}{{ cita.titulo }}{% endif %}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada and not agenda_solo_consulta %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia and not agenda_solo_consulta %}<em class="status courtesy">Cortesía</em>{% endif %}</div>
+        <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{% if es_clinica %}{{ cita.display_servicio }}{% else %}{{ cita.titulo }}{% endif %}</span><em class="mobile-professional-badge professional-badge-{{ cita.agenda_profesional_color }}" title="{{ cita.agenda_profesional_color_label }}">{{ cita.display_responsable }}</em><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada and not agenda_solo_consulta %}<em class="status paid">Pagada</em>{% endif %}{% if cita.cortesia and not agenda_solo_consulta %}<em class="status courtesy">Cortesía</em>{% endif %}{% include "crm/includes/appointment_virtual_badge.html" %}</div>
         <button class="more" type="button" data-cita-actions="{{ cita.id }}" aria-label="{% if agenda_solo_consulta %}Ver detalle de la cita{% else %}Ver acciones de la cita{% endif %}">•••</button>
       </article>
       {% endfor %}
@@ -840,13 +841,13 @@
           {% endif %}
           <div class="errors">{{ field.errors }}</div>
         </div>
-        {% elif field.name == "crear_serie" or field.name == "pagada" or field.name == "cortesia" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_tres_dias_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
-        <div class="field mobile-appointment-toggle {% if field.name == 'crear_serie' %}is-series{% elif field.name == 'pagada' %}is-paid{% elif field.name == 'cortesia' %}is-courtesy{% elif field.name == 'enviar_confirmacion_whatsapp' %}is-whatsapp{% endif %}" data-field-name="{{ field.name }}">
+        {% elif field.name == "crear_serie" or field.name == "pagada" or field.name == "cortesia" or field.name == "virtual" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_tres_dias_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
+        <div class="field mobile-appointment-toggle {% if field.name == 'crear_serie' %}is-series{% elif field.name == 'pagada' %}is-paid{% elif field.name == 'cortesia' %}is-courtesy{% elif field.name == 'virtual' %}is-virtual{% elif field.name == 'enviar_confirmacion_whatsapp' %}is-whatsapp{% endif %}" data-field-name="{{ field.name }}">
           <label class="mobile-appointment-toggle-card" for="{{ field.id_for_label }}">
             {{ field }}
             <span class="mobile-appointment-toggle-copy">
               <strong>{{ field.label }}</strong>
-              <small>{% if field.name == "crear_serie" %}Repetir a la misma hora en días consecutivos, omitiendo domingos.{% elif field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Avisar cinco días antes.{% elif field.name == "recordatorio_tres_dias_whatsapp" %}Avisar tres días antes.{% else %}Avisar un día antes.{% endif %}</small>
+              <small>{% if field.name == "crear_serie" %}Repetir a la misma hora en días consecutivos, omitiendo domingos.{% elif field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "virtual" %}Atención a distancia; no cambia el pago ni la cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Avisar cinco días antes.{% elif field.name == "recordatorio_tres_dias_whatsapp" %}Avisar tres días antes.{% else %}Avisar un día antes.{% endif %}</small>
             </span>
           </label>
           <div class="errors">{{ field.errors }}</div>
@@ -878,6 +879,7 @@
         <div class="mobile-detail-item"><span>Hora</span><strong>{{ cita.fecha_hora|date:"h:i A" }}</strong></div>
         {% if cita.cirugia_fin_estimada %}<div class="mobile-detail-item"><span>Fin estimado</span><strong>{{ cita.cirugia_fin_estimada|date:"h:i A" }}</strong></div>{% endif %}
         <div class="mobile-detail-item"><span>Estado</span><strong>{{ cita.get_estado_display }}</strong></div>
+        {% include "crm/includes/appointment_virtual_badge.html" with badge_detail=True %}
         {% if not agenda_solo_consulta %}
         {% if cita.pagada %}<div class="mobile-detail-item"><span>Pago</span><strong>Pagada</strong></div>{% endif %}
         {% if cita.cortesia %}<div class="mobile-detail-item"><span>Condición</span><strong>Cortesía</strong></div>{% endif %}

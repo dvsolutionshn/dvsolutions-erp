@@ -8,6 +8,7 @@
 
 {% block content %}
 {% load static %}
+{% include "crm/includes/appointment_virtual_badge.html" with badge_styles=True %}
 <script src="{% static 'clinica/restricciones_citas.js' %}" defer></script>
 <style>
 .appointment-service-picker{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.appointment-service-picker select{min-width:0}.appointment-service-new{height:45px;white-space:nowrap;border:1px solid #159a91;border-radius:10px;background:#effbf9;color:#08766f;padding:0 14px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 20px rgba(15,159,143,.08)}.appointment-service-new:hover{background:#e2f8f4;border-color:#087f78}.service-quick-help{margin-top:5px;color:#6a7b8c;font-size:9px;line-height:1.45}.service-quick-grid{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:14px}.service-quick-field{display:grid;gap:6px}.service-quick-field label{color:#617486;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.service-quick-field input,.service-quick-field select{width:100%;min-height:44px;border:1px solid #b8ccdc;border-radius:10px;background:#fff;padding:0 12px;color:#25384a}.service-quick-field input:focus,.service-quick-field select:focus{outline:0;border-color:#159a91;box-shadow:0 0 0 3px rgba(21,154,145,.1)}
@@ -803,6 +804,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
             <div class="patient-history-main">
               <strong>{{ cita.display_servicio }}</strong>
               <span>{{ cita.display_responsable }} · {{ cita.titulo }}</span>
+              {% include "crm/includes/appointment_virtual_badge.html" %}
             </div>
             <span class="patient-history-state">{{ cita.get_estado_display }}</span>
           </article>
@@ -823,6 +825,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
             <div class="patient-history-main">
               <strong>{{ cita.display_servicio }}</strong>
               <span>{{ cita.display_responsable }} · {{ cita.titulo }}</span>
+              {% include "crm/includes/appointment_virtual_badge.html" %}
             </div>
             <span class="patient-history-state">{{ cita.get_estado_display }}</span>
           </article>
@@ -847,7 +850,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
       <span class="calendar-month-total">{{ mes.total }} cita{{ mes.total|pluralize:"s" }}</span>
       <div class="calendar-month-preview">
         {% for cita in mes.citas %}
-        <span>{{ cita.fecha_hora|date:"d/m" }} · {{ cita.display_cliente }}</span>
+        <span{% if cita.virtual %} class="appointment-virtual-preview"{% endif %}>{{ cita.fecha_hora|date:"d/m" }} · {{ cita.display_cliente }} {% include "crm/includes/appointment_virtual_badge.html" %}</span>
         {% empty %}
         <span class="calendar-month-empty">Sin citas programadas</span>
         {% endfor %}
@@ -875,6 +878,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
         <div class="calendar-day-summary" aria-label="{{ dia.citas|length }} citas programadas">
           <span class="calendar-day-count {% if not dia.citas %}is-empty{% elif dia.citas|length >= 8 %}count-high{% elif dia.citas|length >= 4 %}count-medium{% else %}count-low{% endif %}">{{ dia.citas|length }}</span>
           <small>{% if dia.citas|length == 1 %}cita{% else %}citas{% endif %}</small>
+          <span class="appointment-virtual-summary">{% for cita in dia.citas %}{% include "crm/includes/appointment_virtual_badge.html" %}{% endfor %}</span>
         </div>
         {% else %}
         {% for cita in dia.citas %}
@@ -882,6 +886,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}</span>
           <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
+          {% include "crm/includes/appointment_virtual_badge.html" %}
         </button>
         {% endfor %}
         {% for bloqueo in dia.bloqueos %}
@@ -896,6 +901,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
               <strong>{{ cita.display_cliente }}</strong>
               <span class="calendar-modal-service">{{ cita.display_servicio }}</span>
               <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
+              {% include "crm/includes/appointment_virtual_badge.html" %}
             </div>
             <span class="calendar-modal-tag">{{ cita.agenda_color_label }} · {{ cita.agenda_profesional_color_label }}</span>
           </button>
@@ -924,6 +930,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}{% if not es_clinica %} · {{ cita.duracion_minutos }} min{% endif %}</span>
           <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
+          {% include "crm/includes/appointment_virtual_badge.html" %}
         </button>
         {% endfor %}
         {% for bloqueo in dia.bloqueos %}
@@ -951,6 +958,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
           <strong>{{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }} · {{ cita.display_servicio }}{% if not es_clinica %} · {{ cita.duracion_minutos }} minutos{% endif %}</span>
           <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
+          {% include "crm/includes/appointment_virtual_badge.html" %}
         </div>
         <span class="calendar-chip">Ver cita</span>
       </article>
@@ -1208,13 +1216,13 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
             {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
             {% for error in form.cirugia_periodo_fin.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
           </div>
-          {% elif field.name == "crear_serie" or field.name == "pagada" or field.name == "cortesia" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_tres_dias_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
-          <div class="erp-field appointment-toggle {% if field.name == 'crear_serie' %}is-series{% elif field.name == 'pagada' %}is-paid{% elif field.name == 'cortesia' %}is-courtesy{% elif field.name == 'enviar_confirmacion_whatsapp' %}is-whatsapp{% endif %}" data-field-name="{{ field.name }}">
+          {% elif field.name == "crear_serie" or field.name == "pagada" or field.name == "cortesia" or field.name == "virtual" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_tres_dias_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
+          <div class="erp-field appointment-toggle {% if field.name == 'crear_serie' %}is-series{% elif field.name == 'pagada' %}is-paid{% elif field.name == 'cortesia' %}is-courtesy{% elif field.name == 'virtual' %}is-virtual{% elif field.name == 'enviar_confirmacion_whatsapp' %}is-whatsapp{% endif %}" data-field-name="{{ field.name }}">
             <label class="appointment-toggle-card" for="{{ field.id_for_label }}">
               {{ field }}
               <span class="appointment-toggle-copy">
                 <strong>{{ field.label }}</strong>
-                <small>{% if field.name == "crear_serie" %}Repetir a la misma hora en días consecutivos, omitiendo los domingos.{% elif field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al paciente al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Enviar aviso cinco días antes.{% elif field.name == "recordatorio_tres_dias_whatsapp" %}Enviar aviso tres días antes.{% else %}Enviar aviso un día antes.{% endif %}</small>
+                <small>{% if field.name == "crear_serie" %}Repetir a la misma hora en días consecutivos, omitiendo los domingos.{% elif field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "virtual" %}Atención a distancia; no cambia el pago ni la cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al paciente al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Enviar aviso cinco días antes.{% elif field.name == "recordatorio_tres_dias_whatsapp" %}Enviar aviso tres días antes.{% else %}Enviar aviso un día antes.{% endif %}</small>
               </span>
             </label>
             {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
@@ -1311,6 +1319,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
               <span class="appointment-status {{ cita.estado }}">{{ cita.get_estado_display }}</span>
               {% if not agenda_solo_consulta and cita.pagada %}<span class="appointment-paid-badge">Pagada</span>{% endif %}
               {% if not agenda_solo_consulta and cita.cortesia %}<span class="appointment-courtesy-badge">Cortesía</span>{% endif %}
+              {% include "crm/includes/appointment_virtual_badge.html" %}
             </td>
             {% if not agenda_solo_consulta %}
             <td>
@@ -1571,6 +1580,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
       backButton.hidden = true;
     }
     const data = trigger.dataset;
+    const virtualBadge = trigger.querySelector("[data-appointment-virtual]");
     {% if not agenda_solo_consulta %}
     const mediaTemplate = data.appointmentMediaId ? document.getElementById(data.appointmentMediaId) : null;
     const mediaHtml = mediaTemplate ? mediaTemplate.innerHTML.trim() : "";
@@ -1614,7 +1624,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
     title.textContent = "Detalle de la cita";
     body.innerHTML = [
       '<div class="appointment-readonly">',
-        '<div class="appointment-readonly-head"><small>Vista solo lectura</small><strong>'+escapeHtml(data.appointmentClient || "Paciente sin nombre")+'</strong><div class="appointment-readonly-badge">'+escapeHtml(data.appointmentStatus || "Estado")+'</div></div>',
+        '<div class="appointment-readonly-head"><small>Vista solo lectura</small><strong>'+escapeHtml(data.appointmentClient || "Paciente sin nombre")+'</strong><div class="appointment-readonly-badge">'+escapeHtml(data.appointmentStatus || "Estado")+'</div>'+(virtualBadge ? virtualBadge.outerHTML : '')+'</div>',
         '<div class="appointment-readonly-grid">',
           field("Tipo de consulta", data.appointmentService || data.appointmentTitle),
           field("Doctor / profesional", data.appointmentProfessional),

@@ -266,6 +266,7 @@ class CitaCliente(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
     pagada = models.BooleanField(default=False)
     cortesia = models.BooleanField(default=False)
+    virtual = models.BooleanField("Cita virtual", default=False, db_default=False)
     observacion = models.TextField(blank=True, null=True)
     cirugia_detalle = models.TextField(blank=True, null=True)
     cirugia_fin_estimada = models.DateTimeField(blank=True, null=True)

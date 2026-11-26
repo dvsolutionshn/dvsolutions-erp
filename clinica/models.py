@@ -375,6 +375,7 @@ class CitaClinica(models.Model):
     motivo = models.CharField(max_length=220)
     pagada = models.BooleanField(default=False)
     cortesia = models.BooleanField(default=False)
+    virtual = models.BooleanField("Cita virtual", default=False, db_default=False)
     es_recordatorio_tratamiento = models.BooleanField(default=False)
     tratamiento_recordatorio = models.CharField(max_length=180, blank=True, null=True)
     sala = models.CharField(max_length=80, blank=True, null=True)

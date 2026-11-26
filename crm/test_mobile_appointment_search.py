@@ -150,7 +150,8 @@ class MobileAppointmentSearchTests(TestCase):
         for readonly, details in ((True, True), (False, False)):
             context = self.search(citas_q="Ana", readonly=readonly, details=details)
             for row in context["citas_busqueda_page"]:
-                self.assertEqual(set(row), {"id", "nombre", "fecha", "estado", "estado_label", "servicio", "profesional", "es_futura", "agenda_url"})
+                self.assertEqual(set(row), {"id", "nombre", "fecha", "estado", "estado_label", "servicio", "profesional", "es_futura", "agenda_url", "virtual"})
+                self.assertIsInstance(row["virtual"], bool)  # Modality is operational, never a private clinical field.
                 self.assertEqual(row["servicio"], "")
                 self.assertEqual(row["profesional"], "")
                 self.assertNotIn("PRIVAD", str(row))

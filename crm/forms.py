@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from django import forms
 from django.utils import timezone
 
+from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
 from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
 from clinica.widgets_citas import PacienteCitaSelect
@@ -638,7 +639,7 @@ class CitaClienteForm(forms.ModelForm):
 
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cortesia", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp", "crear_serie", "cantidad_serie"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cortesia", "virtual", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp", "crear_serie", "cantidad_serie"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "cirugia_detalle": forms.Textarea(attrs={"rows": 3, "placeholder": "Ejemplo: Abdominoplastia con liposuccion, zona a operar, preparacion especial o detalle clinico."}),
@@ -659,6 +660,8 @@ class CitaClienteForm(forms.ModelForm):
         self.instance._restriccion_usuario = self.usuario
         self._paciente_original_id = self.instance.paciente_id
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
+        if not (self.es_clinica and empresa.slug in EMPRESAS_CLINICAS_CON_ROLES):
+            self.fields.pop("virtual", None)
         self.permitir_motivo_consulta = self.es_clinica and (
             permitir_motivo_consulta or permitir_motivo_consulta_nueva and not self.instance.pk
         )
@@ -873,7 +876,7 @@ class CitaClienteForm(forms.ModelForm):
             if not self.notificaciones_cita_activas:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "crear_serie", "cantidad_serie", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "cortesia", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "crear_serie", "cantidad_serie", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "cortesia", "virtual", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"])
         else:
             for nombre in ["paciente", "servicio_clinico", "profesional_salud", "cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre, None)

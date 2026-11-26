@@ -33,6 +33,7 @@
   {% for cita in citas_busqueda_page %}
   <article class="mobile-appointment-result">
     <div class="appointment-result-head"><strong>{{ cita.nombre }}</strong><span class="appointment-result-state">{{ cita.estado_label }}</span></div>
+    {% include "crm/includes/appointment_virtual_badge.html" %}
     <time datetime="{{ cita.fecha|date:'c' }}">{{ cita.fecha|date:"d/m/Y" }} · {{ cita.fecha|date:"h:i A" }}</time>
     {% if cita.servicio %}<span>{{ cita.servicio }}</span>{% endif %}
     {% if cita.profesional %}<span>{{ cita.profesional }}</span>{% endif %}
