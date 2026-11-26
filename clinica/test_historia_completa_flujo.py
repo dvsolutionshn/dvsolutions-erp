@@ -14,7 +14,9 @@ from . import test_preconsulta_paciente_existente as datos_publicos
 
 
 class HistoriaCompletaFlujoTests(TestCase):
-    respuestas = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas
+    def respuestas(self):
+        valores = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self)
+        return {**valores, "version_declaracion": "1", "riesgo_tromboembolico": ["ninguno"]}
 
     @classmethod
     def setUpTestData(cls):
@@ -128,6 +130,52 @@ class HistoriaCompletaFlujoTests(TestCase):
         self.assertIsNone(preconsulta.fecha_completada)
         self.assertEqual(preconsulta.ultimo_resultado, "validacion")
         self.assertContains(Client().post(enlace, datos), "Información recibida")
+
+    def test_negativas_explicitas_se_guardan_por_http_y_se_leen_en_las_cuatro_empresas(self):
+        valores = {
+            "version_declaracion": "1", "motivo_consulta": "Actualización de antecedentes antes de la consulta",
+            "funcion_apetito": "normal", "funcion_sueno": "normal", "funcion_sed": "normal",
+            "funcion_miccion": "normal", "funcion_evacuaciones": "normal",
+            "diagnostico_medico": "no", "alergias_respuesta": "no", "medicamentos_respuesta": "no",
+            "antecedentes_hospitalarios": ["no"], "quirurgicos_operado": ["no"], "consumo_riesgo": ["no"],
+            "dieta": ["no"], "ejercicio": ["no"], "antecedentes_familiares": ["no_aplica"],
+            "riesgo_tromboembolico": ["ninguno"], "evaluacion_psicologica": ["ninguna"],
+            "decision_cirugia": ["no_decidido"], "gine_embarazada": ["no"], "gine_lactancia": ["no"],
+            "gine_mamografia": ["no"], "consentimiento_datos": "on",
+            "no_aplica_antecedentes_infecciosos": "1",
+            **{f"no_aplica_{campo}": "1" for campo in (
+                "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion",
+            )},
+        }
+        for empresa, paciente, cita in self.casos:
+            with self.subTest(empresa=empresa.slug):
+                paciente_anterior = Paciente.objects.values().get(pk=paciente.pk)
+                preconsulta, enlace = self.generar(empresa, paciente, cita)
+                self.assertContains(Client().get(enlace), 'name="version_declaracion" value="1"')
+                respuesta = Client().post(enlace, valores)
+                self.assertContains(respuesta, "Información recibida")
+                preconsulta.refresh_from_db()
+                self.assertEqual(preconsulta.estado, "completada")
+                declaracion = preconsulta.datos_generales["negativas_explicitas"]
+                self.assertEqual(declaracion["version"], 1)
+                self.assertEqual(declaracion["respuestas"]["alergias_respuesta"], {
+                    "valor": "no", "texto": "Niego tener alergias",
+                })
+                self.assertEqual(declaracion["respuestas"]["antecedentes_familiares"]["valor"], "no_aplica")
+                self.assertEqual(preconsulta.antecedentes_infecciosos, "Niego antecedentes de enfermedades infecciosas, incluido COVID-19")
+                self.assertFalse(preconsulta.antecedentes_hospitalarios)
+                self.assertEqual(preconsulta.antecedentes_familiares, ["no_aplica"])
+                self.assertEqual(Paciente.objects.values().get(pk=paciente.pk), paciente_anterior)
+                detalle = reverse("clinica_preconsulta_detalle", args=[empresa.slug, paciente.pk, preconsulta.pk])
+                for modo in ({}, {"app": "1"}):
+                    pagina = self.client.get(detalle, modo)
+                    self.assertEqual(pagina.status_code, 200)
+                    contenido = pagina.content.decode()
+                    for texto in (
+                        "Niego tener alergias", "Niego antecedentes familiares de estas enfermedades",
+                        preconsulta.antecedentes_infecciosos,
+                    ):
+                        self.assertTrue(texto in contenido, f"No aparece la declaración {texto!r}, empresa={empresa.slug}, modo={modo}")
 
     def test_respuestas_visibles_desde_la_pantalla_de_trabajo_por_especialidad(self):
         for empresa, paciente, cita in self.casos:

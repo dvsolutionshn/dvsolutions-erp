@@ -131,6 +131,15 @@ class PermisosEnlacesPacientesTests(TestCase):
         enlace = urlsplit(generado.context["enlace_publico"]).path
         anterior = (self.paciente.nombre, self.paciente.whatsapp, self.paciente.alergias)
         respuestas = {
+            "version_declaracion": "1", "motivo_consulta": "Consulta de prueba",
+            "antecedentes_hospitalarios": ["no"], "quirurgicos_operado": ["no"],
+            "consumo_riesgo": ["no"], "dieta": ["no"], "ejercicio": ["no"],
+            "antecedentes_familiares": ["no_aplica"], "riesgo_tromboembolico": ["ninguno"],
+            "evaluacion_psicologica": ["ninguna"], "decision_cirugia": ["no_decidido"],
+            "no_aplica_antecedentes_infecciosos": "1",
+            "gine_menarca": "12", "gine_gestas": "0", "gine_partos": "0",
+            "gine_cesareas": "0", "gine_abortos": "0", "gine_ultima_menstruacion": "2026-11-01",
+            "gine_embarazada": ["no"], "gine_lactancia": ["no"], "gine_mamografia": ["no"],
             "nombres": "Nombre actualizado", "apellidos": "Apellido actualizado",
             "identidad": self.paciente.identidad, "fecha_nacimiento": "1990-01-15",
             "sexo": "femenino", "estado_civil": "soltero", "telefono": "99991111",

@@ -213,6 +213,7 @@ class CompletarConservaRespuestasTests(TestCase):
                     cliente_publico = Client()
                     self.assertContains(cliente_publico.get(enlace), "Motivo de Consulta")
                     respuestas = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self)
+                    respuestas.update(version_declaracion="1", riesgo_tromboembolico=["ninguno"])
                     self.assertContains(cliente_publico.post(enlace, respuestas), "Información recibida")
                     publico.refresh_from_db()
                     self.assertEqual(publico.motivo_consulta, respuestas["motivo_consulta"])

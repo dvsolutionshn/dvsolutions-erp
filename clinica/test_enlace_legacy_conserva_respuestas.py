@@ -50,7 +50,8 @@ class EnlaceLegacyConservaRespuestasTests(TestCase):
         return registro, urlsplit(respuesta.context["enlace_publico"]).path
 
     def respuestas_publicas(self):
-        return datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self)
+        valores = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self)
+        return {**valores, "version_declaracion": "1", "riesgo_tromboembolico": ["ninguno"]}
 
     def test_enlaces_anteriores_guardan_los_campos_fuera_del_html_y_se_leen_en_historial(self):
         for empresa, paciente, _anterior, actual in self.casos:

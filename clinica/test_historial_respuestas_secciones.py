@@ -67,7 +67,12 @@ class _PanelesRecibidos(HTMLParser):
 
 class HistorialRespuestasSeccionesTests(TestCase):
     SECCIONES = ("motivo_consulta", "funciones_organicas", "examen_fisico", "antecedentes", "datos_generales")
-    respuestas_base = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas
+
+    def respuestas_base(self):
+        return {
+            **datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self),
+            "version_declaracion": "1", "riesgo_tromboembolico": ["ninguno"],
+        }
 
     @classmethod
     def setUpTestData(cls):

@@ -3145,6 +3145,7 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.post(
             publica_url,
             {
+                "version_declaracion": "1",
                 "nombres": "Nombre alterado",
                 "identidad": paciente.identidad,
                 "motivo_consulta": "Valoracion de cirugia facial",
@@ -3159,6 +3160,7 @@ class ClinicaPacienteTests(TestCase):
                 "funcion_sueno": "normal",
                 "funcion_sed": "normal",
                 "funcion_miccion": "alterada",
+                "funciones_detalle": "Micción",
                 "funcion_evacuaciones": "normal",
                 "revision_sistemas": "normal",
                 "revision_sistemas_detalle": "",
@@ -3186,7 +3188,7 @@ class ClinicaPacienteTests(TestCase):
                 "consumo_riesgo": ["no"],
                 "consumo_riesgo_detalle": "",
                 "riesgo_tromboembolico": ["ninguno"],
-                "riesgo_tromboembolico_otros": "No aplica",
+                "riesgo_tromboembolico_otros": "",
                 "gine_menarca": "12",
                 "gine_gestas": "0",
                 "gine_partos": "0",
@@ -3197,6 +3199,7 @@ class ClinicaPacienteTests(TestCase):
                 "gine_lactancia": ["no"],
                 "gine_mamografia": ["no"],
                 "decision_cirugia": ["usted"],
+                "decision_cirugia_otros": "Decisión tomada por la paciente",
                 "evaluacion_psicologica": ["ninguna"],
                 "evaluacion_psicologica_detalle": "",
                 "examen_peso": "64",
@@ -3297,6 +3300,14 @@ class ClinicaPacienteTests(TestCase):
             response = self.client.post(
                 reverse("clinica_preconsulta_publica", args=[token_raw]),
                 self._datos_formulario_general(
+                    version_declaracion="1",
+                    antecedentes_infecciosos="",
+                    no_aplica_antecedentes_infecciosos="1",
+                    antecedentes_hospitalarios_detalle="",
+                    quirurgicos_detalle="",
+                    antecedentes_familiares_detalle="",
+                    riesgo_tromboembolico_otros="",
+                    decision_cirugia=["no_decidido"],
                     nombres="Paciente",
                     apellidos="Error",
                     identidad="0801199600100",

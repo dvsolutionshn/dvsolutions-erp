@@ -149,6 +149,20 @@ def _secciones_seguras(preconsulta, secciones_callback, *, incluir_datos_general
     if not isinstance(general, dict):
         raise PermissionDenied("La preconsulta contiene un formulario con estructura no compatible.")
     datos_lectura = {"formulario_general": _LecturaGeneral(general)}
+    from .preconsulta_lectura_negativas import negativas_guardadas
+    from .preconsulta_negativas import NEGATIVAS_POR_PREGUNTA, NEGATIVAS_TEXTO
+
+    # Transportar sólo las declaraciones clínicas conocidas y sus dos cadenas;
+    # el lector original comprobará que correspondan a la respuesta guardada.
+    negativas = {
+        nombre: {"valor": valor["valor"], "texto": valor["texto"]}
+        for nombre, valor in negativas_guardadas(preconsulta).items()
+        if nombre in (NEGATIVAS_POR_PREGUNTA.keys() | NEGATIVAS_TEXTO.keys())
+        and isinstance(valor, dict)
+        and isinstance(valor.get("valor"), str) and isinstance(valor.get("texto"), str)
+    }
+    if negativas:
+        datos_lectura["negativas_explicitas"] = {"version": 1, "respuestas": negativas}
     # Esta marca distingue el registro básico de una historia respondida;
     # conservar sólo el booleano evita inventar respuestas clínicas negativas.
     if isinstance(datos, dict) and datos.get("formulario_general_pendiente_doctor") is True:

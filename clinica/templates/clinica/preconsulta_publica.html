@@ -11,7 +11,8 @@
     .procedure-groups{display:grid;grid-template-columns:1fr;gap:14px}.procedure-group{border:1px solid #d5e5f5;border-radius:16px;padding:14px;background:linear-gradient(135deg,#fbfdff,#f7fcfb)}.procedure-group-title{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:900;color:#123f6d}.procedure-group-title:before{content:"";width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));box-shadow:0 0 0 4px rgba(11,159,145,.1)}.procedure-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.procedure-options label{min-height:46px}.procedure-options input{flex:0 0 auto;accent-color:var(--teal);width:18px!important;height:18px!important}.radio-row label.is-disabled,.check-grid label.is-disabled,.procedure-options label.is-disabled{opacity:.48;cursor:not-allowed;background:#f3f6f9;color:#7f8c99;transform:none!important;box-shadow:none!important}.radio-row label.is-disabled input,.check-grid label.is-disabled input,.procedure-options label.is-disabled input{cursor:not-allowed}.procedure-empty{padding:14px;border:1px dashed #b9cede;border-radius:14px;background:#f8fbfe;color:#61758d;font-size:12px;line-height:1.5}@media(max-width:720px){.procedure-options{grid-template-columns:1fr}}
     .photo-capture{grid-column:1/-1;padding:18px;border:1px solid #c8dfeb;border-radius:18px;background:linear-gradient(135deg,#f7fcff,#f2fbf8)}.photo-capture-head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:14px}.photo-capture-head strong{display:block;color:#143457}.photo-capture-head span{display:block;margin-top:4px;color:var(--muted);font-size:12px}.photo-actions{display:flex;gap:10px;flex-wrap:wrap}.photo-action{border:1px solid #a9c8df;border-radius:12px;padding:10px 14px;background:#fff;color:#174f9f;font-weight:900;cursor:pointer}.photo-action.primary{border:0;background:linear-gradient(135deg,var(--blue),var(--teal));color:#fff}.photo-file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none}.camera-stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,.55fr);gap:14px;align-items:center;margin-top:14px}.camera-stage.preview-only{grid-template-columns:minmax(220px,420px);justify-content:end}.camera-stage.preview-only video{display:none}.camera-stage video,.photo-preview{width:100%;max-height:360px;border-radius:16px;background:#102338;object-fit:cover}.photo-preview{background:#eaf2f7}.camera-note{margin:10px 0 0;color:#61758d;font-size:12px}.photo-error{color:var(--danger);font-size:12px;margin-top:8px}.no-apply-toggle{display:inline-flex;align-items:center;gap:8px;width:max-content;margin-top:4px;border:1px solid #c6d8e6;border-radius:999px;padding:8px 10px;background:#f8fcff;color:#385875;font-size:12px;font-weight:900;cursor:pointer}.no-apply-toggle input{width:16px!important;height:16px!important;padding:0!important;accent-color:var(--teal)}.no-apply-toggle.is-selected{border-color:#4bb9ae;background:#effbf8;color:#087466}.field.no-apply-active input,.field.no-apply-active textarea{background:#f5f8fb;color:#7a8b9d}@media(max-width:720px){.photo-capture-head,.camera-stage{grid-template-columns:1fr;display:grid}.photo-actions .photo-action{flex:1}.camera-stage video{max-height:300px}.camera-stage.preview-only{grid-template-columns:1fr}}
     .missing-summary{margin:18px 32px 0;padding:16px;border:1px solid #f3b5ad;border-radius:16px;background:linear-gradient(135deg,#fff7f6,#fff);box-shadow:0 12px 32px rgba(180,35,24,.1);color:#7a271a}.missing-summary strong{display:block;margin-bottom:5px;color:var(--danger);font-size:15px}.missing-summary p{margin:0 0 10px;color:#7a271a;font-size:12px;line-height:1.5}.missing-summary ul{margin:0;padding-left:18px;display:grid;gap:5px}.missing-summary button{border:0;background:transparent;color:#b42318;font-weight:900;text-align:left;cursor:pointer;padding:2px}.field.is-missing,.check-grid.is-missing,.consent.is-missing,.photo-capture.is-missing{border:1px solid #f2aaa3!important;border-radius:15px;background:linear-gradient(135deg,#fff7f6,#fff)!important;box-shadow:0 0 0 3px rgba(180,35,24,.08)}.field.is-missing>label,.check-grid.is-missing>.group-label,.consent.is-missing span{color:#b42318}.field.is-missing input,.field.is-missing select,.field.is-missing textarea{border-color:#ef8f86;box-shadow:0 0 0 3px rgba(180,35,24,.1)}.missing-hint{display:block;color:#b42318;font-size:12px;font-weight:800;margin-top:4px}.check-grid.is-missing label{border-color:#f0aaa3}.missing-toast{position:fixed;left:50%;top:18px;z-index:50;transform:translateX(-50%);width:min(620px,calc(100% - 24px));padding:15px 17px;border:1px solid #f2b8b5;border-radius:18px;background:#fff7f6;box-shadow:0 22px 55px rgba(20,45,70,.18);color:#7a271a;font-size:13px;line-height:1.45}.missing-toast strong{display:block;color:#b42318;margin-bottom:3px}.missing-modal{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:18px;background:rgba(10,24,38,.42);backdrop-filter:blur(8px)}.missing-modal-card{width:min(620px,100%);max-height:min(82vh,720px);overflow:auto;border:1px solid #f2b8b5;border-radius:24px;background:#fff;box-shadow:0 30px 90px rgba(10,24,38,.28);padding:22px}.missing-modal-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:12px}.missing-modal-head h3{margin:0;color:#b42318;font-size:21px}.missing-modal-head p{margin:6px 0 0;color:#61758d;font-size:13px;line-height:1.5}.missing-modal-close{border:1px solid #f2b8b5;border-radius:999px;background:#fff7f6;color:#b42318;width:38px;height:38px;font-weight:900;cursor:pointer}.missing-modal-list{display:grid;gap:8px;margin:14px 0 18px;padding:0;list-style:none}.missing-modal-list button{width:100%;text-align:left;border:1px solid #f5c2bd;border-radius:14px;background:#fff8f7;color:#7a271a;padding:11px 13px;font-weight:900;cursor:pointer}.missing-modal-list button:hover{border-color:#e98177;background:#fff2f0}.missing-modal-actions{display:flex;justify-content:flex-end;gap:10px}.missing-modal-actions button{border:0;border-radius:13px;background:linear-gradient(135deg,var(--blue),var(--teal));color:#fff;padding:11px 15px;font-weight:900;cursor:pointer}@media(max-width:720px){.missing-summary{margin:14px 18px 0}.missing-toast{top:8px}.missing-modal{align-items:end;padding:10px}.missing-modal-card{border-radius:20px 20px 14px 14px;max-height:88vh}}
-    </style>
+.no-apply-toggle{max-width:100%}.no-apply-toggle input{flex:0 0 16px}.no-apply-toggle span{min-width:0;overflow-wrap:anywhere}
+</style>
 </head>
 <body>
 <main class="public-shell"><div class="public-wrap">
@@ -24,13 +25,19 @@
     {% endif %}
     <form method="post" enctype="multipart/form-data" class="public-card" id="preconsultaForm" novalidate>
         {% csrf_token %}
+        {% if form.negativas_explicitas %}{{ form.version_declaracion }}{% endif %}
         <div class="public-head"><h1>Formulario de historia clinica</h1><p>{% if form.formulario_paciente_existente %}Cuéntenos por qué agendó su cita y continúe con las preguntas de su historia clínica. Sus respuestas quedarán vinculadas a esta atención.{% elif modo_edicion_paciente %}Actualice los datos generales del paciente usando el mismo formulario oficial del enlace y del registro de paciente nuevo.{% elif modo_doctor_completar_historia %}Complete las preguntas clinicas pendientes del expediente del paciente. Esta parte queda para uso del doctor y personal autorizado.{% elif registro_interno and flujo_paciente_nuevo_corto %}Complete los datos basicos del paciente con el mismo formulario oficial del enlace. El resto de la historia clinica quedara pendiente para la doctora.{% elif registro_interno %}Complete el mismo formulario general que recibe el paciente por enlace. Al guardar se creara el expediente y quedara registrada la historia clinica general.{% elif flujo_paciente_nuevo_corto %}Complete sus datos basicos para crear el expediente. El resto de la historia clinica sera completado por la doctora durante su atencion.{% elif omitir_pasos_iniciales %}Sus datos generales, contacto y motivo de consulta ya forman parte de su expediente. Continúe desde el paso 4 para completar su historia clínica.{% else %}Preparemos su consulta con una historia clínica ordenada y fácil de entender. Puede seleccionar una o varias respuestas por pregunta y agregar detalles cuando lo necesite.{% endif %}</p><p class="privacy">Este formulario es privado y confidencial. La información será revisada solamente por el doctor y el personal autorizado para su atención médica.</p></div>
         <div class="patient-guide">
             <div class="guide-title">Lea esto antes de empezar</div>
             <ol>
                 <li>Avance paso por paso. El botón <strong>Continuar</strong> revisará cada pregunta antes de pasar al siguiente paso.</li>
+                {% if form.negativas_explicitas %}
+                <li>Responda cada pregunta que corresponda a su caso o marque la declaración negativa indicada, por ejemplo <strong>Niego tener alergias</strong>. Ninguna respuesta se marcará automáticamente.</li>
+                <li>La declaración negativa significa que usted niega ese antecedente. Al marcarla se ocultarán las demás respuestas de esa pregunta; puede cambiarla antes de enviar.</li>
+                {% else %}
                 <li>Si una pregunta no corresponde a su caso, marque <strong>No aplica</strong>, <strong>No</strong> o <strong>Ninguna</strong>. No deje preguntas vacías.</li>
                 <li>Cuando vea cuadritos, puede seleccionar una o varias opciones. Si selecciona <strong>No aplica</strong>, el sistema bloqueará las demás respuestas de esa pregunta.</li>
+                {% endif %}
                 <li>Si falta algo, aparecerá una ventana con la lista de pendientes y lo llevará directo a la pregunta. Sus respuestas no se borran.</li>
             </ol>
             <div class="support-note"><strong>Ayuda rápida:</strong> si corrige lo marcado y aun así no puede enviar, contacte al admin DV Solutions para revisar el caso.</div>
@@ -147,7 +154,7 @@
             <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 2 de 7{% else %}Paso 4 de 9{% endif %}</div><h2>Funciones orgánicas generales</h2><p class="step-copy">Marque si cada función está normal o alterada.</p>
             <div class="field-grid">
                 {% for field in form %}{% if field.name == 'funcion_apetito' or field.name == 'funcion_sueno' or field.name == 'funcion_sed' or field.name == 'funcion_miccion' or field.name == 'funcion_evacuaciones' %}<div class="field radio-row"><span class="group-label">{{ field.label }}</span>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
-                {% if form.formulario_paciente_existente %}<div class="field wide"><label for="{{ form.funciones_detalle.id_for_label }}">{{ form.funciones_detalle.label }}</label>{{ form.funciones_detalle }}{% for error in form.funciones_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}
+                {% if form.formulario_paciente_existente %}<div class="field wide funciones-detail"><label for="{{ form.funciones_detalle.id_for_label }}">{{ form.funciones_detalle.label }}</label>{{ form.funciones_detalle }}{% for error in form.funciones_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}
             </div>
             <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
         </section>
@@ -169,7 +176,7 @@
         <section class="form-step" data-step="5">
             <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 4 de 7{% else %}Paso 6 de 9{% endif %}</div><h2>Antecedentes quirúrgicos, hospitalarios y hábitos</h2><p class="step-copy">Incluya hospitalizaciones, accidentes, fracturas, cirugías previas y hábitos actuales.</p>
             <div class="field-grid">
-                <div class="step-tip">Si nunca fue operado, marque No. Si marca Sí, escriba el año, lugar y procedimiento. En hábitos, seleccione Ninguno o No aplica cuando corresponda.</div>
+                <div class="step-tip">{% if form.negativas_explicitas %}Si no presenta un antecedente o consumo, marque la declaración negativa de esa pregunta. Si marca Sí, complete el detalle solicitado.{% else %}Si nunca fue operado, marque No. Si marca Sí, escriba el año, lugar y procedimiento. En hábitos, seleccione Ninguno o No aplica cuando corresponda.{% endif %}</div>
                 <div class="clinical-note"><strong>Antecedentes hospitalarios, traumáticos y quirúrgicos</strong>Incluye cirugías estéticas y no estéticas, hospitalizaciones, fracturas, accidentes y complicaciones previas.</div>
                 <div class="field wide check-grid"><span class="group-label">{{ form.antecedentes_hospitalarios.label }}</span>{{ form.antecedentes_hospitalarios }}{% for error in form.antecedentes_hospitalarios.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <div class="field wide hospitalarios-detail"><label for="{{ form.antecedentes_hospitalarios_detalle.id_for_label }}">{{ form.antecedentes_hospitalarios_detalle.label }}</label>{{ form.antecedentes_hospitalarios_detalle }}{% for error in form.antecedentes_hospitalarios_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
@@ -187,15 +194,15 @@
             <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 5 de 7{% else %}Paso 7 de 9{% endif %}</div><h2>Antecedentes familiares</h2><p class="step-copy">Los antecedentes familiares se refieren a familiares cercanos en orden de descendencia: abuelos, padre, madre y hermanos.</p>
             <div class="field-grid">
                 <div class="field wide check-grid"><span class="group-label">{{ form.antecedentes_familiares.label }} (abuelos, padre, madre y hermanos)</span>{{ form.antecedentes_familiares }}</div>
-                <div class="field wide"><label for="{{ form.antecedentes_familiares_detalle.id_for_label }}">Otros / detalle:</label>{{ form.antecedentes_familiares_detalle }}</div>
+                <div class="field wide familiares-detail"><label for="{{ form.antecedentes_familiares_detalle.id_for_label }}">Otros / detalle:</label>{{ form.antecedentes_familiares_detalle }}</div>
                 <div class="field wide check-grid"><span class="group-label">{{ form.riesgo_tromboembolico.label }}</span><div class="field-help">Importante para valorar seguridad quirúrgica, especialmente en mujeres y cirugías mayores.</div>{{ form.riesgo_tromboembolico }}</div>
-                <div class="field wide"><label for="{{ form.riesgo_tromboembolico_otros.id_for_label }}">Otros:</label>{{ form.riesgo_tromboembolico_otros }}</div>
+                <div class="field wide riesgo-detail"><label for="{{ form.riesgo_tromboembolico_otros.id_for_label }}">Otros:</label>{{ form.riesgo_tromboembolico_otros }}</div>
             </div>
             <div class="step-actions">{% if omitir_pasos_iniciales and not form.formulario_paciente_existente %}<span></span>{% else %}<button class="btn-secondary prev-step" type="button">Atrás</button>{% endif %}<button class="btn-primary next-step" type="button">Continuar</button></div>
         </section>
 
         <section class="form-step" data-step="7" data-conditional-gine{% if form.formulario_paciente_existente %} data-optional-history-section{% endif %}>
-            <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 6 de 7{% else %}Paso 8 de 9{% endif %}</div><h2>Historia / Riesgo Ginecológico</h2><p class="step-copy">{% if form.formulario_paciente_existente %}Complete las preguntas que correspondan a su caso. Puede continuar sin responder este paso cuando no aplique.{% else %}Este paso se muestra únicamente cuando el paciente es mujer.{% endif %}</p>
+            <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 6 de 7{% else %}Paso 8 de 9{% endif %}</div><h2>Historia / Riesgo Ginecológico</h2><p class="step-copy">{% if form.negativas_explicitas and form.mostrar_ginecologia %}Responda cada pregunta o marque la declaración correspondiente a su caso.{% elif form.formulario_paciente_existente %}Complete las preguntas que correspondan a su caso. Puede continuar sin responder este paso cuando no aplique.{% else %}Este paso se muestra únicamente cuando el paciente es mujer.{% endif %}</p>
             <div class="field-grid">
                 {% for field in form %}{% if field.name == 'gine_menarca' or field.name == 'gine_gestas' or field.name == 'gine_partos' or field.name == 'gine_cesareas' or field.name == 'gine_abortos' or field.name == 'gine_ultima_menstruacion' %}<div class="field gine-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endif %}{% endfor %}
                 <div class="field check-grid gine-field"><span class="group-label">{{ form.gine_embarazada.label }}</span>{{ form.gine_embarazada }}</div>
@@ -214,7 +221,7 @@
                 <div class="field wide check-grid"><span class="group-label">{{ form.evaluacion_psicologica.label }}</span>{{ form.evaluacion_psicologica }}</div>
                 <div class="field wide evaluacion-otros-detail no-apply-ready"><label for="{{ form.evaluacion_psicologica_detalle.id_for_label }}">{{ form.evaluacion_psicologica_detalle.label }}</label>{{ form.evaluacion_psicologica_detalle }}{% for error in form.evaluacion_psicologica_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <div class="field wide check-grid decision-surgery-field"><span class="group-label">{{ form.decision_cirugia.label }}</span>{{ form.decision_cirugia }}</div>
-                <div class="field wide decision-surgery-field"><label for="{{ form.decision_cirugia_otros.id_for_label }}">Otros:</label>{{ form.decision_cirugia_otros }}</div>
+                <div class="field wide decision-surgery-field decision-other-detail"><label for="{{ form.decision_cirugia_otros.id_for_label }}">Otros:</label>{{ form.decision_cirugia_otros }}</div>
                 <div class="field wide consent"><label>{{ form.consentimiento_datos }}<span>{{ form.consentimiento_datos.label }}</span></label>{% for error in form.consentimiento_datos.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <p class="privacy field wide">Su informacion se incorpora al expediente clinico de {{ preconsulta.empresa.nombre }} y sera accesible unicamente para personal autorizado. No comparta este enlace con otras personas.</p>
             </div>
@@ -243,6 +250,8 @@
 (function(){
     const form=document.getElementById("preconsultaForm"),steps=[...document.querySelectorAll(".form-step")],bars=[...document.querySelectorAll(".progress span")];let current=Number("{{ inicio_paso|default:0 }}")||0;
     const existingPatientHistory={% if form.formulario_paciente_existente %}true{% else %}false{% endif %};
+    const explicitClinicalAnswers={% if form.negativas_explicitas %}true{% else %}false{% endif %};
+    const gynecologyApplicable={% if form.negativas_explicitas %}{% if form.mostrar_ginecologia == None %}null{% elif form.mostrar_ginecologia %}true{% else %}false{% endif %}{% else %}null{% endif %};
     const stepNumberOffset=existingPatientHistory?0:Math.max(0,(Number("{{ paso_numero_inicial|default:1 }}")||1)-1);
     const activityUrl="{{ registro_actividad_url|default:''|escapejs }}";
     let activityTimer=null,lastTrackedStep=0,activityOpened=false;
@@ -261,6 +270,7 @@
     function saveDraft(){
         try{
             const data={savedAt:Date.now(),fields:{}};
+            if(typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers)data.declarationVersion="1";
             serializableFields().forEach(input=>{
                 if(input.type==="checkbox"||input.type==="radio"){
                     if(!data.fields[input.name])data.fields[input.name]=[];
@@ -279,7 +289,11 @@
             if(!raw)return;
             const data=JSON.parse(raw);
             if(!data?.savedAt||Date.now()-data.savedAt>draftMaxAge){localStorage.removeItem(draftKey);return;}
+            const strict=typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers;
+            const compatibleDeclaration=!strict||data.declarationVersion==="1";
             serializableFields().forEach(input=>{
+                if(strict&&input.name.endsWith("version_declaracion"))return;
+                if(!compatibleDeclaration&&(input.dataset?.noApplyFor||((input.type==="checkbox"||input.type==="radio")&&isNoAplicaOption(input))))return;
                 if(!(input.name in data.fields))return;
                 const value=data.fields[input.name];
                 if(input.type==="checkbox"||input.type==="radio"){
@@ -294,13 +308,16 @@
     function refreshChecks(){document.querySelectorAll(".check-grid label,.radio-row label").forEach(label=>{const input=label.querySelector("input");label.classList.toggle("is-selected",!!input&&input.checked);});}
     function visibleSteps(){return steps.filter(step=>!step.hidden);}
     function updateStepNumbers(){const visibles=visibleSteps();bars.forEach((bar,index)=>bar.hidden=index>=visibles.length);document.querySelector(".progress").style.gridTemplateColumns=`repeat(${visibles.length},1fr)`;visibles.forEach((step,index)=>{const label=step.querySelector("[data-step-number]");if(label)label.textContent=`Paso ${index+1+stepNumberOffset} de ${visibles.length+stepNumberOffset}`;});}
-    function toggleGineFields(){const sexo=form.querySelector('[name="sexo"]');const mostrar=existingPatientHistory||sexo&&sexo.value==="femenino";const gineStep=form.querySelector("[data-conditional-gine]");if(gineStep)gineStep.hidden=!mostrar;document.querySelectorAll(".gine-field").forEach(field=>{field.hidden=!mostrar;field.querySelectorAll("input,select,textarea").forEach(input=>{input.disabled=!mostrar;if(!mostrar){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});updateStepNumbers();refreshChecks();}
+    function toggleGineFields(){const sexo=form.querySelector('[name="sexo"]');const strict=typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers;const applicability=typeof gynecologyApplicable!=="undefined"?gynecologyApplicable:null;const mostrar=strict&&applicability!==null?applicability:existingPatientHistory||sexo&&sexo.value==="femenino";const gineStep=form.querySelector("[data-conditional-gine]");if(gineStep)gineStep.hidden=!mostrar;document.querySelectorAll(".gine-field").forEach(field=>{field.hidden=!mostrar;field.querySelectorAll("input,select,textarea").forEach(input=>{input.disabled=!mostrar;if(!mostrar){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});updateStepNumbers();refreshChecks();}
     function toggleReferral(){const field=form.querySelector('[name="referido_por"]');const show=field&&field.value==="referencia";document.querySelectorAll(".referral-detail").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
     function toggleInformante(){const field=form.querySelector('[name="informante"]');const show=field&&field.value&&field.value!=="yo_mismo";document.querySelectorAll(".informante-detail").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
     function selectedMotivos(){const selected=new Set([...form.querySelectorAll('[name="motivo_categoria"]:checked')].map(input=>input.value));if(existingPatientHistory)form.querySelectorAll('[data-preserved-legacy] input[name="motivo_categoria"]').forEach(input=>selected.add(input.value));return selected;}
     function normalizeMotivoNoAplica(changed){if(!changed||changed.name!=="motivo_categoria")return;const noAplica=form.querySelector('[name="motivo_categoria"][value="no_aplica"]');if(!noAplica)return;if(changed.value==="no_aplica"&&changed.checked){form.querySelectorAll('[name="motivo_categoria"]').forEach(input=>{if(input!==noAplica)input.checked=false;});}else if(changed.checked){noAplica.checked=false;}}
     function isNoAplicaOption(input){
         if(!input)return false;
+        const strict=typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers;
+        const negativeValue=input.getAttribute?.("data-negativa-value");
+        if(strict&&negativeValue!=null)return input.value===negativeValue;
         const value=(input.value||"").toString().toLowerCase();
         const labelText=(input.closest("label")?.textContent||"").toLowerCase();
         return value==="no_aplica"||value.startsWith("no_aplica_")||labelText.includes("no aplica");
@@ -333,13 +350,33 @@
                 const inputs=[...scope.querySelectorAll(`input[name="${CSS.escape(name)}"]`)].filter(input=>input.type==="checkbox"||input.type==="radio");
                 const noAplicas=inputs.filter(isNoAplicaOption);
                 if(!noAplicas.length)return;
-                const locked=noAplicas.some(input=>input.checked);
+                const explicitNegative=explicitClinicalAnswers&&noAplicas.some(input=>input.getAttribute("data-negativa-value")!==null);
+                const conflictingRetry=explicitNegative&&!!form.querySelector?.(".error-summary")
+                    &&noAplicas.some(input=>input.checked)&&inputs.some(input=>!isNoAplicaOption(input)&&input.checked);
+                const locked=noAplicas.some(input=>input.checked)&&!conflictingRetry;
                 inputs.forEach(input=>{
                     if(isNoAplicaOption(input))return;
                     input.disabled=locked;
                     if(locked)input.checked=false;
                     input.closest("label")?.classList.toggle("is-disabled",locked);
+                    if(explicitNegative)input.closest("label")?.toggleAttribute("hidden",locked);
                 });
+                if(explicitNegative&&inputs.some(input=>input.type==="radio")){
+                    let change=scope.querySelector(`[data-change-negative-for="${CSS.escape(name)}"]`);
+                    if(!change){
+                        change=document.createElement("button");
+                        change.type="button";change.className="no-apply-toggle";
+                        change.dataset.changeNegativeFor=name;change.textContent="Cambiar respuesta";
+                        change.addEventListener("click",()=>{
+                            noAplicas.forEach(input=>{input.checked=false;});
+                            applyNoAplicaLocks(scope);refreshChecks();toggleConditionalDetails();
+                            saveDraftSoon();collectMissing(steps[current]);
+                            inputs.find(input=>!input.disabled)?.focus();
+                        });
+                        scope.appendChild(change);
+                    }
+                    change.hidden=!locked;
+                }
             });
         });
     }
@@ -348,7 +385,7 @@
     function toggleMamografiaFecha(){const show=[...form.querySelectorAll('[name="gine_mamografia"]:checked')].some(input=>input.value==="si");document.querySelectorAll(".mamografia-fecha").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
     function selectedValue(name,value){return [...form.querySelectorAll(`[name="${CSS.escape(name)}"]:checked`)].some(input=>input.value===value);}
     function normalizeSingleAnswer(changed){const singleNames=["antecedentes_hospitalarios","quirurgicos_operado","consumo_riesgo","dieta","ejercicio","gine_embarazada","gine_lactancia","gine_mamografia","evaluacion_psicologica"];if(!changed||!singleNames.includes(changed.name)||!changed.checked)return;form.querySelectorAll(`[name="${CSS.escape(changed.name)}"]`).forEach(input=>{if(input!==changed)input.checked=false;});}
-    function toggleDetail(selector,show){document.querySelectorAll(selector).forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show)input.value="";});});}
+    function toggleDetail(selector,show){document.querySelectorAll(selector).forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});}
     function toggleConditionalDetails(){
         const showHospitalarios=selectedValue("antecedentes_hospitalarios","si");
         document.querySelectorAll(".hospitalarios-detail").forEach(panel=>{panel.hidden=!showHospitalarios;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!showHospitalarios;if(!showHospitalarios){input.value="";}});});
@@ -359,20 +396,36 @@
         toggleDetail(".medicamentos-detail",selectedValue("medicamentos_respuesta","si"));
         toggleDetail(".consumo-riesgo-detail",selectedValue("consumo_riesgo","si"));
         toggleDetail(".evaluacion-otros-detail",selectedValue("evaluacion_psicologica","otros"));
+        if(explicitClinicalAnswers){
+            const selected=name=>[...form.querySelectorAll(`[name="${CSS.escape(name)}"]:checked`)].map(input=>input.value);
+            const altered=[...form.querySelectorAll('[name^="funcion_"]:checked')].some(input=>input.value==="alterada");
+            toggleDetail(".funciones-detail",altered);
+            toggleDetail(".familiares-detail",selected("antecedentes_familiares").some(value=>value!=="no_aplica"));
+            toggleDetail(".riesgo-detail",selected("riesgo_tromboembolico").some(value=>value!=="ninguno"));
+            toggleDetail(".decision-other-detail",selected("decision_cirugia").some(value=>value!=="no_decidido"));
+        }
     }
     function installNoAplicaControls(){
         document.querySelectorAll(".field").forEach(field=>{
             if(field.classList.contains("check-grid")||field.classList.contains("consent")||field.classList.contains("no-apply-ready"))return;
             const control=field.querySelector("textarea,input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='file'])");
-            if(!control||control.required||control.disabled||["date","time","datetime-local"].includes(control.type))return;
+            if(!control)return;
+            const strict=typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers;
+            const marker=control.getAttribute("data-no-aplica-name");
+            const needsExplicitAnswer=control.getAttribute("data-respuesta-explicita")==="true";
+            const clinicalStep=Number(control.closest?.("[data-step]")?.getAttribute?.("data-step"))>=3||control.name.endsWith("motivo_consulta");
+            if(strict&&clinicalStep&&!marker){if(needsExplicitAnswer)field.classList.add("needs-answer");return;}
+            if((control.required&&!(strict&&marker))||control.disabled||["date","time","datetime-local"].includes(control.type))return;
             field.classList.add("no-apply-ready","needs-answer");
             const label=document.createElement("label");
             label.className="no-apply-toggle";
-            const marker=control.getAttribute("data-no-aplica-name");
-            label.innerHTML='<input type="checkbox" data-no-apply-for="'+control.name+'"'+(marker?' name="'+marker+'" value="1"':'')+'><span>'+(marker?'No aplica':'Dejar en blanco')+'</span>';
+            const negativeLabel=strict&&marker?control.getAttribute("data-no-aplica-label"):null;
+            const text=negativeLabel||(marker?'No aplica':'Dejar en blanco');
+            const escapedText=text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+            label.innerHTML='<input type="checkbox" data-no-apply-for="'+control.name+'"'+(marker?' name="'+marker+'" value="1"':'')+'><span>'+escapedText+'</span>';
             field.appendChild(label);
             const toggle=label.querySelector("input");
-            if(marker&&(control.getAttribute("data-no-aplica-selected")==="true"||(control.value||"").trim().toLowerCase()==="no aplica")){
+            if(marker&&(control.getAttribute("data-no-aplica-selected")==="true"||(!strict&&(control.value||"").trim().toLowerCase()==="no aplica"))){
                 toggle.checked=true;updateNoApply(toggle);
             }
         });
@@ -384,7 +437,12 @@
         field.classList.toggle("no-apply-active",control.checked);
         control.closest(".no-apply-toggle")?.classList.toggle("is-selected",control.checked);
         const target=field.querySelector("textarea,input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='file'])");
-        if(target&&control.checked){target.value="";target.dispatchEvent(new Event("input",{bubbles:true}));}
+        const strict=typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers;
+        if(target&&strict&&target.getAttribute("data-no-aplica-name")){
+            target.hidden=control.checked;
+            target.disabled=control.checked||!!field.closest("[hidden]");
+            if(control.checked&&target.value){target.value="";target.dispatchEvent(new Event("input",{bubbles:true}));}
+        }else if(target&&control.checked){target.value="";target.dispatchEvent(new Event("input",{bubbles:true}));}
     }
     function clearNoAplicaOnInput(control){
         const toggle=control.closest(".field")?.querySelector("[data-no-apply-for]");
@@ -392,9 +450,13 @@
             toggle.checked=false;updateNoApply(toggle);
         }
     }
+    function syncExplicitNegativeTexts(){
+        if(typeof explicitClinicalAnswers==="undefined"||!explicitClinicalAnswers)return;
+        form.querySelectorAll("[data-no-apply-for]").forEach(updateNoApply);
+    }
     function show(index, options={}){
         if(steps[index]?.hidden){const visibles=visibleSteps(),actual=steps[current],pos=Math.max(0,visibles.indexOf(actual));index=steps.indexOf(visibles[Math.min(pos,visibles.length-1)]||visibles[0]);}
-        current=index;steps.forEach((step,i)=>step.classList.toggle("active",i===index));bars.forEach((bar,i)=>bar.classList.toggle("active",i<=index));refreshChecks();toggleGineFields();toggleReferral();toggleInformante();toggleProcedureGroups();toggleMamografiaFecha();toggleConditionalDetails();applyNoAplicaLocks(document);
+        current=index;steps.forEach((step,i)=>step.classList.toggle("active",i===index));bars.forEach((bar,i)=>bar.classList.toggle("active",i<=index));refreshChecks();toggleGineFields();toggleReferral();toggleInformante();toggleProcedureGroups();toggleMamografiaFecha();toggleConditionalDetails();applyNoAplicaLocks(document);syncExplicitNegativeTexts();
         const visibles=visibleSteps(),visibleIndex=visibles.indexOf(steps[index]);bars.forEach((bar,i)=>bar.classList.toggle("active",i<=visibleIndex&&i<visibles.length));
         const visibleStep=visibleIndex+1;trackActivity(visibleStep,!activityOpened||visibleStep>lastTrackedStep,activityOpened?"progreso":"apertura");activityOpened=true;lastTrackedStep=Math.max(lastTrackedStep,visibleStep);
         if(!options.keepScroll){window.scrollTo({top:0,behavior:"smooth"});}
@@ -429,7 +491,7 @@
     }
     function groupMissingRecord(group){
         const inputs=[...group.querySelectorAll('input[type="checkbox"],input[type="radio"]')].filter(input=>!input.disabled);
-        if(!inputs.some(input=>input.required))return null;
+        if(!inputs.some(input=>input.required||input.getAttribute?.("data-respuesta-explicita")==="true"))return null;
         if(!inputs.length||inputs.some(input=>input.checked))return null;
         return {element:inputs[0],label:fieldLabel(inputs[0]),message:"Seleccione al menos una opcion."};
     }
@@ -443,7 +505,7 @@
         if((input.type==="checkbox"||input.type==="radio")){
             const sameName=[...form.querySelectorAll(`input[name="${CSS.escape(input.name)}"]`)].filter(item=>!item.disabled&&isVisible(item.closest(".field,.check-grid,.consent")||item));
             if(sameName.length>1){
-                if(existingPatientHistory&&input.closest("[data-optional-history-section]"))return null;
+                if(existingPatientHistory&&input.closest("[data-optional-history-section]")&&!(explicitClinicalAnswers&&sameName.some(item=>item.getAttribute("data-respuesta-explicita")==="true")))return null;
                 if(sameName.some(item=>item.checked))return null;
                 return {element:sameName[0],label:fieldLabel(sameName[0]),message:"Seleccione al menos una opcion."};
             }
@@ -467,10 +529,12 @@
         const inScope=element=>!!element&&root.contains(element);
         root.querySelectorAll(".field.needs-answer").forEach(field=>{
             if(!isVisible(field)||isNoApplyChecked(field))return;
-            if(existingPatientHistory&&field.closest("[data-optional-history-section]"))return;
+            if(existingPatientHistory&&field.closest("[data-optional-history-section]")&&!(explicitClinicalAnswers&&field.querySelector('[data-respuesta-explicita="true"]')))return;
             const control=field.querySelector("textarea,input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='file'])");
-            if(control&&!control.disabled&&!(control.value||"").trim()){
-                addRecord(records,seen,control,fieldLabel(control),"Complete este campo o marque No aplica.");
+            const legacyOmission=explicitClinicalAnswers&&control?.getAttribute("data-respuesta-explicita")==="true"&&(control.value||"").trim().toLowerCase()==="no aplica";
+            if(control&&!control.disabled&&(!(control.value||"").trim()||legacyOmission)){
+                const message=explicitClinicalAnswers?"Responda esta pregunta o marque la declaración negativa indicada.":"Complete este campo o marque No aplica.";
+                addRecord(records,seen,control,fieldLabel(control),message);
             }
         });
         const hospitalariosDetalle=form.querySelector('[name="antecedentes_hospitalarios_detalle"]');
@@ -508,7 +572,7 @@
             const record=inputMissingRecord(input);
             if(record&&!seen.has(record.element.name)){seen.add(record.element.name);records.push(record);}
         });
-        root.querySelectorAll(".check-grid").forEach(group=>{
+        root.querySelectorAll(".check-grid,.radio-row").forEach(group=>{
             if(!isVisible(group))return;
             const record=groupMissingRecord(group);
             if(record&&!seen.has(record.element.name)){seen.add(record.element.name);records.push(record);}
@@ -612,7 +676,7 @@
         if(existingPatientHistory)form.querySelectorAll('button[type="submit"]').forEach(button=>button.disabled=false);
     });
     document.addEventListener("input",event=>{if(event.target.closest("#preconsultaForm")){clearNoAplicaOnInput(event.target);saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
-    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"],[name="diagnostico_medico"],[name="alergias_respuesta"],[name="medicamentos_respuesta"],[name="consumo_riesgo"],[name="evaluacion_psicologica"]'))toggleConditionalDetails();if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
+    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"],[name="diagnostico_medico"],[name="alergias_respuesta"],[name="medicamentos_respuesta"],[name="consumo_riesgo"],[name="evaluacion_psicologica"],[name="antecedentes_familiares"],[name="riesgo_tromboembolico"],[name="decision_cirugia"],[name^="funcion_"]'))toggleConditionalDetails();syncExplicitNegativeTexts();if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
     document.getElementById("missingModalClose")?.addEventListener("click",closeMissingModal);
     document.getElementById("missingModal")?.addEventListener("click",event=>{if(event.target.id==="missingModal")closeMissingModal();});
     window.addEventListener("error",()=>showTechnicalSupport("Sus respuestas siguen guardadas en este navegador. Si el problema continúa, contacte al admin DV Solutions."));

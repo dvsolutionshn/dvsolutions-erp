@@ -2133,8 +2133,10 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         omitir_pasos_iniciales=False,
         sin_datos_previos=False,
         formulario_paciente_existente=False,
+        negativas_explicitas=False,
         **kwargs,
     ):
+        self.negativas_explicitas = bool(negativas_explicitas and not modo_basico_paciente_nuevo)
         self.paciente = paciente
         self.empresa = empresa or getattr(paciente, "empresa", None)
         self.modo_basico_paciente_nuevo = modo_basico_paciente_nuevo
@@ -2343,6 +2345,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             if self.is_bound and valores == ["1"]:
                 self._campos_no_aplica.add(nombre)
                 campo.widget.attrs["data-no-aplica-selected"] = "true"
+        if self.negativas_explicitas:
+            from .preconsulta_negativas import configurar_negativas
+            configurar_negativas(self)
 
     @property
     def campos_administrativos_reintento(self):
@@ -2392,17 +2397,21 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        for campo in self._campos_no_aplica:
-            if campo not in self._errors:
-                cleaned_data[campo] = "No aplica"
-        if self.modo_basico_paciente_nuevo:
-            cleaned_data["consentimiento_datos"] = True
-        for campo, valor in self.CHECKBOX_DEFAULTS.items():
-            if campo in self.fields and not cleaned_data.get(campo):
-                cleaned_data[campo] = list(valor)
-        for campo, valor in self.TEXT_DEFAULTS.items():
-            if campo in self.fields and not (cleaned_data.get(campo) or "").strip():
-                cleaned_data[campo] = valor
+        if self.negativas_explicitas:
+            from .preconsulta_negativas import validar_negativas
+            validar_negativas(self, cleaned_data)
+        else:
+            for campo in self._campos_no_aplica:
+                if campo not in self._errors:
+                    cleaned_data[campo] = "No aplica"
+            if self.modo_basico_paciente_nuevo:
+                cleaned_data["consentimiento_datos"] = True
+            for campo, valor in self.CHECKBOX_DEFAULTS.items():
+                if campo in self.fields and not cleaned_data.get(campo):
+                    cleaned_data[campo] = list(valor)
+            for campo, valor in self.TEXT_DEFAULTS.items():
+                if campo in self.fields and not (cleaned_data.get(campo) or "").strip():
+                    cleaned_data[campo] = valor
         nombres = (cleaned_data.get("nombres") or "").strip()
         apellidos = (cleaned_data.get("apellidos") or "").strip()
         partes_nombre = nombres.split()
@@ -2491,7 +2500,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 if categoria in categorias_con_procedimiento
             ]
 
-        if not self.formulario_paciente_existente and cleaned_data.get("sexo") != "femenino":
+        if self.negativas_explicitas and self.mostrar_ginecologia is False:
+            pass  # Las respuestas heredadas de preguntas no mostradas se conservan en el JSON.
+        elif not self.formulario_paciente_existente and cleaned_data.get("sexo") != "femenino":
             for campo in [
                 "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos",
                 "gine_ultima_menstruacion", "gine_embarazada", "gine_lactancia",
@@ -2664,6 +2675,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         for campo in ["gine_mamografia_fecha"]:
             if datos["formulario_general"].get(campo):
                 datos["formulario_general"][campo] = datos["formulario_general"][campo].isoformat()
+        if self.negativas_explicitas:
+            from .preconsulta_negativas import guardar_negativas
+            return guardar_negativas(self, datos)
         return datos
 
     def save(self, commit=True):

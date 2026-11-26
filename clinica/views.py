@@ -526,9 +526,12 @@ def _etiquetas_seleccion(valores, choices):
 
 
 def _resumen_preconsulta(preconsulta):
+    from .preconsulta_lectura_negativas import respuestas_para_lectura, valor_modelo_para_lectura
+
     general = {}
     if isinstance(preconsulta.datos_generales, dict):
         general = preconsulta.datos_generales.get("formulario_general", {}) or {}
+    general = respuestas_para_lectura(preconsulta, general)
     return {
         "antecedentes_personales": _etiquetas_seleccion(
             preconsulta.antecedentes_personales,
@@ -539,7 +542,7 @@ def _resumen_preconsulta(preconsulta):
             MEDICAMENTOS_HABITUALES_CHOICES,
         ),
         "antecedentes_familiares": _etiquetas_seleccion(
-            preconsulta.antecedentes_familiares,
+            valor_modelo_para_lectura(preconsulta, "antecedentes_familiares", preconsulta.antecedentes_familiares),
             ANTECEDENTES_FAMILIARES_CHOICES,
         ),
         "general": general,
@@ -583,9 +586,12 @@ def _campo_lectura_preconsulta(general, etiqueta, campo, choices=None, tipo="tex
 
 def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
     from .preconsulta_respuestas import completar_secciones_preconsulta
+    from .preconsulta_lectura_negativas import respuestas_para_lectura, valor_modelo_para_lectura
+
     general = {}
     if isinstance(preconsulta.datos_generales, dict):
         general = preconsulta.datos_generales.get("formulario_general", {}) or {}
+    general = respuestas_para_lectura(preconsulta, general)
     secciones = [
         {
             "titulo": "1. Motivo y procedimientos de interés",
@@ -665,7 +671,7 @@ def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
             "titulo": "5. Familiares, ginecología y riesgos",
             "descripcion": "Antecedentes familiares y datos ginecológicos cuando aplican.",
             "campos": [
-                {"label": "Antecedentes familiares", "value": _etiquetas_seleccion(preconsulta.antecedentes_familiares, ANTECEDENTES_FAMILIARES_CHOICES), "type": "chips"},
+                {"label": "Antecedentes familiares", "value": _etiquetas_seleccion(valor_modelo_para_lectura(preconsulta, "antecedentes_familiares", preconsulta.antecedentes_familiares), ANTECEDENTES_FAMILIARES_CHOICES), "type": "chips"},
                 _campo_lectura_preconsulta(general, "Detalle familiares", "antecedentes_familiares_detalle"),
                 _campo_lectura_preconsulta(general, "Riesgo tromboembólico", "riesgo_tromboembolico", RIESGO_TROMBOEMBOLICO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle riesgo", "riesgo_tromboembolico_otros"),
@@ -700,9 +706,24 @@ def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
     secciones = completar_secciones_preconsulta(preconsulta, secciones)
     if not incluir_datos_generales:
         secciones = [seccion for seccion in secciones if seccion.get("clave") != "datos_generales"]
+    etiquetas_modelo = {
+        "Dieta": "dieta", "Ejercicio": "ejercicio",
+        "Hospitalizaciones, accidentes, fracturas o cirugías previas": "antecedentes_hospitalarios",
+    }
     for seccion in secciones:
+        resueltas = []
+        for campo in seccion["campos"]:
+            nombre = etiquetas_modelo.get(campo.get("label")) if campo else None
+            valor = getattr(preconsulta, nombre, None) if nombre else None
+            negativa = valor_modelo_para_lectura(preconsulta, nombre, valor) if nombre else valor
+            if negativa != valor:
+                campo = {**campo, "value": [negativa] if campo["type"] == "chips" else negativa}
+                if any(previo and previo.get("label") == campo["label"]
+                       and previo.get("value") in (negativa, [negativa]) for previo in resueltas):
+                    continue
+            resueltas.append(campo)
         seccion["campos"] = [
-            campo for campo in seccion["campos"]
+            campo for campo in resueltas
             if campo and campo.get("value") not in (None, "", [])
         ]
     return [seccion for seccion in secciones if seccion["campos"]]
@@ -4981,6 +5002,7 @@ def preconsulta_publica(request, token):
         omitir_pasos_iniciales=True,
         sin_datos_previos=preconsulta.sin_datos_previos,
         formulario_paciente_existente=True,
+        negativas_explicitas=True,
     )
     if request.method == "GET":
         preconsulta = registrar_actividad_preconsulta(preconsulta, "apertura")
@@ -5020,6 +5042,7 @@ def preconsulta_publica(request, token):
                     request.POST, request.FILES, instance=preconsulta, paciente=paciente,
                     empresa=preconsulta.empresa, omitir_pasos_iniciales=True,
                     sin_datos_previos=preconsulta.sin_datos_previos, formulario_paciente_existente=True,
+                    negativas_explicitas=True,
                 )
                 if form.is_valid():
                     form.cleaned_data.update(campos_heredados)
