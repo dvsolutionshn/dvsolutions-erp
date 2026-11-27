@@ -4,6 +4,7 @@
 {% block mobile_page_title %}Historial clínico{% endblock %}
 {% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
 {% block mobile_content %}
+{% include "clinica/includes/alerta_condiciones_paciente.html" %}
 <div class="mi-warning"><strong>Historial clínico del paciente</strong><p>Las respuestas recibidas se muestran en su sección y se conservan por fecha y cita. Las notas profesionales se registran por separado.</p></div>
 <nav class="mi-card" aria-label="Secciones del historial clínico"><h2>Secciones del historial</h2>
 {% if can_view_history %}<a class="mi-link" href="{{ app_patient_history_url }}&amp;seccion=motivo_consulta#motivo-consulta">Motivo de Consulta</a>{% endif %}

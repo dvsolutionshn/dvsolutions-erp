@@ -6,6 +6,7 @@
 {% block mobile_header_description %}<p>{{ paciente.expediente_codigo }}</p>{% endblock %}
 {% block mobile_header_actions %}{% if can_edit_patient or can_view_history or can_create_history or can_view_gastos %}<button type="button" class="mi-more" data-open-sheet="patientActionsSheet" aria-label="Más acciones del paciente"><b aria-hidden="true">⋮</b> Acciones</button>{% endif %}{% endblock %}
 {% block mobile_content %}
+{% include "clinica/includes/alerta_condiciones_paciente.html" %}
 {% if paciente.no_agendar %}
 <section class="mi-card mp-booking-restriction" role="alert">
   <span class="mp-restriction-badge">NO AGENDAR</span>

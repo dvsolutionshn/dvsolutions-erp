@@ -171,6 +171,7 @@
             {% if erp_access.ver_historia_clinica and paciente.es_alergico %}
             <div class="patient-alert" style="margin-top:12px;">Paciente alergico{% if paciente.alergias %}: {{ paciente.alergias }}{% endif %}</div>
             {% endif %}
+            {% include "clinica/includes/alerta_condiciones_paciente.html" %}
             {% if paciente.sexo_normalizado != "femenino" and paciente.sexo_normalizado != "masculino" %}
             <div class="patient-data-alert" role="alert">
                 <span>Debe modificar el sexo del paciente y seleccionar Femenino o Masculino.</span>

@@ -14,6 +14,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from . import test_mobile_general_history as datos_internos
 from . import test_preconsulta_paciente_existente as datos_publicos
 from .models import CitaClinica, Paciente, PreconsultaClinica
+from .test_preconsulta_pdf_datos import respuestas_pdf
 
 
 class CompletarConservaRespuestasTests(TestCase):
@@ -212,8 +213,7 @@ class CompletarConservaRespuestasTests(TestCase):
                     self.assertTrue(publico.vigente)
                     cliente_publico = Client()
                     self.assertContains(cliente_publico.get(enlace), "Motivo de Consulta")
-                    respuestas = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self)
-                    respuestas.update(version_declaracion="1", riesgo_tromboembolico=["ninguno"])
+                    respuestas = respuestas_pdf(datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self))
                     self.assertContains(cliente_publico.post(enlace, respuestas), "Información recibida")
                     publico.refresh_from_db()
                     self.assertEqual(publico.motivo_consulta, respuestas["motivo_consulta"])

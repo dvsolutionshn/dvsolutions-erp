@@ -26,6 +26,7 @@ from facturacion.models import Cliente, Producto
 from .forms import CitaClinicaForm, FUNCIONES_ORGANICAS_SISTEMAS, PreconsultaClinicaPublicaForm
 from .models import CitaClinica, ClasificacionAlopecia, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, ManualReceta, Paciente, PacienteFotoEvolucion, PlanTratamientoPaciente, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
 from .tokens import hash_token_preconsulta
+from .test_preconsulta_pdf_datos import respuestas_pdf
 
 
 class ClinicaPacienteTests(TestCase):
@@ -3144,7 +3145,7 @@ class ClinicaPacienteTests(TestCase):
 
         response = self.client.post(
             publica_url,
-            {
+            respuestas_pdf({
                 "version_declaracion": "1",
                 "nombres": "Nombre alterado",
                 "identidad": paciente.identidad,
@@ -3214,7 +3215,7 @@ class ClinicaPacienteTests(TestCase):
                 "alergias": "Penicilina",
                 "antecedentes_infecciosos": "COVID-19 en 2022",
                 "consentimiento_datos": "on",
-            },
+            }),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -3228,8 +3229,8 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(formulario_general["motivo_categoria"], ["cirugia_facial"])
         self.assertEqual(formulario_general["procedimientos_interes"], ["rinoplastia"])
         self.assertEqual(formulario_general["diagnostico_medico"], "si")
-        self.assertEqual(formulario_general["alergias_respuesta"], "si")
-        self.assertEqual(formulario_general["alergias_detalle"], "Alergia a penicilina")
+        self.assertEqual(formulario_general["alergias_farmacos_respuesta"], "si")
+        self.assertEqual(formulario_general["alergias_farmacos_detalle"], "Alergia a penicilina")
         self.assertEqual(formulario_general["medicamentos_respuesta"], "si")
         self.assertEqual(formulario_general["medicamentos_detalle"], "Anticonceptivos de uso diario")
         self.assertEqual(formulario_general["examen_peso"], "64")
@@ -3241,7 +3242,6 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(paciente.alergias, "Alergia de consulta anterior")
         self.assertEqual(paciente.medicamentos_actuales, "Medicamento de consulta anterior")
         self.assertEqual(paciente.antecedentes_medicos, "Antecedente de consulta anterior")
-        self.assertEqual(preconsulta.alergias, "Alergia a penicilina")
         self.assertEqual(preconsulta.medicamentos_habituales_detalle, "Anticonceptivos de uso diario")
         self.assertEqual(preconsulta.datos_generales["nombres"], "Nombre alterado")
         self.assertEqual(preconsulta.paciente_id, paciente.pk)
@@ -3299,7 +3299,7 @@ class ClinicaPacienteTests(TestCase):
         with patch.object(PreconsultaClinica, "save", autospec=True, side_effect=fallar_guardado_final):
             response = self.client.post(
                 reverse("clinica_preconsulta_publica", args=[token_raw]),
-                self._datos_formulario_general(
+                respuestas_pdf(self._datos_formulario_general(
                     version_declaracion="1",
                     antecedentes_infecciosos="",
                     no_aplica_antecedentes_infecciosos="1",
@@ -3312,7 +3312,7 @@ class ClinicaPacienteTests(TestCase):
                     apellidos="Error",
                     identidad="0801199600100",
                     telefono="99990010",
-                ),
+                )),
             )
 
         self.assertEqual(response.status_code, 200)

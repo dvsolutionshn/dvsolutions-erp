@@ -154,7 +154,8 @@
             <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 2 de 7{% else %}Paso 4 de 9{% endif %}</div><h2>Funciones orgánicas generales</h2><p class="step-copy">Marque si cada función está normal o alterada.</p>
             <div class="field-grid">
                 {% for field in form %}{% if field.name == 'funcion_apetito' or field.name == 'funcion_sueno' or field.name == 'funcion_sed' or field.name == 'funcion_miccion' or field.name == 'funcion_evacuaciones' %}<div class="field radio-row"><span class="group-label">{{ field.label }}</span>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
-                {% if form.formulario_paciente_existente %}<div class="field wide funciones-detail"><label for="{{ form.funciones_detalle.id_for_label }}">{{ form.funciones_detalle.label }}</label>{{ form.funciones_detalle }}{% for error in form.funciones_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}
+                {% if form.negativas_explicitas %}<div class="field wide radio-row"><span class="group-label">{{ form.funciones_otras_alteraciones.label }}</span>{{ form.funciones_otras_alteraciones }}{% for error in form.funciones_otras_alteraciones.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}
+                {% if form.formulario_paciente_existente or form.negativas_explicitas %}<div class="field wide funciones-detail"><label for="{{ form.funciones_detalle.id_for_label }}">{{ form.funciones_detalle.label }}</label>{{ form.funciones_detalle }}{% for error in form.funciones_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}
             </div>
             <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
         </section>
@@ -163,12 +164,21 @@
             <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 3 de 7{% else %}Paso 5 de 9{% endif %}</div><h2>Antecedentes médicos</h2><p class="step-copy">Indique si tiene condiciones diagnosticadas, alergias o medicamentos de uso habitual.</p>
             <div class="field-grid">
                 <div class="field wide radio-row"><span class="group-label">{{ form.diagnostico_medico.label }}</span>{{ form.diagnostico_medico }}</div>
+                {% if form.negativas_explicitas %}<div class="field wide check-grid condiciones-diagnosticadas"><span class="group-label">{{ form.condiciones_diagnosticadas.label }}</span>{{ form.condiciones_diagnosticadas }}{% for error in form.condiciones_diagnosticadas.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}
                 <div class="field wide diagnostico-medico-detail no-apply-ready"><label for="{{ form.diagnostico_medico_detalle.id_for_label }}">{{ form.diagnostico_medico_detalle.label }}</label>{{ form.diagnostico_medico_detalle }}{% for error in form.diagnostico_medico_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                {% if form.negativas_explicitas %}
+                <div class="field wide radio-row"><span class="group-label">{{ form.alergias_farmacos_respuesta.label }}</span>{{ form.alergias_farmacos_respuesta }}{% for error in form.alergias_farmacos_respuesta.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                <div class="field wide alergias-farmacos-detail no-apply-ready"><label for="{{ form.alergias_farmacos_detalle.id_for_label }}">{{ form.alergias_farmacos_detalle.label }}</label>{{ form.alergias_farmacos_detalle }}{% for error in form.alergias_farmacos_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                <div class="field wide radio-row"><span class="group-label">{{ form.alergias_alimentos_respuesta.label }}</span>{{ form.alergias_alimentos_respuesta }}{% for error in form.alergias_alimentos_respuesta.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                <div class="field wide alergias-alimentos-detail no-apply-ready"><label for="{{ form.alergias_alimentos_detalle.id_for_label }}">{{ form.alergias_alimentos_detalle.label }}</label>{{ form.alergias_alimentos_detalle }}{% for error in form.alergias_alimentos_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                {% else %}
                 <div class="field wide radio-row"><span class="group-label">{{ form.alergias_respuesta.label }}</span>{{ form.alergias_respuesta }}</div>
                 <div class="field wide alergias-detail no-apply-ready"><label for="{{ form.alergias_detalle.id_for_label }}">{{ form.alergias_detalle.label }}</label>{{ form.alergias_detalle }}{% for error in form.alergias_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                {% endif %}
                 <div class="field wide radio-row"><span class="group-label">{{ form.medicamentos_respuesta.label }}</span>{{ form.medicamentos_respuesta }}</div>
                 <div class="field wide medicamentos-detail no-apply-ready"><label for="{{ form.medicamentos_detalle.id_for_label }}">{{ form.medicamentos_detalle.label }}</label>{{ form.medicamentos_detalle }}{% for error in form.medicamentos_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
-                <div class="field wide"><label for="{{ form.antecedentes_infecciosos.id_for_label }}">{{ form.antecedentes_infecciosos.label }}</label>{{ form.antecedentes_infecciosos }}</div>
+                {% if form.negativas_explicitas %}<div class="field wide radio-row"><span class="group-label">{{ form.antecedentes_infecciosos_respuesta.label }}</span>{{ form.antecedentes_infecciosos_respuesta }}{% for error in form.antecedentes_infecciosos_respuesta.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}
+                <div class="field wide{% if form.negativas_explicitas %} infecciosos-detail no-apply-ready{% endif %}"><label for="{{ form.antecedentes_infecciosos.id_for_label }}">{{ form.antecedentes_infecciosos.label }}</label>{{ form.antecedentes_infecciosos }}{% for error in form.antecedentes_infecciosos.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
             </div>
             <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
         </section>
@@ -194,9 +204,9 @@
             <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 5 de 7{% else %}Paso 7 de 9{% endif %}</div><h2>Antecedentes familiares</h2><p class="step-copy">Los antecedentes familiares se refieren a familiares cercanos en orden de descendencia: abuelos, padre, madre y hermanos.</p>
             <div class="field-grid">
                 <div class="field wide check-grid"><span class="group-label">{{ form.antecedentes_familiares.label }} (abuelos, padre, madre y hermanos)</span>{{ form.antecedentes_familiares }}</div>
-                <div class="field wide familiares-detail"><label for="{{ form.antecedentes_familiares_detalle.id_for_label }}">Otros / detalle:</label>{{ form.antecedentes_familiares_detalle }}</div>
+                <div class="field wide familiares-detail"><label for="{{ form.antecedentes_familiares_detalle.id_for_label }}">Otros / detalle:</label>{{ form.antecedentes_familiares_detalle }}{% for error in form.antecedentes_familiares_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <div class="field wide check-grid"><span class="group-label">{{ form.riesgo_tromboembolico.label }}</span><div class="field-help">Importante para valorar seguridad quirúrgica, especialmente en mujeres y cirugías mayores.</div>{{ form.riesgo_tromboembolico }}</div>
-                <div class="field wide riesgo-detail"><label for="{{ form.riesgo_tromboembolico_otros.id_for_label }}">Otros:</label>{{ form.riesgo_tromboembolico_otros }}</div>
+                <div class="field wide riesgo-detail"><label for="{{ form.riesgo_tromboembolico_otros.id_for_label }}">Otros:</label>{{ form.riesgo_tromboembolico_otros }}{% for error in form.riesgo_tromboembolico_otros.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
             </div>
             <div class="step-actions">{% if omitir_pasos_iniciales and not form.formulario_paciente_existente %}<span></span>{% else %}<button class="btn-secondary prev-step" type="button">Atrás</button>{% endif %}<button class="btn-primary next-step" type="button">Continuar</button></div>
         </section>
@@ -204,7 +214,14 @@
         <section class="form-step" data-step="7" data-conditional-gine{% if form.formulario_paciente_existente %} data-optional-history-section{% endif %}>
             <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 6 de 7{% else %}Paso 8 de 9{% endif %}</div><h2>Historia / Riesgo Ginecológico</h2><p class="step-copy">{% if form.negativas_explicitas and form.mostrar_ginecologia %}Responda cada pregunta o marque la declaración correspondiente a su caso.{% elif form.formulario_paciente_existente %}Complete las preguntas que correspondan a su caso. Puede continuar sin responder este paso cuando no aplique.{% else %}Este paso se muestra únicamente cuando el paciente es mujer.{% endif %}</p>
             <div class="field-grid">
+                {% if form.negativas_explicitas %}
+                <div class="field gine-field"><label for="{{ form.gine_menarca.id_for_label }}">{{ form.gine_menarca.label }}</label>{{ form.gine_menarca }}{% for error in form.gine_menarca.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                <div class="field gine-field radio-row"><span class="group-label">{{ form.gine_gestas_respuesta.label }}</span>{{ form.gine_gestas_respuesta }}{% for error in form.gine_gestas_respuesta.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                {% for field in form %}{% if field.name == 'gine_partos' or field.name == 'gine_cesareas' or field.name == 'gine_abortos' %}<div class="field gine-field gestas-detail"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
+                <div class="field gine-field"><label for="{{ form.gine_ultima_menstruacion.id_for_label }}">{{ form.gine_ultima_menstruacion.label }}</label>{{ form.gine_ultima_menstruacion }}{% for error in form.gine_ultima_menstruacion.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                {% else %}
                 {% for field in form %}{% if field.name == 'gine_menarca' or field.name == 'gine_gestas' or field.name == 'gine_partos' or field.name == 'gine_cesareas' or field.name == 'gine_abortos' or field.name == 'gine_ultima_menstruacion' %}<div class="field gine-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endif %}{% endfor %}
+                {% endif %}
                 <div class="field check-grid gine-field"><span class="group-label">{{ form.gine_embarazada.label }}</span>{{ form.gine_embarazada }}</div>
                 <div class="field check-grid gine-field"><span class="group-label">{{ form.gine_lactancia.label }}</span>{{ form.gine_lactancia }}</div>
                 <div class="field check-grid gine-field"><span class="group-label">{{ form.gine_mamografia.label }}</span>{{ form.gine_mamografia }}</div>
@@ -214,14 +231,15 @@
         </section>
 
         <section class="form-step" data-step="8">
-            <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 7 de 7{% else %}Paso 9 de 9{% endif %}</div><h2>Evaluación psicológica y consentimiento</h2><p class="step-copy">Estas preguntas ayudan a acompañarle de forma segura y humana.</p>
+            <div class="step-kicker" data-step-number>{% if form.formulario_paciente_existente %}Paso 7 de 7{% else %}Paso 9 de 9{% endif %}</div><h2>{% if form.negativas_explicitas %}Decisión y consentimiento{% else %}Evaluación psicológica y consentimiento{% endif %}</h2><p class="step-copy">Estas preguntas ayudan a acompañarle de forma segura y humana.</p>
             <div class="field-grid">
                 <div class="step-tip">Responda con sinceridad. No hay respuestas buenas o malas; esta información ayuda al doctor a cuidar mejor su seguridad y expectativas.</div>
                 <div class="clinical-note"><strong>Importante</strong>El examen físico y la historia de la enfermedad actual detallada serán completados por el personal médico/enfermería durante la consulta.</div>
-                <div class="field wide check-grid"><span class="group-label">{{ form.evaluacion_psicologica.label }}</span>{{ form.evaluacion_psicologica }}</div>
+                {% if not form.negativas_explicitas %}<div class="field wide check-grid"><span class="group-label">{{ form.evaluacion_psicologica.label }}</span>{{ form.evaluacion_psicologica }}</div>
                 <div class="field wide evaluacion-otros-detail no-apply-ready"><label for="{{ form.evaluacion_psicologica_detalle.id_for_label }}">{{ form.evaluacion_psicologica_detalle.label }}</label>{{ form.evaluacion_psicologica_detalle }}{% for error in form.evaluacion_psicologica_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                {% endif %}
                 <div class="field wide check-grid decision-surgery-field"><span class="group-label">{{ form.decision_cirugia.label }}</span>{{ form.decision_cirugia }}</div>
-                <div class="field wide decision-surgery-field decision-other-detail"><label for="{{ form.decision_cirugia_otros.id_for_label }}">Otros:</label>{{ form.decision_cirugia_otros }}</div>
+                {% if not form.negativas_explicitas %}<div class="field wide decision-surgery-field decision-other-detail"><label for="{{ form.decision_cirugia_otros.id_for_label }}">Otros:</label>{{ form.decision_cirugia_otros }}</div>{% endif %}
                 <div class="field wide consent"><label>{{ form.consentimiento_datos }}<span>{{ form.consentimiento_datos.label }}</span></label>{% for error in form.consentimiento_datos.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <p class="privacy field wide">Su informacion se incorpora al expediente clinico de {{ preconsulta.empresa.nombre }} y sera accesible unicamente para personal autorizado. No comparta este enlace con otras personas.</p>
             </div>
@@ -270,7 +288,7 @@
     function saveDraft(){
         try{
             const data={savedAt:Date.now(),fields:{}};
-            if(typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers)data.declarationVersion="1";
+            if(typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers)data.declarationVersion="2";
             serializableFields().forEach(input=>{
                 if(input.type==="checkbox"||input.type==="radio"){
                     if(!data.fields[input.name])data.fields[input.name]=[];
@@ -290,7 +308,7 @@
             const data=JSON.parse(raw);
             if(!data?.savedAt||Date.now()-data.savedAt>draftMaxAge){localStorage.removeItem(draftKey);return;}
             const strict=typeof explicitClinicalAnswers!=="undefined"&&explicitClinicalAnswers;
-            const compatibleDeclaration=!strict||data.declarationVersion==="1";
+            const compatibleDeclaration=!strict||data.declarationVersion==="2";
             serializableFields().forEach(input=>{
                 if(strict&&input.name.endsWith("version_declaracion"))return;
                 if(!compatibleDeclaration&&(input.dataset?.noApplyFor||((input.type==="checkbox"||input.type==="radio")&&isNoAplicaOption(input))))return;
@@ -369,6 +387,7 @@
                         change.dataset.changeNegativeFor=name;change.textContent="Cambiar respuesta";
                         change.addEventListener("click",()=>{
                             noAplicas.forEach(input=>{input.checked=false;});
+                            clearConditionalRetry(name);
                             applyNoAplicaLocks(scope);refreshChecks();toggleConditionalDetails();
                             saveDraftSoon();collectMissing(steps[current]);
                             inputs.find(input=>!input.disabled)?.focus();
@@ -385,24 +404,37 @@
     function toggleMamografiaFecha(){const show=[...form.querySelectorAll('[name="gine_mamografia"]:checked')].some(input=>input.value==="si");document.querySelectorAll(".mamografia-fecha").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
     function selectedValue(name,value){return [...form.querySelectorAll(`[name="${CSS.escape(name)}"]:checked`)].some(input=>input.value===value);}
     function normalizeSingleAnswer(changed){const singleNames=["antecedentes_hospitalarios","quirurgicos_operado","consumo_riesgo","dieta","ejercicio","gine_embarazada","gine_lactancia","gine_mamografia","evaluacion_psicologica"];if(!changed||!singleNames.includes(changed.name)||!changed.checked)return;form.querySelectorAll(`[name="${CSS.escape(changed.name)}"]`).forEach(input=>{if(input!==changed)input.checked=false;});}
-    function toggleDetail(selector,show){document.querySelectorAll(selector).forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});}
+    function clearConditionalRetry(name){
+        if(!explicitClinicalAnswers)return;
+        const panels={diagnostico_medico:".condiciones-diagnosticadas,.diagnostico-medico-detail",condiciones_diagnosticadas:".diagnostico-medico-detail",alergias_farmacos_respuesta:".alergias-farmacos-detail",alergias_alimentos_respuesta:".alergias-alimentos-detail",antecedentes_infecciosos_respuesta:".infecciosos-detail",funciones_otras_alteraciones:".funciones-detail",antecedentes_familiares:".familiares-detail",riesgo_tromboembolico:".riesgo-detail",gine_gestas_respuesta:".gestas-detail",antecedentes_hospitalarios:".hospitalarios-detail",quirurgicos_operado:".quirurgicos-detail",medicamentos_respuesta:".medicamentos-detail",consumo_riesgo:".consumo-riesgo-detail"};
+        if(panels[name])document.querySelectorAll(panels[name]).forEach(panel=>panel.dataset.conditionalRetryResolved="true");
+    }
+    function toggleDetail(selector,show){
+        document.querySelectorAll(selector).forEach(panel=>{
+            const retryError=explicitClinicalAnswers&&!panel.dataset.conditionalRetryResolved&&!!form.querySelector(".error-summary")&&(!!panel.querySelector(".field-error")||(selector===".diagnostico-medico-detail"&&!!form.querySelector(".condiciones-diagnosticadas .field-error")));
+            const visible=show||retryError;
+            panel.hidden=!visible;
+            panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!visible;if(!visible){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});
+        });
+    }
     function toggleConditionalDetails(){
-        const showHospitalarios=selectedValue("antecedentes_hospitalarios","si");
-        document.querySelectorAll(".hospitalarios-detail").forEach(panel=>{panel.hidden=!showHospitalarios;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!showHospitalarios;if(!showHospitalarios){input.value="";}});});
-        const showQuirurgicos=selectedValue("quirurgicos_operado","si");
-        document.querySelectorAll(".quirurgicos-detail").forEach(panel=>{panel.hidden=!showQuirurgicos;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!showQuirurgicos;if(!showQuirurgicos){input.value="";}});});
-        toggleDetail(".diagnostico-medico-detail",selectedValue("diagnostico_medico","si"));
+        toggleDetail(".hospitalarios-detail",selectedValue("antecedentes_hospitalarios","si"));
+        toggleDetail(".quirurgicos-detail",selectedValue("quirurgicos_operado","si"));
+        const diagnosticDetail=selectedValue("diagnostico_medico","si")&&(!explicitClinicalAnswers||selectedValue("condiciones_diagnosticadas","otras")||selectedValue("condiciones_diagnosticadas","ninguna_anteriores"));
+        toggleDetail(".diagnostico-medico-detail",diagnosticDetail);
         toggleDetail(".alergias-detail",selectedValue("alergias_respuesta","si"));
         toggleDetail(".medicamentos-detail",selectedValue("medicamentos_respuesta","si"));
         toggleDetail(".consumo-riesgo-detail",selectedValue("consumo_riesgo","si"));
         toggleDetail(".evaluacion-otros-detail",selectedValue("evaluacion_psicologica","otros"));
         if(explicitClinicalAnswers){
-            const selected=name=>[...form.querySelectorAll(`[name="${CSS.escape(name)}"]:checked`)].map(input=>input.value);
-            const altered=[...form.querySelectorAll('[name^="funcion_"]:checked')].some(input=>input.value==="alterada");
-            toggleDetail(".funciones-detail",altered);
-            toggleDetail(".familiares-detail",selected("antecedentes_familiares").some(value=>value!=="no_aplica"));
-            toggleDetail(".riesgo-detail",selected("riesgo_tromboembolico").some(value=>value!=="ninguno"));
-            toggleDetail(".decision-other-detail",selected("decision_cirugia").some(value=>value!=="no_decidido"));
+            toggleDetail(".condiciones-diagnosticadas",selectedValue("diagnostico_medico","si"));
+            toggleDetail(".alergias-farmacos-detail",selectedValue("alergias_farmacos_respuesta","si"));
+            toggleDetail(".alergias-alimentos-detail",selectedValue("alergias_alimentos_respuesta","si"));
+            toggleDetail(".infecciosos-detail",selectedValue("antecedentes_infecciosos_respuesta","si"));
+            toggleDetail(".funciones-detail",selectedValue("funciones_otras_alteraciones","si"));
+            toggleDetail(".familiares-detail",selectedValue("antecedentes_familiares","otra"));
+            toggleDetail(".riesgo-detail",selectedValue("riesgo_tromboembolico","otros"));
+            toggleDetail(".gestas-detail",!form.querySelector('[data-conditional-gine]')?.hidden&&selectedValue("gine_gestas_respuesta","si"));
         }
     }
     function installNoAplicaControls(){
@@ -545,10 +577,29 @@
         if(selectedValue("quirurgicos_operado","si")&&inScope(quirurgicosDetalle)&&!(quirurgicosDetalle.value||"").trim()){
             addRecord(records,seen,quirurgicosDetalle,"Detalle de cirugias previas, plasticas u otras","Complete el detalle porque marco Si.");
         }
-        [["diagnostico_medico","diagnostico_medico_detalle","Detalle de condiciones diagnosticadas"],["alergias_respuesta","alergias_detalle","Detalle de alergias"],["medicamentos_respuesta","medicamentos_detalle","Detalle de medicamentos habituales"],["consumo_riesgo","consumo_riesgo_detalle","Indique qué consume"]].forEach(([respuesta,detalle,etiqueta])=>{
+        const conditionalTextPairs=[["alergias_respuesta","alergias_detalle","Detalle de alergias"],["medicamentos_respuesta","medicamentos_detalle","Detalle de medicamentos habituales"],["consumo_riesgo","consumo_riesgo_detalle","Indique qué consume"]];
+        if(explicitClinicalAnswers){
+            conditionalTextPairs.push(["alergias_farmacos_respuesta","alergias_farmacos_detalle","Detalle de alergias a medicamentos"],["alergias_alimentos_respuesta","alergias_alimentos_detalle","Detalle de alergias alimentarias"],["antecedentes_infecciosos_respuesta","antecedentes_infecciosos","Detalle de antecedentes infecciosos"],["funciones_otras_alteraciones","funciones_detalle","Detalle de otras alteraciones"]);
+        }else{
+            conditionalTextPairs.push(["diagnostico_medico","diagnostico_medico_detalle","Detalle de condiciones diagnosticadas"]);
+        }
+        conditionalTextPairs.forEach(([respuesta,detalle,etiqueta])=>{
             const control=form.querySelector(`[name="${detalle}"]`);
             if(selectedValue(respuesta,"si")&&inScope(control)&&!(control.value||"").trim())addRecord(records,seen,control,etiqueta,"Complete el detalle porque marcó Sí.");
         });
+        if(explicitClinicalAnswers){
+            const otherDetails=[["condiciones_diagnosticadas",["otras","ninguna_anteriores"],"diagnostico_medico_detalle","Describa la otra condición médica diagnosticada."],["antecedentes_familiares",["otra"],"antecedentes_familiares_detalle","Describa el otro antecedente familiar."],["riesgo_tromboembolico",["otros"],"riesgo_tromboembolico_otros","Describa el otro factor de riesgo."]];
+            otherDetails.forEach(([respuesta,values,detalle,message])=>{
+                const control=form.querySelector(`[name="${detalle}"]`);
+                if(values.some(value=>selectedValue(respuesta,value))&&inScope(control)&&!(control.value||"").trim())addRecord(records,seen,control,fieldLabel(control),message);
+            });
+            if(selectedValue("gine_gestas_respuesta","si")){
+                ["gine_partos","gine_cesareas","gine_abortos"].forEach(nombre=>{
+                    const control=form.querySelector(`[name="${nombre}"]`);
+                    if(inScope(control)&&!(control.value||"").trim())addRecord(records,seen,control,fieldLabel(control),"Indique la cantidad; escriba 0 si no ha ocurrido.");
+                });
+            }
+        }
         const evaluacionOtros=form.querySelector('[name="evaluacion_psicologica_detalle"]');
         if(selectedValue("evaluacion_psicologica","otros")&&inScope(evaluacionOtros)&&!(evaluacionOtros.value||"").trim())addRecord(records,seen,evaluacionOtros,"Especifique Otros","Complete el detalle porque seleccionó Otros.");
         const informante=form.querySelector('[name="informante"]'),informanteDetalle=form.querySelector('[name="informante_detalle"]');
@@ -676,7 +727,7 @@
         if(existingPatientHistory)form.querySelectorAll('button[type="submit"]').forEach(button=>button.disabled=false);
     });
     document.addEventListener("input",event=>{if(event.target.closest("#preconsultaForm")){clearNoAplicaOnInput(event.target);saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
-    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"],[name="diagnostico_medico"],[name="alergias_respuesta"],[name="medicamentos_respuesta"],[name="consumo_riesgo"],[name="evaluacion_psicologica"],[name="antecedentes_familiares"],[name="riesgo_tromboembolico"],[name="decision_cirugia"],[name^="funcion_"]'))toggleConditionalDetails();syncExplicitNegativeTexts();if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
+    document.addEventListener("change",event=>{clearConditionalRetry(event.target.name);if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"],[name="diagnostico_medico"],[name="condiciones_diagnosticadas"],[name="alergias_respuesta"],[name="alergias_farmacos_respuesta"],[name="alergias_alimentos_respuesta"],[name="antecedentes_infecciosos_respuesta"],[name="medicamentos_respuesta"],[name="consumo_riesgo"],[name="evaluacion_psicologica"],[name="antecedentes_familiares"],[name="riesgo_tromboembolico"],[name="decision_cirugia"],[name="funciones_otras_alteraciones"],[name="gine_gestas_respuesta"],[name^="funcion_"]'))toggleConditionalDetails();syncExplicitNegativeTexts();if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
     document.getElementById("missingModalClose")?.addEventListener("click",closeMissingModal);
     document.getElementById("missingModal")?.addEventListener("click",event=>{if(event.target.id==="missingModal")closeMissingModal();});
     window.addEventListener("error",()=>showTechnicalSupport("Sus respuestas siguen guardadas en este navegador. Si el problema continúa, contacte al admin DV Solutions."));

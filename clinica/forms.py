@@ -2157,7 +2157,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 campo: getattr(self.instance, campo, "")
                 for campo in [
                     "funciones_organicas", "funciones_detalle", "dieta", "ejercicio",
-                    "alergias", "medicamentos_habituales_detalle",
+                    "alergias", "medicamentos_habituales_detalle", "antecedentes_infecciosos",
+                    "antecedentes_familiares_detalle",
                 ]
             }
         if paciente is None:
@@ -2346,6 +2347,14 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 self._campos_no_aplica.add(nombre)
                 campo.widget.attrs["data-no-aplica-selected"] = "true"
         if self.negativas_explicitas:
+            # Incluso un enlace sin precarga conserva las respuestas antiguas
+            # de controles retirados o cuya estructura acaba de cambiar.
+            for nombre in (
+                "funciones_organicas", "funciones_detalle", "dieta", "ejercicio",
+                "alergias", "medicamentos_habituales_detalle",
+                "antecedentes_infecciosos", "antecedentes_familiares_detalle",
+            ):
+                self._valores_modelo_historicos[nombre] = getattr(self.instance, nombre, "")
             from .preconsulta_negativas import configurar_negativas
             configurar_negativas(self)
 
@@ -2450,13 +2459,15 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         cleaned_data["funciones_organicas"] = "alterada" if "alterada" in respuestas_funciones else "normal"
         alteradas = [etiqueta for campo, etiqueta in self.FUNCIONES_ORGANICAS_CAMPOS if cleaned_data.get(campo) == "alterada"]
         detalle_funciones = (cleaned_data.get("funciones_detalle") or "").strip()
-        cleaned_data["funciones_detalle"] = detalle_funciones or ", ".join(alteradas)
+        cleaned_data["funciones_detalle"] = detalle_funciones if self.negativas_explicitas else detalle_funciones or ", ".join(alteradas)
 
         for respuesta, detalle, mensaje in [
             ("diagnostico_medico", "diagnostico_medico_detalle", "Detalle las condiciones diagnosticadas por un médico."),
             ("alergias_respuesta", "alergias_detalle", "Detalle cuáles alergias tiene."),
             ("medicamentos_respuesta", "medicamentos_detalle", "Detalle cuáles medicamentos usa habitualmente."),
         ]:
+            if respuesta not in self.fields or (self.negativas_explicitas and respuesta == "diagnostico_medico"):
+                continue
             if cleaned_data.get(respuesta) == "si":
                 if not (cleaned_data.get(detalle) or "").strip():
                     self.add_error(detalle, mensaje)
@@ -2666,12 +2677,22 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                     formulario_previo["evaluacion_psicologica_detalle"],
                 )
         for campo in campos_generales:
+            if campo not in self.fields:
+                continue
             valor = self.cleaned_data.get(campo)
             if valor in (None, "", []):
                 formulario_actualizado.pop(campo, None)
             else:
                 formulario_actualizado[campo] = valor
         datos["formulario_general"] = formulario_actualizado
+        if self.negativas_explicitas:
+            from .preconsulta_mejoras_pdf import CAMPOS_NUEVOS
+            for campo in CAMPOS_NUEVOS:
+                valor = self.cleaned_data.get(campo)
+                if valor in (None, "", []):
+                    formulario_actualizado.pop(campo, None)
+                else:
+                    formulario_actualizado[campo] = valor
         for campo in ["gine_mamografia_fecha"]:
             if datos["formulario_general"].get(campo):
                 datos["formulario_general"][campo] = datos["formulario_general"][campo].isoformat()
@@ -2683,11 +2704,12 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     def save(self, commit=True):
         preconsulta = super().save(commit=False)
         if not self.modo_basico_paciente_nuevo:
-            preconsulta.alergias = (
-                (self.cleaned_data.get("alergias_detalle") or "").strip()
-                if self.cleaned_data.get("alergias_respuesta") == "si"
-                else ""
-            )
+            if not self.negativas_explicitas:
+                preconsulta.alergias = (
+                    (self.cleaned_data.get("alergias_detalle") or "").strip()
+                    if self.cleaned_data.get("alergias_respuesta") == "si"
+                    else ""
+                )
             preconsulta.medicamentos_habituales_detalle = (
                 (self.cleaned_data.get("medicamentos_detalle") or "").strip()
                 if self.cleaned_data.get("medicamentos_respuesta") == "si"

@@ -11,12 +11,13 @@ from core.models import Empresa, EmpresaModulo, Modulo, RegistroAuditoria, Usuar
 from .models import CitaClinica, HistoriaClinicaEspecialidad, Paciente, PreconsultaClinica
 from .preconsulta_control import estado_control_preconsulta
 from . import test_preconsulta_paciente_existente as datos_publicos
+from .test_preconsulta_pdf_datos import respuestas_pdf
 
 
 class HistoriaCompletaFlujoTests(TestCase):
     def respuestas(self):
         valores = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self)
-        return {**valores, "version_declaracion": "1", "riesgo_tromboembolico": ["ninguno"]}
+        return respuestas_pdf(valores)
 
     @classmethod
     def setUpTestData(cls):
@@ -83,16 +84,16 @@ class HistoriaCompletaFlujoTests(TestCase):
                 self.assertEqual(preconsulta.funciones_detalle, datos["funciones_detalle"])
                 self.assertEqual(preconsulta.antecedentes_familiares_detalle, datos["antecedentes_familiares_detalle"])
                 self.assertEqual(preconsulta.antecedentes_hospitalarios_detalle, datos["antecedentes_hospitalarios_detalle"])
-                self.assertEqual(preconsulta.alergias, datos["alergias_detalle"])
+                self.assertEqual(preconsulta.datos_generales["formulario_general"]["alergias_farmacos_detalle"], datos["alergias_farmacos_detalle"])
                 self.assertEqual(preconsulta.medicamentos_habituales_detalle, datos["medicamentos_detalle"])
                 general = preconsulta.datos_generales["formulario_general"]
-                for campo in ("gine_menarca", "gine_gestas", "gine_mamografia", "diagnostico_medico_detalle", "quirurgicos_detalle", "decision_cirugia", "evaluacion_psicologica_detalle"):
+                for campo in ("gine_menarca", "gine_gestas_respuesta", "gine_mamografia", "diagnostico_medico_detalle", "quirurgicos_detalle", "decision_cirugia"):
                     self.assertEqual(general[campo], datos[campo], campo)
 
                 detalle = reverse("clinica_preconsulta_detalle", args=[empresa.slug, paciente.pk, preconsulta.pk])
                 for app in ({}, {"app": "1"}):
                     original = self.client.get(detalle, app)
-                    for texto in (datos["motivo_consulta"], datos["funciones_detalle"], datos["alergias_detalle"], datos["medicamentos_detalle"], datos["quirurgicos_detalle"], datos["antecedentes_hospitalarios_detalle"], datos["gine_menarca"]):
+                    for texto in (datos["motivo_consulta"], datos["funciones_detalle"], datos["alergias_farmacos_detalle"], datos["medicamentos_detalle"], datos["quirurgicos_detalle"], datos["antecedentes_hospitalarios_detalle"], datos["gine_menarca"]):
                         self.assertContains(original, texto)
                     historial = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.pk])
                     motivo = self.client.get(historial, {**app, "seccion": "motivo_consulta"})
@@ -122,9 +123,9 @@ class HistoriaCompletaFlujoTests(TestCase):
         empresa, paciente, cita = self.casos[0]
         preconsulta, enlace = self.generar(empresa, paciente, cita)
         datos = self.respuestas()
-        rechazado = Client().post(enlace, {**datos, "alergias_detalle": ""})
+        rechazado = Client().post(enlace, {**datos, "alergias_farmacos_detalle": ""})
         self.assertContains(rechazado, datos["motivo_consulta"])
-        self.assertIn("alergias_detalle", rechazado.context["form"].errors)
+        self.assertIn("alergias_farmacos_detalle", rechazado.context["form"].errors)
         preconsulta.refresh_from_db()
         self.assertEqual(preconsulta.estado, "pendiente")
         self.assertIsNone(preconsulta.fecha_completada)
@@ -133,36 +134,33 @@ class HistoriaCompletaFlujoTests(TestCase):
 
     def test_negativas_explicitas_se_guardan_por_http_y_se_leen_en_las_cuatro_empresas(self):
         valores = {
-            "version_declaracion": "1", "motivo_consulta": "Actualización de antecedentes antes de la consulta",
+            "version_declaracion": "2", "motivo_consulta": "Actualización de antecedentes antes de la consulta",
             "funcion_apetito": "normal", "funcion_sueno": "normal", "funcion_sed": "normal",
             "funcion_miccion": "normal", "funcion_evacuaciones": "normal",
-            "diagnostico_medico": "no", "alergias_respuesta": "no", "medicamentos_respuesta": "no",
+            "diagnostico_medico": "no", "alergias_farmacos_respuesta": "no", "alergias_alimentos_respuesta": "no", "medicamentos_respuesta": "no",
             "antecedentes_hospitalarios": ["no"], "quirurgicos_operado": ["no"], "consumo_riesgo": ["no"],
             "dieta": ["no"], "ejercicio": ["no"], "antecedentes_familiares": ["no_aplica"],
-            "riesgo_tromboembolico": ["ninguno"], "evaluacion_psicologica": ["ninguna"],
+            "riesgo_tromboembolico": ["ninguno"], "funciones_otras_alteraciones": "no", "gine_gestas_respuesta": "no",
             "decision_cirugia": ["no_decidido"], "gine_embarazada": ["no"], "gine_lactancia": ["no"],
             "gine_mamografia": ["no"], "consentimiento_datos": "on",
-            "no_aplica_antecedentes_infecciosos": "1",
+            "antecedentes_infecciosos_respuesta": "no",
             **{f"no_aplica_{campo}": "1" for campo in (
-                "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion",
+                "gine_menarca", "gine_ultima_menstruacion",
             )},
         }
         for empresa, paciente, cita in self.casos:
             with self.subTest(empresa=empresa.slug):
                 paciente_anterior = Paciente.objects.values().get(pk=paciente.pk)
                 preconsulta, enlace = self.generar(empresa, paciente, cita)
-                self.assertContains(Client().get(enlace), 'name="version_declaracion" value="1"')
+                self.assertContains(Client().get(enlace), 'name="version_declaracion" value="2"')
                 respuesta = Client().post(enlace, valores)
                 self.assertContains(respuesta, "Información recibida")
                 preconsulta.refresh_from_db()
                 self.assertEqual(preconsulta.estado, "completada")
                 declaracion = preconsulta.datos_generales["negativas_explicitas"]
                 self.assertEqual(declaracion["version"], 1)
-                self.assertEqual(declaracion["respuestas"]["alergias_respuesta"], {
-                    "valor": "no", "texto": "Niego tener alergias",
-                })
+                self.assertEqual(declaracion["respuestas"]["alergias_farmacos_respuesta"]["valor"], "no")
                 self.assertEqual(declaracion["respuestas"]["antecedentes_familiares"]["valor"], "no_aplica")
-                self.assertEqual(preconsulta.antecedentes_infecciosos, "Niego antecedentes de enfermedades infecciosas, incluido COVID-19")
                 self.assertFalse(preconsulta.antecedentes_hospitalarios)
                 self.assertEqual(preconsulta.antecedentes_familiares, ["no_aplica"])
                 self.assertEqual(Paciente.objects.values().get(pk=paciente.pk), paciente_anterior)
@@ -172,8 +170,8 @@ class HistoriaCompletaFlujoTests(TestCase):
                     self.assertEqual(pagina.status_code, 200)
                     contenido = pagina.content.decode()
                     for texto in (
-                        "Niego tener alergias", "Niego antecedentes familiares de estas enfermedades",
-                        preconsulta.antecedentes_infecciosos,
+                        declaracion["respuestas"]["alergias_farmacos_respuesta"]["texto"], "Niego antecedentes familiares de estas enfermedades",
+                        declaracion["respuestas"]["antecedentes_infecciosos_respuesta"]["texto"],
                     ):
                         self.assertTrue(texto in contenido, f"No aparece la declaración {texto!r}, empresa={empresa.slug}, modo={modo}")
 
@@ -186,13 +184,13 @@ class HistoriaCompletaFlujoTests(TestCase):
                 historial = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.pk])
                 pantalla = self.client.get(historial, {"seccion": "especialidad", "tipo": "medicina_estetica"})
                 self.assertContains(pantalla, "Respuestas recibidas del paciente")
-                for campo in ("motivo_consulta", "funciones_detalle", "diagnostico_medico_detalle", "alergias_detalle", "medicamentos_detalle", "quirurgicos_detalle", "antecedentes_familiares_detalle", "evaluacion_psicologica_detalle"):
+                for campo in ("motivo_consulta", "funciones_detalle", "diagnostico_medico_detalle", "alergias_farmacos_detalle", "medicamentos_detalle", "quirurgicos_detalle", "antecedentes_familiares_detalle"):
                     self.assertContains(pantalla, datos[campo])
                 formulario = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.pk, "medicina_estetica"])
                 for modo in ({}, {"app": "1"}):
                     consulta = self.client.get(formulario, modo)
                     self.assertContains(consulta, "Respuestas recibidas del paciente")
-                    for campo in ("motivo_consulta", "funciones_detalle", "medicamentos_detalle", "antecedentes_familiares_detalle", "evaluacion_psicologica_detalle"):
+                    for campo in ("motivo_consulta", "funciones_detalle", "medicamentos_detalle", "antecedentes_familiares_detalle"):
                         self.assertContains(consulta, datos[campo])
                 self.assertFalse(HistoriaClinicaEspecialidad.objects.exists())
 

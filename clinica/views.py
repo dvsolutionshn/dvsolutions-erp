@@ -587,6 +587,7 @@ def _campo_lectura_preconsulta(general, etiqueta, campo, choices=None, tipo="tex
 def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
     from .preconsulta_respuestas import completar_secciones_preconsulta
     from .preconsulta_lectura_negativas import respuestas_para_lectura, valor_modelo_para_lectura
+    from .preconsulta_mejoras_pdf import CONDICIONES_DIAGNOSTICADAS_CHOICES
 
     general = {}
     if isinstance(preconsulta.datos_generales, dict):
@@ -615,6 +616,7 @@ def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
                 _campo_lectura_preconsulta(general, "Sed", "funcion_sed", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Micción", "funcion_miccion", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Evacuaciones", "funcion_evacuaciones", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Tiene alguna otra alteración", "funciones_otras_alteraciones", SI_NO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle histórico de funciones", "funciones_detalle_historico"),
             ],
         },
@@ -623,9 +625,15 @@ def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
             "descripcion": "Condiciones, alergias y tratamientos reportados.",
             "campos": [
                 _campo_lectura_preconsulta(general, "Condiciones diagnosticadas", "diagnostico_medico", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Condiciones médicas seleccionadas", "condiciones_diagnosticadas", CONDICIONES_DIAGNOSTICADAS_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle de condiciones diagnosticadas", "diagnostico_medico_detalle"),
+                _campo_lectura_preconsulta(general, "Detalle histórico de condiciones diagnosticadas", "diagnostico_medico_detalle_historico"),
                 _campo_lectura_preconsulta(general, "Tiene alergias", "alergias_respuesta", SI_NO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle de alergias", "alergias_detalle"),
+                _campo_lectura_preconsulta(general, "Alergias a medicamentos", "alergias_farmacos_respuesta", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle de alergias a medicamentos", "alergias_farmacos_detalle"),
+                _campo_lectura_preconsulta(general, "Alergias a alimentos", "alergias_alimentos_respuesta", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle de alergias a alimentos", "alergias_alimentos_detalle"),
                 _campo_lectura_preconsulta(general, "Usa medicamentos habitualmente", "medicamentos_respuesta", SI_NO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle de medicamentos habituales", "medicamentos_detalle"),
                 _campo_lectura_preconsulta(general, "Alergias y medicamentos (respuesta histórica)", "alergias_medicamentos", SI_NO_CHOICES, "chips"),
@@ -642,6 +650,8 @@ def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
                 {"label": "Medicamentos actuales", "value": _valor_preconsulta(general, "medicamentos_actuales_seleccion", MEDICAMENTOS_ACTUALES_CHOICES), "type": "chips"},
                 _campo_lectura_preconsulta(general, "Detalle medicamentos actuales", "medicamentos_actuales_otros"),
                 _campo_lectura_preconsulta(general, "Antecedentes infecciosos", "antecedentes_infecciosos"),
+                _campo_lectura_preconsulta(general, "Tiene antecedentes infecciosos", "antecedentes_infecciosos_respuesta", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Antecedentes infecciosos históricos", "antecedentes_infecciosos_historico"),
                 {"label": "Antecedentes infecciosos", "value": preconsulta.antecedentes_infecciosos, "type": "texto"},
                 _campo_lectura_preconsulta(general, "Hospitalizaciones o cirugías previas", "antecedentes_hospitalarios_detalle"),
             ],
@@ -673,13 +683,19 @@ def _secciones_preconsulta(preconsulta, *, incluir_datos_generales=True):
             "campos": [
                 {"label": "Antecedentes familiares", "value": _etiquetas_seleccion(valor_modelo_para_lectura(preconsulta, "antecedentes_familiares", preconsulta.antecedentes_familiares), ANTECEDENTES_FAMILIARES_CHOICES), "type": "chips"},
                 _campo_lectura_preconsulta(general, "Detalle familiares", "antecedentes_familiares_detalle"),
-                _campo_lectura_preconsulta(general, "Riesgo tromboembólico", "riesgo_tromboembolico", RIESGO_TROMBOEMBOLICO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle histórico de familiares", "antecedentes_familiares_detalle_historico"),
+                _campo_lectura_preconsulta(general, "Riesgo tromboembólico", "riesgo_tromboembolico", [*RIESGO_TROMBOEMBOLICO_CHOICES, ("otros", "Otros")], "chips"),
                 _campo_lectura_preconsulta(general, "Detalle riesgo", "riesgo_tromboembolico_otros"),
+                _campo_lectura_preconsulta(general, "Detalle histórico de riesgo", "riesgo_tromboembolico_otros_historico"),
                 _campo_lectura_preconsulta(general, "Menarca", "gine_menarca"),
-                _campo_lectura_preconsulta(general, "Gestas", "gine_gestas"),
+                _campo_lectura_preconsulta(general, "Gestas (respuesta histórica)" if general.get("gine_gestas_respuesta") else "Gestas", "gine_gestas"),
+                _campo_lectura_preconsulta(general, "Ha tenido embarazos", "gine_gestas_respuesta", SI_NO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Partos", "gine_partos"),
                 _campo_lectura_preconsulta(general, "Cesáreas", "gine_cesareas"),
                 _campo_lectura_preconsulta(general, "Abortos", "gine_abortos"),
+                _campo_lectura_preconsulta(general, "Partos (respuesta histórica)", "gine_partos_historico"),
+                _campo_lectura_preconsulta(general, "Cesáreas (respuesta histórica)", "gine_cesareas_historico"),
+                _campo_lectura_preconsulta(general, "Abortos (respuesta histórica)", "gine_abortos_historico"),
                 _campo_lectura_preconsulta(general, "Última menstruación", "gine_ultima_menstruacion"),
                 _campo_lectura_preconsulta(general, "Embarazada", "gine_embarazada", SI_NO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Lactancia", "gine_lactancia", SI_NO_CHOICES, "chips"),
@@ -1651,6 +1667,8 @@ def eliminar_paciente(request, empresa_slug, paciente_id):
 
 @login_required
 def paciente_detalle(request, empresa_slug, paciente_id):
+    from .preconsulta_alertas import alerta_condiciones_paciente
+
     empresa = _empresa_desde_slug(empresa_slug)
     if datos_paciente_limitados(request.user, empresa):
         raise PermissionDenied("No tiene permiso para consultar los datos generales del paciente.")
@@ -1704,6 +1722,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
         {
             "empresa": empresa,
             "paciente": paciente,
+            "alerta_condiciones": alerta_condiciones_paciente(request.user, empresa, paciente),
             "eventos": eventos,
             "citas": citas,
             "recordatorios_tratamiento": recordatorios_tratamiento,
@@ -3186,6 +3205,7 @@ def plan_tratamiento_crear_app(request, empresa_slug, paciente_id):
 def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     from .mobile_clinical_read_scope import validar_historias_lectura_app
     from .preconsulta_respuestas import registro_inicial_sin_historia
+    from .preconsulta_alertas import alerta_condiciones_paciente
 
     empresa = _empresa_desde_slug(empresa_slug)
     if not request.user.puede_acceder_empresa(empresa):
@@ -3821,6 +3841,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "historias": historias,
             "preconsultas": preconsultas,
             "bloques_preconsulta": bloques_preconsulta,
+            "alerta_condiciones": alerta_condiciones_paciente(request.user, empresa, paciente),
             "bloques_motivo": bloques_motivo,
             "bloques_antecedentes": bloques_antecedentes,
             "bloques_datos_generales": bloques_datos_generales,

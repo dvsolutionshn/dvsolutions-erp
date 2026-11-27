@@ -12,6 +12,7 @@ from django.utils import timezone
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from .models import CitaClinica, HistoriaClinicaEspecialidad, Paciente, PreconsultaClinica
 from . import test_preconsulta_paciente_existente as datos_publicos
+from .test_preconsulta_pdf_datos import respuestas_pdf
 
 
 class _PanelesRecibidos(HTMLParser):
@@ -69,10 +70,7 @@ class HistorialRespuestasSeccionesTests(TestCase):
     SECCIONES = ("motivo_consulta", "funciones_organicas", "examen_fisico", "antecedentes", "datos_generales")
 
     def respuestas_base(self):
-        return {
-            **datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self),
-            "version_declaracion": "1", "riesgo_tromboembolico": ["ninguno"],
-        }
+        return respuestas_pdf(datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self))
 
     @classmethod
     def setUpTestData(cls):
@@ -100,15 +98,13 @@ class HistorialRespuestasSeccionesTests(TestCase):
             "motivo_consulta": f"MOTIVO RECIBIDO {marca}",
             "funciones_detalle": f"FUNCIONES RECIBIDAS {marca}",
             "diagnostico_medico_detalle": f"CONDICIÓN RECIBIDA {marca}",
-            "alergias_detalle": f"ALERGIA RECIBIDA {marca}",
+            "alergias_farmacos_detalle": f"ALERGIA RECIBIDA {marca}",
             "medicamentos_detalle": f"MEDICACIÓN RECIBIDA {marca}",
             "antecedentes_hospitalarios_detalle": f"HOSPITALIZACIÓN RECIBIDA {marca}",
             "quirurgicos_detalle": f"CIRUGÍA RECIBIDA {marca}",
             "antecedentes_familiares_detalle": f"FAMILIARES RECIBIDOS {marca}",
             "consumo_riesgo_detalle": f"HÁBITOS RECIBIDOS {marca}",
             "gine_menarca": f"MENARCA RECIBIDA {marca}",
-            "evaluacion_psicologica_detalle": f"PSICOLOGÍA RECIBIDA {marca}",
-            "decision_cirugia_otros": f"DECISIÓN RECIBIDA {marca}",
             "examen_peso": f"MEDICIÓN RECIBIDA {marca}",
             "ocupacion": f"OFICIO DECLARADO {marca}",
         }
@@ -133,9 +129,9 @@ class HistorialRespuestasSeccionesTests(TestCase):
             "funciones_organicas": [campos["funciones_detalle"]],
             "examen_fisico": [campos["examen_peso"]],
             "antecedentes": [campos[campo] for campo in (
-                "diagnostico_medico_detalle", "alergias_detalle", "medicamentos_detalle",
+                "diagnostico_medico_detalle", "alergias_farmacos_detalle", "medicamentos_detalle",
                 "antecedentes_hospitalarios_detalle", "quirurgicos_detalle", "antecedentes_familiares_detalle",
-                "consumo_riesgo_detalle", "gine_menarca", "evaluacion_psicologica_detalle", "decision_cirugia_otros",
+                "consumo_riesgo_detalle", "gine_menarca",
             )],
             "datos_generales": [campos["ocupacion"]],
         }

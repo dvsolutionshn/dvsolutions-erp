@@ -1,0 +1,8 @@
+{% if alerta_condiciones %}
+<div role="alert" class="clinical-diagnosis-alert" style="margin:14px 0;padding:14px 16px;border:1px solid #f1b6bd;border-radius:14px;background:#fff1f2;color:#991b35;line-height:1.5;">
+    <strong>Alerta médica · Condiciones diagnosticadas</strong>
+    {% if alerta_condiciones.condiciones %}<div>{{ alerta_condiciones.condiciones|join:", " }}</div>{% endif %}
+    {% if alerta_condiciones.detalle %}<div>{{ alerta_condiciones.detalle|linebreaksbr }}</div>{% endif %}
+    {% if alerta_condiciones.fecha %}<small>Declaradas por el paciente el {{ alerta_condiciones.fecha|date:"d/m/Y H:i" }}.</small>{% endif %}
+</div>
+{% endif %}

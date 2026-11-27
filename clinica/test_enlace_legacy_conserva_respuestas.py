@@ -9,6 +9,7 @@ from django.urls import reverse
 from . import test_completar_conserva_respuestas as datos_internos
 from . import test_preconsulta_paciente_existente as datos_publicos
 from .models import Paciente, PreconsultaClinica
+from .test_preconsulta_pdf_datos import respuestas_pdf
 
 
 class EnlaceLegacyConservaRespuestasTests(TestCase):
@@ -51,7 +52,7 @@ class EnlaceLegacyConservaRespuestasTests(TestCase):
 
     def respuestas_publicas(self):
         valores = datos_publicos.FormularioHistoriaPacienteExistenteTests.respuestas(self)
-        return {**valores, "version_declaracion": "1", "riesgo_tromboembolico": ["ninguno"]}
+        return respuestas_pdf(valores)
 
     def test_enlaces_anteriores_guardan_los_campos_fuera_del_html_y_se_leen_en_historial(self):
         for empresa, paciente, _anterior, actual in self.casos:
@@ -91,9 +92,9 @@ class EnlaceLegacyConservaRespuestasTests(TestCase):
         registro, enlace = self.sembrar_enlace_heredado(empresa, paciente)
         datos = {**self.respuestas_publicas(), **{nombre: "" for nombre in (*self.COLUMNAS, *self.RESPUESTAS)}}
         publico = Client()
-        error = publico.post(enlace, {**datos, "alergias_detalle": ""})
+        error = publico.post(enlace, {**datos, "alergias_farmacos_detalle": ""})
         self.assertEqual(error.status_code, 200)
-        self.assertIn("alergias_detalle", error.context["form"].errors)
+        self.assertIn("alergias_farmacos_detalle", error.context["form"].errors)
         registro.refresh_from_db()
         self.assertEqual(registro.estado, "pendiente")
         for nombre, valor in self.COLUMNAS.items():
@@ -107,3 +108,23 @@ class EnlaceLegacyConservaRespuestasTests(TestCase):
         for nombre in self.RESPUESTAS:
             self.assertNotIn(nombre, registro.datos_generales["formulario_general"])
         self.assertEqual(PreconsultaClinica.objects.values().get(pk=actual.pk), otra_consulta)
+
+    def test_pdf_no_permite_sobrescribir_campos_retirados_con_peticion_manipulada(self):
+        empresa, paciente, _anterior, _actual = self.casos[0]
+        registro, enlace = self.sembrar_enlace_heredado(empresa, paciente)
+        retirados = {
+            "alergias_respuesta": "si", "alergias_detalle": "ALERGIA GENÉRICA HEREDADA",
+            "alergias_medicamentos_detalle": "CAMPO COMBINADO HEREDADO",
+            "gine_gestas": "3", "evaluacion_psicologica": ["otros"],
+            "evaluacion_psicologica_detalle": "RESPUESTA PSICOLÓGICA HEREDADA",
+            "decision_cirugia_otros": "DECISIÓN HEREDADA",
+        }
+        datos_anteriores = deepcopy(registro.datos_generales)
+        datos_anteriores["formulario_general"].update(retirados)
+        PreconsultaClinica.objects.filter(pk=registro.pk).update(alergias="ALERGIA GENÉRICA HEREDADA", datos_generales=datos_anteriores)
+        enviados = {**self.respuestas_publicas(), **{nombre: "INTENTO DE CAMBIO" for nombre in retirados}}
+        self.assertContains(Client().post(enlace, enviados), "Información recibida")
+        registro.refresh_from_db()
+        self.assertEqual(registro.alergias, "ALERGIA GENÉRICA HEREDADA")
+        for nombre, valor in retirados.items():
+            self.assertEqual(registro.datos_generales["formulario_general"][nombre], valor, nombre)

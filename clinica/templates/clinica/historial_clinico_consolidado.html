@@ -228,6 +228,7 @@
         </div>
     </header>
 
+    {% include "clinica/includes/alerta_condiciones_paciente.html" %}
     <section class="summary-dashboard" aria-label="Resumen operativo del paciente">
         {% if erp_access.ver_calendario %}<article class="summary-dashboard-card is-next">
             <div class="summary-dashboard-label"><span class="summary-dashboard-icon">01</span>Próxima cita</div>

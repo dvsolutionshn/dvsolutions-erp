@@ -10,6 +10,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario, Usu
 from crm.models import ConfiguracionCRM
 
 from .models import InvitacionRegistroPaciente, Paciente, PreconsultaClinica
+from .test_preconsulta_pdf_datos import respuestas_pdf
 
 
 class PermisosEnlacesPacientesTests(TestCase):
@@ -73,7 +74,7 @@ class PermisosEnlacesPacientesTests(TestCase):
                     self.assertContains(listado, "Enlace para paciente nuevo")
                     self.assertNotContains(listado, self.url("clinica_crear_paciente", slug=slug, app=app))
                     respuesta = self.client.get(self.url(expediente, paciente.pk, slug=slug, app=app))
-                    self.assertContains(respuesta, "Enviar historia clínica")
+                    self.assertContains(respuesta, "Enviar link para completar expediente")
 
                     historia = self.client.post(self.url("clinica_generar_enlace_preconsulta", paciente.pk, slug=slug, app=app))
                     self.assertContains(historia, "Compartir por WhatsApp")
@@ -130,7 +131,7 @@ class PermisosEnlacesPacientesTests(TestCase):
         generado = self.client.post(self.url("clinica_generar_enlace_preconsulta", self.paciente.pk))
         enlace = urlsplit(generado.context["enlace_publico"]).path
         anterior = (self.paciente.nombre, self.paciente.whatsapp, self.paciente.alergias)
-        respuestas = {
+        respuestas = respuestas_pdf({
             "version_declaracion": "1", "motivo_consulta": "Consulta de prueba",
             "antecedentes_hospitalarios": ["no"], "quirurgicos_operado": ["no"],
             "consumo_riesgo": ["no"], "dieta": ["no"], "ejercicio": ["no"],
@@ -147,7 +148,7 @@ class PermisosEnlacesPacientesTests(TestCase):
             "diagnostico_medico": "no", "alergias_respuesta": "si", "alergias_detalle": "Alergia reportada",
             "medicamentos_respuesta": "no", "consentimiento_datos": "on",
             **{f"funcion_{campo}": "normal" for campo in ("apetito", "sueno", "sed", "miccion", "evacuaciones")},
-        }
+        })
         publico = Client()
         rechazo = publico.post(enlace, {**respuestas, "identidad": "0801199900099"})
         self.assertIn("identidad", rechazo.context["form"].errors)
@@ -161,7 +162,7 @@ class PermisosEnlacesPacientesTests(TestCase):
         preconsulta.refresh_from_db()
         self.paciente.refresh_from_db()
         self.assertEqual(preconsulta.estado, "completada")
-        self.assertEqual(preconsulta.alergias, "Alergia reportada")
+        self.assertEqual(preconsulta.datos_generales["formulario_general"]["alergias_farmacos_detalle"], "Alergia reportada")
         self.assertEqual(preconsulta.datos_generales["nombres"], "Nombre actualizado")
         self.assertEqual((self.paciente.nombre, self.paciente.whatsapp, self.paciente.alergias), anterior)
 

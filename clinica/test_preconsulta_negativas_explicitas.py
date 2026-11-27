@@ -15,6 +15,7 @@ from django.test import SimpleTestCase
 from .forms import PreconsultaClinicaPublicaForm
 from .mobile_preconsultas import _secciones_seguras
 from . import test_preconsulta_paciente_existente as datos_publicos
+from .test_preconsulta_pdf_datos import respuestas_pdf
 from .views import _secciones_preconsulta
 
 
@@ -24,9 +25,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
         self.caso.setUp()
 
     def respuestas(self, **cambios):
-        valores = self.caso.respuestas()
-        valores["riesgo_tromboembolico"] = ["ninguno"]
-        valores["version_declaracion"] = "1"
+        valores = respuestas_pdf(self.caso.respuestas())
         valores.update(cambios)
         return valores
 
@@ -36,10 +35,10 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
 
     def test_no_se_inventan_respuestas_negativas_en_preguntas_sin_contestar(self):
         for nombre in (
-            "diagnostico_medico", "alergias_respuesta", "medicamentos_respuesta",
+            "diagnostico_medico", "alergias_farmacos_respuesta", "alergias_alimentos_respuesta", "medicamentos_respuesta",
             "antecedentes_hospitalarios", "quirurgicos_operado", "consumo_riesgo",
             "dieta", "ejercicio", "antecedentes_familiares", "riesgo_tromboembolico",
-            "evaluacion_psicologica",
+            "funciones_otras_alteraciones", "antecedentes_infecciosos_respuesta",
         ):
             with self.subTest(pregunta=nombre):
                 valores = self.respuestas()
@@ -48,7 +47,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
                 self.assertFalse(form.is_valid())
                 self.assertIn(nombre, form.errors)
 
-    def test_texto_infeccioso_vacio_requiere_respuesta_o_negativa_explicita(self):
+    def test_texto_infeccioso_vacio_requiere_detalle_si_contesta_si(self):
         form = self.formulario(self.respuestas(antecedentes_infecciosos=""))
         self.assertFalse(form.is_valid())
         self.assertIn("antecedentes_infecciosos", form.errors)
@@ -68,7 +67,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
                     self.assertEqual(recibido[nombre], valor)
                 self.assertEqual(self.caso.preconsulta.datos_generales["formulario_general"], historico)
 
-    def test_reintento_con_negativa_contradictoria_conserva_el_texto_visible(self):
+    def test_reintento_con_marcador_anterior_conserva_el_texto_visible(self):
         form = self.formulario(self.respuestas(no_aplica_antecedentes_infecciosos="1"))
         self.assertFalse(form.is_valid())
         self.assertNotEqual(form.fields["antecedentes_infecciosos"].widget.attrs.get("data-no-aplica-selected"), "true")
@@ -84,23 +83,21 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
         self.assertIn("funcion_sueno", form.errors)
 
     def test_negativa_infecciosa_se_adapta_y_se_guarda_en_el_expediente(self):
-        valores = self.respuestas(antecedentes_infecciosos="", no_aplica_antecedentes_infecciosos="1")
+        valores = self.respuestas(antecedentes_infecciosos="", antecedentes_infecciosos_respuesta="no")
         form = self.formulario(valores)
         self.assertTrue(form.is_valid(), form.errors.as_json())
-        etiqueta = form.fields["antecedentes_infecciosos"].widget.attrs["data-no-aplica-label"]
+        etiqueta = dict(form.fields["antecedentes_infecciosos_respuesta"].choices)["no"]
         self.assertIn("Niego", etiqueta)
         self.assertIn("infeccios", etiqueta.lower())
         self.assertIn("COVID", etiqueta)
         preconsulta = form.save(commit=False)
-        self.assertEqual(preconsulta.antecedentes_infecciosos, etiqueta)
-        self.assertEqual(form.cleaned_data["antecedentes_infecciosos"], etiqueta)
         declaracion = form.datos_generales_limpios()["negativas_explicitas"]
         self.assertEqual(declaracion["version"], 1)
-        self.assertEqual(declaracion["respuestas"]["antecedentes_infecciosos"]["texto"], etiqueta)
-        self.assertEqual(declaracion["respuestas"]["antecedentes_infecciosos"]["valor"], "niega")
+        self.assertEqual(declaracion["respuestas"]["antecedentes_infecciosos_respuesta"]["texto"], etiqueta)
+        self.assertEqual(declaracion["respuestas"]["antecedentes_infecciosos_respuesta"]["valor"], "no")
 
     def test_paginas_anteriores_sin_version_no_se_convierten_en_declaraciones(self):
-        for version in (None, "", "0", "2", ["1", "1"]):
+        for version in (None, "", "0", "1", ["2", "2"]):
             with self.subTest(version=version):
                 datos = QueryDict(mutable=True)
                 for nombre, valor in self.respuestas().items():
@@ -147,9 +144,9 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
 
     def test_un_si_no_puede_omitir_su_detalle_marcando_una_negativa(self):
         for detalle in (
-            "diagnostico_medico_detalle", "alergias_detalle", "medicamentos_detalle",
+            "diagnostico_medico_detalle", "alergias_farmacos_detalle", "medicamentos_detalle",
             "antecedentes_hospitalarios_detalle", "quirurgicos_detalle", "consumo_riesgo_detalle",
-            "evaluacion_psicologica_detalle",
+            "funciones_detalle",
         ):
             with self.subTest(detalle=detalle):
                 valores = self.respuestas(**{detalle: "", f"no_aplica_{detalle}": "1"})
@@ -159,7 +156,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
 
     def test_no_se_guardan_respuestas_positivas_y_negativas_contradictorias(self):
         casos = (
-            ({"alergias_respuesta": "no", "alergias_detalle": "Alergia a penicilina"}, "alergias_detalle"),
+            ({"alergias_farmacos_respuesta": "no", "alergias_farmacos_detalle": "Alergia a penicilina"}, "alergias_farmacos_detalle"),
             ({"antecedentes_familiares": ["no_aplica", "diabetes"]}, "antecedentes_familiares"),
             ({"consumo_riesgo": ["no", "si"]}, "consumo_riesgo"),
             ({"antecedentes_infecciosos": "COVID-19 en 2021", "no_aplica_antecedentes_infecciosos": "1"}, "antecedentes_infecciosos"),
@@ -171,9 +168,9 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
                 self.assertIn(campo, form.errors)
 
     def test_no_aplica_escrito_no_satisface_el_detalle_de_un_si(self):
-        form = self.formulario(self.respuestas(alergias_detalle="No aplica"))
+        form = self.formulario(self.respuestas(alergias_farmacos_detalle="No aplica"))
         self.assertFalse(form.is_valid())
-        self.assertIn("alergias_detalle", form.errors)
+        self.assertIn("alergias_farmacos_detalle", form.errors)
 
     def test_marcador_falso_o_repetido_no_declara_una_negativa(self):
         for valor in ("true", "0", "si", ["1", "1"]):
@@ -215,8 +212,8 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
         }
         form = self.formulario(sin_datos_previos=False)
         for campo in (
-            "diagnostico_medico", "alergias_respuesta", "medicamentos_respuesta", "consumo_riesgo",
-            "dieta", "ejercicio", "antecedentes_familiares", "riesgo_tromboembolico", "evaluacion_psicologica",
+            "diagnostico_medico", "alergias_farmacos_respuesta", "medicamentos_respuesta", "consumo_riesgo",
+            "dieta", "ejercicio", "antecedentes_familiares", "riesgo_tromboembolico",
         ):
             with self.subTest(pregunta=campo):
                 self.assertIn(form[campo].value(), (None, "", []))
@@ -224,7 +221,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
     def test_alternativas_negativas_tienen_textos_segun_la_pregunta(self):
         form = self.formulario()
         for campo, fragmento in (
-            ("diagnostico_medico", "diagnostic"), ("alergias_respuesta", "alerg"),
+            ("diagnostico_medico", "diagnostic"), ("alergias_farmacos_respuesta", "alerg"),
             ("medicamentos_respuesta", "medicamento"), ("antecedentes_hospitalarios", "hospital"),
             ("quirurgicos_operado", "cirug"), ("consumo_riesgo", "consum"),
             ("antecedentes_familiares", "familiar"),
@@ -246,7 +243,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
         self.assertFalse(any(nombre.startswith("gine_") for nombre in declaradas))
 
     def test_la_historia_femenina_debe_responder_las_preguntas_ginecologicas_visibles(self):
-        for campo in ("gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion"):
+        for campo in ("gine_menarca", "gine_gestas_respuesta", "gine_partos", "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion"):
             with self.subTest(pregunta=campo):
                 datos = self.respuestas(**{campo: ""})
                 form = self.formulario(datos)
@@ -255,7 +252,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
 
     def test_formulario_interno_conserva_el_contrato_anterior(self):
         form = self.caso.formulario(
-            self.respuestas(antecedentes_infecciosos="", no_aplica_antecedentes_infecciosos="1"),
+            {**self.caso.respuestas(), "antecedentes_infecciosos": "", "no_aplica_antecedentes_infecciosos": "1"},
             sin_datos_previos=True,
         )
         self.assertTrue(form.is_valid(), form.errors.as_json())
@@ -292,7 +289,7 @@ class NegativasExplicitasFormularioTests(SimpleTestCase):
 
             def handle_starttag(self, tag, attrs):
                 attrs = dict(attrs)
-                if tag in {"input", "textarea"} and attrs.get("name") == "antecedentes_infecciosos":
+                if tag in {"input", "textarea"} and attrs.get("name") == "gine_menarca":
                     self.atributos = attrs
 
         controles = Controles()
@@ -376,10 +373,10 @@ process.stdout.write(JSON.stringify({initial,marked,markedPayload,draft,restored
     def test_los_controles_ocultan_y_restauran_sin_perder_el_marcador_del_borrador(self):
         resultado = self.ejecutar_controles_js()
         self.assertFalse(resultado["initial"]["checked"])
-        self.assertIn("Niego", resultado["initial"]["label"])
+        self.assertIn("No he tenido", resultado["initial"]["label"])
         self.assertEqual(resultado["marked"], {"hidden": True, "disabled": True, "text": ""})
-        self.assertEqual(resultado["markedPayload"], [["no_aplica_antecedentes_infecciosos", "1"]])
-        self.assertEqual(resultado["draft"]["declarationVersion"], "1")
+        self.assertEqual(resultado["markedPayload"], [["no_aplica_gine_menarca", "1"]])
+        self.assertEqual(resultado["draft"]["declarationVersion"], "2")
         self.assertEqual(resultado["restored"], {
             "checked": True, "hidden": True, "disabled": True, "payload": resultado["markedPayload"],
         })
