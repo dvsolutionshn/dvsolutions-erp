@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}Historia clínica completa - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %}{% endblock %}
+{% block header_kicker %}Expediente{% if not erp_access.datos_paciente_limitados %} {{ paciente.expediente_codigo }}{% endif %} {% include "clinica/includes/estado_expediente_historia.html" %}{% endblock %}
 {% block header_title %}Historia clínica completa{% endblock %}
 {% block header_description %}Lectura y trabajo clínico en una sola hoja: datos generales, formularios completados y cuadros médicos por área sin salir del expediente.{% endblock %}
 {% block topbar_actions %}

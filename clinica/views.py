@@ -120,6 +120,10 @@ from .models import (
     asegurar_profesionales_agenda_base,
 )
 from .busqueda_pacientes import filtro_identidad_paciente
+from .historia_completitud import (
+    MENSAJE_HISTORIA_COMPLETA, anotar_estados_historia,
+    contexto_estado_historia, historia_general_completada,
+)
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from .mobile_patients import (
     autorizar_pacientes_app,
@@ -1095,7 +1099,7 @@ def pacientes(request, empresa_slug):
     q = (request.GET.get("q") or "").strip()
     if pacientes_solo_tarjetas(request.user, empresa):
         pacientes_qs = _buscar_tarjetas_pacientes(empresa, q).only(
-            "id", "nombre", "foto_perfil", "identidad", "fecha_nacimiento", "sexo",
+            "id", "empresa", "nombre", "foto_perfil", "identidad", "fecha_nacimiento", "sexo",
             "telefono", "whatsapp", "celular_2", "correo",
         )
         contexto = {
@@ -1104,6 +1108,7 @@ def pacientes(request, empresa_slug):
             "q": q,
             "vista_pacientes_solo_tarjetas": True,
         }
+        anotar_estados_historia(empresa, contexto["pacientes"])
         template = "clinica/pacientes.html"
         if es_pacientes_app(request, empresa):
             from crm.mobile_modules import inicio_app_disponible, url_modulos_app
@@ -1124,7 +1129,7 @@ def pacientes(request, empresa_slug):
 
     if datos_paciente_limitados(request.user, empresa):
         pacientes_qs = Paciente.objects.filter(empresa=empresa, activo=True).only(
-            "id", "nombre", "foto_perfil",
+            "id", "empresa", "nombre", "foto_perfil",
         ).order_by("nombre", "id")
         puede_buscar_identidad = request.user.tiene_permiso_erp("puede_buscar_pacientes_por_identidad", empresa)
         identidad = filtro_identidad_paciente(q) if puede_buscar_identidad else None
@@ -1134,6 +1139,7 @@ def pacientes(request, empresa_slug):
             if q:
                 pacientes_qs = pacientes_qs.filter(nombre__icontains=q)
             pacientes_lista = Paginator(pacientes_qs, 25).get_page(request.GET.get("page"))
+        anotar_estados_historia(empresa, pacientes_lista)
         respuesta = render_pacientes_app(request, empresa, "clinica/pacientes.html", "clinica/mobile_patient_list.html", {
             "empresa": empresa,
             "pacientes": pacientes_lista,
@@ -1179,6 +1185,7 @@ def pacientes(request, empresa_slug):
             paciente.iniciales = (iniciales or (paciente.nombre or "P")[:2]).upper()
     if es_pacientes_app(request, empresa):
         pacientes_lista = Paginator(pacientes_lista, 25).get_page(request.GET.get("page"))
+    anotar_estados_historia(empresa, pacientes_lista)
     return render_pacientes_app(request, empresa, "clinica/pacientes.html", "clinica/mobile_patient_list.html", {
         "empresa": empresa,
         "pacientes": pacientes_lista,
@@ -1723,6 +1730,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "empresa": empresa,
             "paciente": paciente,
             "alerta_condiciones": alerta_condiciones_paciente(request.user, empresa, paciente),
+            **contexto_estado_historia(empresa, paciente),
             "eventos": eventos,
             "citas": citas,
             "recordatorios_tratamiento": recordatorios_tratamiento,
@@ -3121,6 +3129,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "tipos": tipos,
             "preconsultas": preconsultas,
             **({"mobile_preconsulta_items": mobile_preconsulta_items} if modo_preconsulta_app else {}),
+            **contexto_estado_historia(empresa, paciente),
             **({"mobile_history_area": area_app} if area_app else {}),
             "mobile_history_notes": notas_historia_app(historias) if es_pacientes_app(request, empresa) else [],
         },
@@ -3842,6 +3851,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "preconsultas": preconsultas,
             "bloques_preconsulta": bloques_preconsulta,
             "alerta_condiciones": alerta_condiciones_paciente(request.user, empresa, paciente),
+            **contexto_estado_historia(empresa, paciente),
             "bloques_motivo": bloques_motivo,
             "bloques_antecedentes": bloques_antecedentes,
             "bloques_datos_generales": bloques_datos_generales,
@@ -4637,6 +4647,9 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
     tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Tipo de formulario de historia clinica no valido.")
+    if tipo == "general" and historia_general_completada(empresa, paciente):
+        messages.info(request, MENSAJE_HISTORIA_COMPLETA)
+        return redirect(_volver_desde_enlace(request, empresa, paciente))
     cita, seleccion = _cita_enlace_preconsulta(request, empresa, paciente, tipo)
     if seleccion is not None:
         return seleccion
@@ -4659,6 +4672,9 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
     token_raw, token_hash, token_preview = generar_token_preconsulta()
     with transaction.atomic():
         Paciente.objects.select_for_update().only("pk").get(pk=paciente.pk)
+        if tipo == "general" and historia_general_completada(empresa, paciente):
+            messages.info(request, MENSAJE_HISTORIA_COMPLETA)
+            return redirect(_volver_desde_enlace(request, empresa, paciente))
         pendientes = paciente.preconsultas.filter(empresa=empresa, cita=cita, estado="pendiente", tipo=tipo)
         if delegado:
             pendientes = pendientes.filter(sin_datos_previos=True)
@@ -4743,6 +4759,9 @@ def enviar_preconsulta_whatsapp(request, empresa_slug, paciente_id, preconsulta_
         not delegado and not _puede_enviar_preconsulta_heredada(request.user, empresa)
     ):
         raise PermissionDenied("No tiene permiso para enviar este formulario.")
+    if preconsulta.tipo == "general" and historia_general_completada(empresa, paciente):
+        messages.info(request, MENSAJE_HISTORIA_COMPLETA)
+        return redirect(_volver_desde_enlace(request, empresa, paciente))
     tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
     tipo_nombre = tipos_validos.get(preconsulta.tipo, preconsulta.get_tipo_display())
     enlace_publico = (request.POST.get("enlace_publico") or "").strip()
@@ -5009,7 +5028,9 @@ def preconsulta_publica(request, token):
         token_hash=hash_token_preconsulta(token),
         empresa__tipo_solucion="clinica",
     )
-    if preconsulta.estado == "completada":
+    if preconsulta.estado == "completada" or (
+        preconsulta.tipo == "general" and historia_general_completada(preconsulta.empresa, preconsulta.paciente)
+    ):
         return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
     if not preconsulta.vigente:
         return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": False}, status=410)
@@ -5035,6 +5056,8 @@ def preconsulta_publica(request, token):
                 preconsulta = PreconsultaClinica.objects.select_for_update().get(
                     pk=preconsulta.pk, empresa=preconsulta.empresa, paciente=paciente,
                 )
+                if preconsulta.tipo == "general" and historia_general_completada(preconsulta.empresa, paciente):
+                    return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
                 if not preconsulta.vigente:
                     completada = preconsulta.estado == "completada"
                     return render(
@@ -5134,7 +5157,9 @@ def preconsulta_actividad_publica(request, token):
             Q(cita__isnull=True) | Q(cita__empresa_id=F("empresa_id"), cita__paciente_id=F("paciente_id")),
         ), token_hash=hash_token_preconsulta(token), empresa__tipo_solucion="clinica",
     )
-    if not preconsulta.vigente:
+    if not preconsulta.vigente or (
+        preconsulta.tipo == "general" and historia_general_completada(preconsulta.empresa, preconsulta.paciente)
+    ):
         return JsonResponse({"ok": False}, status=410)
     evento = request.POST.get("evento") or "progreso"
     if evento not in {"apertura", "progreso"}:

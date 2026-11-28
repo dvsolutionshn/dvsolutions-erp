@@ -15,7 +15,7 @@
                         {% if paciente.foto_perfil %}<img src="{{ paciente.foto_perfil.url }}" alt="" loading="lazy">
                         {% else %}<span aria-hidden="true">{{ paciente.nombre|slice:':2'|upper }}</span>{% endif %}
                     </div>
-                    <div class="premium-patient-identity"><h3>{{ paciente.nombre }}</h3></div>
+                    <div class="premium-patient-identity"><h3>{{ paciente.nombre }}</h3>{% include "clinica/includes/estado_expediente_historia.html" with expediente_historia_estado=paciente.expediente_historia_estado expediente_historia_completo=paciente.expediente_historia_completo %}</div>
                 </div>
                 <div class="premium-patient-badges">
                     {% if paciente.identidad %}<span class="premium-patient-badge">ID {{ paciente.identidad }}</span>{% endif %}

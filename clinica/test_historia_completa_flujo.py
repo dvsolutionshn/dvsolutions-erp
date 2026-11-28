@@ -195,9 +195,9 @@ class HistoriaCompletaFlujoTests(TestCase):
                 self.assertFalse(HistoriaClinicaEspecialidad.objects.exists())
 
     def test_error_de_guardado_no_informa_exito_y_permite_reintentar(self):
-        empresa, paciente, cita = self.casos[0]
         guardar_original = PreconsultaClinica.save
-        for error in (ValidationError("Validación temporal de prueba"), RuntimeError("Fallo temporal de prueba")):
+        for indice, error in enumerate((ValidationError("Validación temporal de prueba"), RuntimeError("Fallo temporal de prueba"))):
+            empresa, paciente, cita = self.casos[indice]
             with self.subTest(error=type(error).__name__):
                 preconsulta, enlace = self.generar(empresa, paciente, cita)
 
@@ -236,7 +236,7 @@ class HistoriaCompletaFlujoTests(TestCase):
         for modo in ({}, {"app": "1"}):
             self.assertNotContains(self.client.get(crear, modo), "Respuesta de otra empresa QA")
 
-    def test_varias_citas_piden_elegir_y_conservan_respuestas_anteriores(self):
+    def test_varias_citas_piden_elegir_y_no_exigen_llenar_de_nuevo_historia_completa(self):
         empresa, paciente, cita = self.casos[0]
         segunda = CitaClinica.objects.create(empresa=empresa, paciente=paciente, fecha_hora=cita.fecha_hora + timezone.timedelta(days=5))
         seleccion = self.client.post(reverse("clinica_generar_enlace_preconsulta", args=[empresa.slug, paciente.pk]))
@@ -244,11 +244,13 @@ class HistoriaCompletaFlujoTests(TestCase):
         self.assertFalse(PreconsultaClinica.objects.exists())
         primera, enlace = self.generar(empresa, paciente, cita)
         self.assertContains(Client().post(enlace, self.respuestas()), "Información recibida")
-        siguiente, enlace_nuevo = self.generar(empresa, paciente, segunda)
-        self.assertContains(Client().post(enlace_nuevo, {**self.respuestas(), "motivo_consulta": "Motivo de la segunda consulta"}), "Información recibida")
+        siguiente = self.client.post(
+            reverse("clinica_generar_enlace_preconsulta", args=[empresa.slug, paciente.pk]),
+            {"cita_id": segunda.pk},
+        )
+        self.assertEqual(siguiente.status_code, 302)
         primera.refresh_from_db()
         self.assertEqual(primera.cita_id, cita.pk)
         self.assertEqual(primera.motivo_consulta, self.respuestas()["motivo_consulta"])
-        siguiente.refresh_from_db()
-        self.assertEqual(siguiente.cita_id, segunda.pk)
-        self.assertEqual(siguiente.motivo_consulta, "Motivo de la segunda consulta")
+        self.assertEqual(PreconsultaClinica.objects.filter(paciente=paciente).count(), 1)
+        self.assertEqual(CitaClinica.objects.filter(paciente=paciente).count(), 2)

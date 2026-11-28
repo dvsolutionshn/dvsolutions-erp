@@ -381,6 +381,7 @@
                     </div>
                     <div class="premium-patient-identity">
                         <h3 title="{{ paciente.nombre }}">{{ paciente.nombre }}</h3>
+                        {% include "clinica/includes/estado_expediente_historia.html" with expediente_historia_estado=paciente.expediente_historia_estado expediente_historia_completo=paciente.expediente_historia_completo %}
                         <p>{{ paciente.expediente_codigo }} · {% if paciente.edad is not None %}{{ paciente.edad }} años{% else %}Edad no indicada{% endif %}</p>
                     </div>
                     {% if paciente.no_agendar %}<span class="patient-restriction-badge">NO AGENDAR</span>{% else %}<span class="premium-patient-status">Activo</span>{% endif %}
@@ -484,6 +485,7 @@
                         <div class="patient-name-stack">
                             <strong><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">{{ paciente.primer_nombre|default:paciente.nombre }}{% if paciente.segundo_nombre %} {{ paciente.segundo_nombre }}{% endif %}</a></strong>
                             <span>{{ paciente.expediente_codigo }}</span>
+                            {% include "clinica/includes/estado_expediente_historia.html" with expediente_historia_estado=paciente.expediente_historia_estado expediente_historia_completo=paciente.expediente_historia_completo %}
                             {% if paciente.no_agendar %}<span class="patient-restriction-badge">NO AGENDAR</span>{% endif %}
                         </div>
                     </td>

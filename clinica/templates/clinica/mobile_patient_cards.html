@@ -34,6 +34,7 @@
             </div>
             <div class="mp-patient-copy">
                 <strong>{{ paciente.nombre }}</strong>
+                {% include "clinica/includes/estado_expediente_historia.html" with expediente_historia_estado=paciente.expediente_historia_estado expediente_historia_completo=paciente.expediente_historia_completo %}
                 {% if paciente.identidad %}<small>ID {{ paciente.identidad }}</small>{% endif %}
             </div>
         </div>

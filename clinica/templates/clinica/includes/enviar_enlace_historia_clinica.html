@@ -1,5 +1,7 @@
+{% if not expediente_historia_completo and not paciente.expediente_historia_completo %}
 <form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}"{% if clase_formulario %} class="{{ clase_formulario }}"{% endif %}>
     {% csrf_token %}
     {% if modo_app %}<input type="hidden" name="app" value="1">{% endif %}
     <button class="{{ clase_boton }}" type="submit">Enviar link para completar expediente</button>
 </form>
+{% endif %}

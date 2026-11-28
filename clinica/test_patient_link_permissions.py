@@ -48,7 +48,9 @@ class PermisosEnlacesPacientesTests(TestCase):
             rol = cls.roles["recepcion" if slug in {"medical_spa", "serviciosmedicos"} else "enfermeria"]
             UsuarioEmpresaPermiso.objects.create(usuario=cls.usuario, empresa=empresa, rol_sistema=rol)
             PreconsultaClinica.objects.create(
-                empresa=empresa, paciente=cls.pacientes[slug], tipo="general", estado="completada",
+                # Una nota de especialidad previa no equivale a completar
+                # la historia general que se solicita mediante este enlace.
+                empresa=empresa, paciente=cls.pacientes[slug], tipo="capilar", estado="completada",
                 token_hash=f"prueba-historia-previa-{slug}", fecha_expiracion=timezone.now() + timedelta(days=1),
                 motivo_consulta="Historia previa privada",
                 datos_generales={"formulario_general": {"procedimientos_interes_otros": "Procedimiento privado"}},
@@ -126,6 +128,32 @@ class PermisosEnlacesPacientesTests(TestCase):
         self.assert_denegado(self.client.post(especializado))
         self.assertEqual(PreconsultaClinica.objects.filter(estado="pendiente").count(), 1)
         self.assertEqual(InvitacionRegistroPaciente.objects.count(), 1)
+
+    def test_estado_completo_se_ve_sin_exponer_antecedentes_a_roles_de_envio(self):
+        for slug, empresa in self.empresas.items():
+            paciente = self.pacientes[slug]
+            PreconsultaClinica.objects.create(
+                empresa=empresa, paciente=paciente, tipo="general", estado="completada",
+                token_hash=f"prueba-general-completa-{slug}", fecha_expiracion=timezone.now() + timedelta(days=1),
+                fecha_completada=timezone.now(), motivo_consulta="Motivo confidencial no autorizado",
+                datos_generales={"formulario_general": {
+                    "diagnostico_medico": "si", "condiciones_diagnosticadas": ["vih"],
+                    "diagnostico_medico_detalle": "Detalle confidencial de antecedentes",
+                }},
+            )
+            vista = "clinica_paciente_expediente" if slug not in {"medical_spa", "serviciosmedicos"} else "clinica_paciente_detalle"
+            for app in (False, True):
+                with self.subTest(empresa=slug, app=app):
+                    pagina = self.client.get(self.url(vista, paciente.pk, slug=slug, app=app))
+                    self.assertContains(pagina, "Expediente completo")
+                    self.assertNotContains(pagina, "Enviar link para completar expediente")
+                    self.assertNotContains(pagina, "Motivo confidencial no autorizado")
+                    self.assertNotContains(pagina, "Detalle confidencial de antecedentes")
+                    self.assertNotContains(pagina, "VIH")
+                    cantidad = PreconsultaClinica.objects.filter(paciente=paciente).count()
+                    bloqueada = self.client.post(self.url("clinica_generar_enlace_preconsulta", paciente.pk, slug=slug, app=app))
+                    self.assertEqual(bloqueada.status_code, 302)
+                    self.assertEqual(PreconsultaClinica.objects.filter(paciente=paciente).count(), cantidad)
 
     def test_las_respuestas_nuevas_se_guardan_sin_sobrescribir_datos_del_paciente(self):
         generado = self.client.post(self.url("clinica_generar_enlace_preconsulta", self.paciente.pk))

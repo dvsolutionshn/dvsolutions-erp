@@ -13,7 +13,7 @@
 {% block content %}
 <section class="erp-card" style="display:flex;align-items:center;gap:16px;margin-bottom:18px">
     {% if paciente.foto_perfil %}<img src="{{ paciente.foto_perfil.url }}" width="64" height="64" alt="" style="object-fit:cover;border-radius:12px">{% endif %}
-    <h2>{{ paciente.nombre }}</h2>
+    <h2>{{ paciente.nombre }} {% include "clinica/includes/estado_expediente_historia.html" %}</h2>
 </section>
 <nav class="erp-grid" aria-label="Secciones del expediente">
     {% for accion in acciones_expediente %}

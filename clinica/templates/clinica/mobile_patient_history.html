@@ -2,7 +2,7 @@
 {% block mobile_title %}Historial clínico{% endblock %}
 {% block mobile_back_url %}{% if can_view_patient %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
 {% block mobile_page_title %}Historial clínico{% endblock %}
-{% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %}</p>{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }}{% if not erp_access.datos_paciente_limitados %} · {{ paciente.expediente_codigo }}{% endif %} {% include "clinica/includes/estado_expediente_historia.html" %}</p>{% endblock %}
 {% block mobile_content %}
 {% include "clinica/includes/alerta_condiciones_paciente.html" %}
 <div class="mi-warning"><strong>Historial clínico del paciente</strong><p>Las respuestas recibidas se muestran en su sección y se conservan por fecha y cita. Las notas profesionales se registran por separado.</p></div>

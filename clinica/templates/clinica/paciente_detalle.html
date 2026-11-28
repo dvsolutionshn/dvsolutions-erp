@@ -3,7 +3,7 @@
 
 {% block title %}{{ paciente.nombre }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
-{% block header_title %}{{ paciente.nombre }}{% endblock %}
+{% block header_title %}{{ paciente.nombre }} {% include "clinica/includes/estado_expediente_historia.html" %}{% endblock %}
 {% block header_description %}Datos principales, accesos clinicos y recordatorios de seguimiento del paciente.{% endblock %}
 
 {% block topbar_actions %}
@@ -162,7 +162,7 @@
         </div>
         <div>
             <div class="erp-kpi-label">Datos generales</div>
-            <h3 class="erp-panel-title" style="margin:6px 0 0;">{{ paciente.expediente_codigo }}</h3>
+            <h3 class="erp-panel-title" style="margin:6px 0 0;">{{ paciente.expediente_codigo }} {% include "clinica/includes/estado_expediente_historia.html" %}</h3>
             {% if not paciente.no_agendar %}
             {% if erp_access.restringir_citas_paciente or erp_access.habilitar_citas_paciente or erp_access.ver_motivo_restriccion_paciente %}
             <a class="erp-inline-link" href="{% url 'clinica_restringir_citas_paciente' empresa.slug paciente.id %}#historial-restricciones">Historial de restricciones de citas</a>

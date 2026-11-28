@@ -16,6 +16,7 @@ from crm.models import (
 
 from .mobile_patients import es_pacientes_app, notas_historia_app, render_pacientes_app
 from .models import HistoriaClinicaEspecialidad, Paciente
+from .historia_completitud import contexto_estado_historia
 
 
 SECCIONES = {
@@ -79,6 +80,7 @@ def expediente(request, empresa_slug, paciente_id):
     return _respuesta(request, empresa, "clinica/paciente_expediente.html", "clinica/mobile_patient_expediente.html", {
         "empresa": empresa,
         "paciente": paciente,
+        **contexto_estado_historia(empresa, paciente),
         "acciones_expediente": acciones,
         "pacientes_url": _url(request, empresa, "clinica_pacientes"),
     })

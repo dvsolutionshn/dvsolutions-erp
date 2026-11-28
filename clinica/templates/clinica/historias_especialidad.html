@@ -1,7 +1,7 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Historia clínica - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }} {% include "clinica/includes/estado_expediente_historia.html" %}{% endblock %}
 {% block header_title %}Historia clínica del paciente{% endblock %}
 {% block header_description %}Una sola hoja de trabajo para revisar formularios, leer notas y continuar alimentando cada área clínica sin perderse entre pantallas.{% endblock %}
 
@@ -93,10 +93,7 @@
             <strong>Historia clínica general del paciente</strong>
             <span>Formulario general de entrada y formularios enviados por área.</span>
         </div>
-        <form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}">
-            {% csrf_token %}
-            <button class="erp-btn" type="submit">Enviar formulario de historia clínica</button>
-        </form>
+        {% include "clinica/includes/enviar_enlace_historia_clinica.html" with clase_boton="erp-btn" %}
     </section>
 
     <section class="clinical-area-list">

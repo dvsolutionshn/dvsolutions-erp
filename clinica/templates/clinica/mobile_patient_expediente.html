@@ -6,7 +6,7 @@
 <section class="mi-card mp-profile">
   <div class="mp-profile-head">
     <div class="mp-avatar large">{% if paciente.foto_perfil %}<img src="{{ paciente.foto_perfil.url }}" alt="Fotografía del paciente">{% else %}{{ paciente.nombre|slice:':2'|upper }}{% endif %}</div>
-    <h2>{{ paciente.nombre }}</h2>
+    <h2>{{ paciente.nombre }} {% include "clinica/includes/estado_expediente_historia.html" %}</h2>
   </div>
 </section>
 {% if erp_access.enviar_enlace_historia_clinica %}

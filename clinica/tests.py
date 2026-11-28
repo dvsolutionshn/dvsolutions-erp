@@ -3091,8 +3091,10 @@ class ClinicaPacienteTests(TestCase):
             fecha_expiracion=timezone.now() + timezone.timedelta(days=30),
             fecha_completada=timezone.now(),
             datos_generales={
+                "formulario_general_pendiente_doctor": True,
                 "referido_por": "instagram",
                 "formulario_general": {
+                    "pendiente_doctor_desde_paso": 4,
                     "motivo_categoria": ["cirugia_facial"],
                     "procedimientos_interes": ["rinoplastia"],
                     "procedimientos_interes_otros": "Revision de cicatriz previa",
@@ -3248,6 +3250,7 @@ class ClinicaPacienteTests(TestCase):
         historia_anterior.refresh_from_db()
         self.assertEqual(historia_anterior.estado, "completada")
         self.assertEqual(historia_anterior.datos_generales["formulario_general"], {
+            "pendiente_doctor_desde_paso": 4,
             "motivo_categoria": ["cirugia_facial"],
             "procedimientos_interes": ["rinoplastia"],
             "procedimientos_interes_otros": "Revision de cicatriz previa",
