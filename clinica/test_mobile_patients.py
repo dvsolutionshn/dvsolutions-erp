@@ -372,25 +372,20 @@ class MobilePatientsIntegrationTests(TestCase):
         self.assertEqual(HistoriaClinicaEspecialidad.objects.get(paciente=self.paciente, tipo="capilar").motivo_consulta, "Consulta capilar existente")
 
     def test_event_uses_existing_form_scoped_relations_and_mobile_redirect(self):
-        profesional = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Profesional autorizado")
-        extranjero = ProfesionalSalud.objects.create(empresa=self.empresas["medical_spa"], nombre="Profesional otra empresa")
+        profesional = ProfesionalSalud.objects.create(empresa=self.empresa, usuario=self.usuario, nombre="Profesional autorizado")
+        extranjero = ProfesionalSalud.objects.create(empresa=self.empresas["medical_spa"], usuario=self.usuario, nombre="Profesional otra empresa")
         route = self.url("clinica_crear_evento_paciente", self.paciente)
         screen = self.client.get(route)
         self.assertIsInstance(screen.context["form"], ExpedienteEventoForm)
         self.assertEqual(list(screen.context["form"].fields["paciente"].queryset), [self.paciente])
-        self.assertEqual(list(screen.context["form"].fields["profesional"].queryset), [profesional])
-        data = {"app": "1", "paciente": self.paciente.pk, "profesional": extranjero.pk, "tipo": "nota",
+        self.assertNotIn("profesional", screen.context["form"].fields)
+        self.assertNotContains(screen, 'name="profesional"')
+        data = {"app": "1", "paciente": self.pacientes["medical_spa"].pk, "profesional": extranjero.pk, "tipo": "nota",
                 "fecha": timezone.localtime().strftime("%Y-%m-%dT%H:%M"), "titulo": "Nota móvil", "descripcion": "Trabajo clínico conservado"}
-        invalid = self.client.post(route, data)
-        self.assertEqual(invalid.status_code, 200)
-        self.assertIn("profesional", invalid.context["form"].errors)
-        self.assertContains(invalid, "Trabajo clínico conservado")
-        self.assertFalse(ExpedienteEvento.objects.exists())
-        data["profesional"] = profesional.pk
-        data["paciente"] = self.pacientes["medical_spa"].pk
         foreign_patient = self.client.post(route, data)
         self.assertEqual(foreign_patient.status_code, 200)
         self.assertIn("paciente", foreign_patient.context["form"].errors)
+        self.assertContains(foreign_patient, "Trabajo clínico conservado")
         self.assertFalse(ExpedienteEvento.objects.exists())
         data["paciente"] = self.paciente.pk
         response = self.client.post(route, data)
@@ -398,6 +393,7 @@ class MobilePatientsIntegrationTests(TestCase):
         evento = ExpedienteEvento.objects.get()
         self.assertEqual((evento.empresa_id, evento.paciente_id, evento.profesional_id, evento.creado_por_id),
                          (self.empresa.pk, self.paciente.pk, profesional.pk, self.usuario.pk))
+        self.assertNotEqual(evento.profesional_id, extranjero.pk)
         self.assertEqual(evento.descripcion, "Trabajo clínico conservado")
 
     def test_creator_only_success_stays_in_authorized_mobile_flow(self):
